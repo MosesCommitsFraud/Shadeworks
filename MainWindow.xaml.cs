@@ -265,7 +265,7 @@ public partial class MainWindow : Window
         {
             isPanning = true;
             lastMousePosition = e.GetPosition(ImageScrollViewer);
-            ImageScrollViewer.Cursor = Cursors.Hand;
+            ImageScrollViewer.Cursor = Cursors.SizeAll; // Grabbing hand cursor
             ImageScrollViewer.CaptureMouse();
             e.Handled = true;
         }
@@ -273,16 +273,35 @@ public partial class MainWindow : Window
 
     private void ImageScrollViewer_MouseMove(object sender, MouseEventArgs e)
     {
+        // Show hand cursor hint when hovering and middle button would work
+        if (!isPanning && originalImage != null)
+        {
+            if (e.MiddleButton == MouseButtonState.Pressed)
+            {
+                // Start panning if middle button is pressed during move
+                isPanning = true;
+                lastMousePosition = e.GetPosition(ImageScrollViewer);
+                ImageScrollViewer.Cursor = Cursors.SizeAll;
+                ImageScrollViewer.CaptureMouse();
+                e.Handled = true;
+            }
+        }
+
         if (isPanning && lastMousePosition.HasValue)
         {
             Point currentPosition = e.GetPosition(ImageScrollViewer);
             double deltaX = currentPosition.X - lastMousePosition.Value.X;
             double deltaY = currentPosition.Y - lastMousePosition.Value.Y;
 
-            ImageScrollViewer.ScrollToHorizontalOffset(ImageScrollViewer.HorizontalOffset - deltaX);
-            ImageScrollViewer.ScrollToVerticalOffset(ImageScrollViewer.VerticalOffset - deltaY);
+            // Smooth scrolling with live updates
+            double newHorizontalOffset = ImageScrollViewer.HorizontalOffset - deltaX;
+            double newVerticalOffset = ImageScrollViewer.VerticalOffset - deltaY;
+
+            ImageScrollViewer.ScrollToHorizontalOffset(newHorizontalOffset);
+            ImageScrollViewer.ScrollToVerticalOffset(newVerticalOffset);
 
             lastMousePosition = currentPosition;
+            e.Handled = true;
         }
     }
 
