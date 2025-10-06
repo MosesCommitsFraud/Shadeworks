@@ -8,7 +8,8 @@
         WindowStyle="None"
         AllowsTransparency="True"
         Background="Transparent"
-        ResizeMode="CanResize">
+        ResizeMode="CanResize"
+        Icon="Assets/logo-white.png">
     
     <Border Background="#1E1E1E" CornerRadius="12" BorderBrush="#2D2D30" BorderThickness="1">
         <Grid>
