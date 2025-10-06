@@ -210,14 +210,38 @@ public partial class MainWindow : Window
             e.Handled = true;
             System.Diagnostics.Debug.WriteLine("Alt key detected, zooming");
 
+            // Get mouse position relative to the image container
+            Point mousePos = e.GetPosition(ImageBorder);
+            
+            // Store old zoom
+            double oldZoom = zoomLevel;
+
             double zoomDelta = e.Delta > 0 ? ZoomIncrement : -ZoomIncrement;
             double newZoom = Math.Max(MinZoom, Math.Min(MaxZoom, zoomLevel + zoomDelta));
 
-            if (newZoom != zoomLevel)
+            if (newZoom != oldZoom)
             {
+                // Calculate the point in the image before zoom
+                double pointX = mousePos.X;
+                double pointY = mousePos.Y;
+                
                 zoomLevel = newZoom;
                 ImageScaleTransform.ScaleX = zoomLevel;
                 ImageScaleTransform.ScaleY = zoomLevel;
+                
+                // Force layout update
+                ImageScrollViewer.UpdateLayout();
+                
+                // Calculate how much the point has moved due to zoom
+                double zoomRatio = newZoom / oldZoom;
+                
+                // Adjust scroll to keep the same point under the mouse
+                double newOffsetX = ImageScrollViewer.HorizontalOffset * zoomRatio + pointX * (zoomRatio - 1);
+                double newOffsetY = ImageScrollViewer.VerticalOffset * zoomRatio + pointY * (zoomRatio - 1);
+                
+                ImageScrollViewer.ScrollToHorizontalOffset(newOffsetX);
+                ImageScrollViewer.ScrollToVerticalOffset(newOffsetY);
+                
                 System.Diagnostics.Debug.WriteLine($"Zoom level: {zoomLevel}");
                 UpdateZoomIndicator();
             }
@@ -233,14 +257,17 @@ public partial class MainWindow : Window
         ZoomIndicator.Visibility = Visibility.Collapsed;
     }
 
-    private void ImageScrollViewer_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+    private void ImageScrollViewer_MouseDown(object sender, MouseButtonEventArgs e)
     {
-        if (zoomLevel > 1.0)
+        // Middle mouse button always pans, left button only pans when zoomed
+        if (e.MiddleButton == MouseButtonState.Pressed || 
+            (e.LeftButton == MouseButtonState.Pressed && zoomLevel > 1.0))
         {
             isPanning = true;
             lastMousePosition = e.GetPosition(ImageScrollViewer);
             ImageScrollViewer.Cursor = Cursors.Hand;
             ImageScrollViewer.CaptureMouse();
+            e.Handled = true;
         }
     }
 
@@ -259,7 +286,7 @@ public partial class MainWindow : Window
         }
     }
 
-    private void ImageScrollViewer_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
+    private void ImageScrollViewer_MouseUp(object sender, MouseButtonEventArgs e)
     {
         if (isPanning)
         {
