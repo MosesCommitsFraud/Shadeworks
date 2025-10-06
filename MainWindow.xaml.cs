@@ -3,6 +3,7 @@ using System.IO;
 using System.Windows;
 using System.Windows.Input;
 using System.Windows.Media.Imaging;
+using System.Windows.Controls;
 
 namespace Shadeworks;
 
@@ -10,6 +11,13 @@ public partial class MainWindow : Window
 {
     private BitmapImage? originalImage;
     private ImageProcessor? processor;
+    private double zoomLevel = 1.0;
+    private const double ZoomIncrement = 0.1;
+    private const double MinZoom = 0.1;
+    private const double MaxZoom = 10.0;
+    private Point? lastMousePosition;
+    private bool isPanning = false;
+    private bool isProcessing = false;
 
     public MainWindow()
     {
@@ -58,6 +66,7 @@ public partial class MainWindow : Window
                 originalImage = new BitmapImage(new Uri(openFileDialog.FileName));
                 processor = new ImageProcessor(originalImage);
                 PlaceholderText.Visibility = Visibility.Collapsed;
+                ResetZoom();
                 ProcessImage();
             }
             catch (Exception ex)
@@ -121,6 +130,7 @@ public partial class MainWindow : Window
 
     private void ImageParameter_Changed(object sender, RoutedEventArgs e)
     {
+        System.Diagnostics.Debug.WriteLine("ImageParameter_Changed called");
         ProcessImage();
     }
 
@@ -137,8 +147,16 @@ public partial class MainWindow : Window
 
     private async void ProcessImage()
     {
-        if (processor == null || originalImage == null)
+        System.Diagnostics.Debug.WriteLine($"ProcessImage called. Processor null? {processor == null}, Image null? {originalImage == null}, IsProcessing? {isProcessing}");
+        
+        if (processor == null || originalImage == null || isProcessing)
+        {
+            System.Diagnostics.Debug.WriteLine("ProcessImage exited early");
             return;
+        }
+
+        isProcessing = true;
+        System.Diagnostics.Debug.WriteLine("Starting image processing...");
 
         try
         {
@@ -155,13 +173,111 @@ public partial class MainWindow : Window
                 Invert = InvertCheckBox.IsChecked == true
             };
 
+            System.Diagnostics.Debug.WriteLine($"Settings: Brightness={settings.Brightness}, Contrast={settings.Contrast}");
+
             var processed = await Task.Run(() => processor.Process(settings));
-            ImagePreview.Source = processed;
+            
+            System.Diagnostics.Debug.WriteLine("Processing complete, updating UI");
+            
+            Dispatcher.Invoke(() =>
+            {
+                ImagePreview.Source = processed;
+                System.Diagnostics.Debug.WriteLine("Image source updated");
+            });
         }
         catch (Exception ex)
         {
-            MessageBox.Show($"Error processing image: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            System.Diagnostics.Debug.WriteLine($"Error: {ex.Message}\n{ex.StackTrace}");
+            Dispatcher.Invoke(() =>
+            {
+                MessageBox.Show($"Error processing image: {ex.Message}\n\nStack trace:\n{ex.StackTrace}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            });
         }
+        finally
+        {
+            isProcessing = false;
+            System.Diagnostics.Debug.WriteLine("ProcessImage finished");
+        }
+    }
+
+    private void ImageScrollViewer_MouseWheel(object sender, MouseWheelEventArgs e)
+    {
+        System.Diagnostics.Debug.WriteLine($"MouseWheel: Delta={e.Delta}, Modifiers={Keyboard.Modifiers}");
+        
+        // Check if Alt key is pressed for zooming
+        if (Keyboard.Modifiers == ModifierKeys.Alt)
+        {
+            e.Handled = true;
+            System.Diagnostics.Debug.WriteLine("Alt key detected, zooming");
+
+            double zoomDelta = e.Delta > 0 ? ZoomIncrement : -ZoomIncrement;
+            double newZoom = Math.Max(MinZoom, Math.Min(MaxZoom, zoomLevel + zoomDelta));
+
+            if (newZoom != zoomLevel)
+            {
+                zoomLevel = newZoom;
+                ImageScaleTransform.ScaleX = zoomLevel;
+                ImageScaleTransform.ScaleY = zoomLevel;
+                System.Diagnostics.Debug.WriteLine($"Zoom level: {zoomLevel}");
+                UpdateZoomIndicator();
+            }
+        }
+    }
+
+    private async void UpdateZoomIndicator()
+    {
+        ZoomText.Text = $"{(int)(zoomLevel * 100)}%";
+        ZoomIndicator.Visibility = Visibility.Visible;
+        
+        await Task.Delay(1000);
+        ZoomIndicator.Visibility = Visibility.Collapsed;
+    }
+
+    private void ImageScrollViewer_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+    {
+        if (zoomLevel > 1.0)
+        {
+            isPanning = true;
+            lastMousePosition = e.GetPosition(ImageScrollViewer);
+            ImageScrollViewer.Cursor = Cursors.Hand;
+            ImageScrollViewer.CaptureMouse();
+        }
+    }
+
+    private void ImageScrollViewer_MouseMove(object sender, MouseEventArgs e)
+    {
+        if (isPanning && lastMousePosition.HasValue)
+        {
+            Point currentPosition = e.GetPosition(ImageScrollViewer);
+            double deltaX = currentPosition.X - lastMousePosition.Value.X;
+            double deltaY = currentPosition.Y - lastMousePosition.Value.Y;
+
+            ImageScrollViewer.ScrollToHorizontalOffset(ImageScrollViewer.HorizontalOffset - deltaX);
+            ImageScrollViewer.ScrollToVerticalOffset(ImageScrollViewer.VerticalOffset - deltaY);
+
+            lastMousePosition = currentPosition;
+        }
+    }
+
+    private void ImageScrollViewer_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
+    {
+        if (isPanning)
+        {
+            isPanning = false;
+            lastMousePosition = null;
+            ImageScrollViewer.Cursor = Cursors.Arrow;
+            ImageScrollViewer.ReleaseMouseCapture();
+        }
+    }
+
+    private void ResetZoom()
+    {
+        zoomLevel = 1.0;
+        ImageScaleTransform.ScaleX = 1.0;
+        ImageScaleTransform.ScaleY = 1.0;
+        ImageScrollViewer.ScrollToHorizontalOffset(0);
+        ImageScrollViewer.ScrollToVerticalOffset(0);
+        ZoomIndicator.Visibility = Visibility.Collapsed;
     }
 }
 

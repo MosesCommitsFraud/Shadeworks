@@ -30,60 +30,68 @@ public class ImageProcessor
     {
         var workingBitmap = new Bitmap(originalBitmap);
 
-        // Apply adjustments
-        if (settings.Brightness != 0 || settings.Contrast != 0 || settings.Saturation != 0)
+        try
         {
-            ApplyAdjustments(workingBitmap, settings.Brightness, settings.Contrast, settings.Saturation);
-        }
+            // Apply adjustments
+            if (settings.Brightness != 0 || settings.Contrast != 0 || settings.Saturation != 0)
+            {
+                ApplyAdjustments(workingBitmap, settings.Brightness, settings.Contrast, settings.Saturation);
+            }
 
-        // Apply grayscale
-        if (settings.Grayscale)
+            // Apply grayscale
+            if (settings.Grayscale)
+            {
+                ApplyGrayscale(workingBitmap);
+            }
+
+            // Apply invert
+            if (settings.Invert)
+            {
+                ApplyInvert(workingBitmap);
+            }
+
+            // Apply dithering
+            switch (settings.DitherAlgorithm)
+            {
+                case "Floyd-Steinberg":
+                    ApplyFloydSteinberg(workingBitmap, settings.ColorCount);
+                    break;
+                case "Atkinson":
+                    ApplyAtkinson(workingBitmap, settings.ColorCount);
+                    break;
+                case "Bayer 2x2":
+                    ApplyBayerDither(workingBitmap, 2, settings.ColorCount);
+                    break;
+                case "Bayer 4x4":
+                    ApplyBayerDither(workingBitmap, 4, settings.ColorCount);
+                    break;
+                case "Bayer 8x8":
+                    ApplyBayerDither(workingBitmap, 8, settings.ColorCount);
+                    break;
+                case "Stucki":
+                    ApplyStucki(workingBitmap, settings.ColorCount);
+                    break;
+                case "Jarvis-Judice-Ninke":
+                    ApplyJarvisJudiceNinke(workingBitmap, settings.ColorCount);
+                    break;
+                case "Sierra":
+                    ApplySierra(workingBitmap, settings.ColorCount);
+                    break;
+                case "Sierra Lite":
+                    ApplySierraLite(workingBitmap, settings.ColorCount);
+                    break;
+                case "Burkes":
+                    ApplyBurkes(workingBitmap, settings.ColorCount);
+                    break;
+            }
+
+            var result = BitmapToBitmapImage(workingBitmap);
+            return result;
+        }
+        finally
         {
-            ApplyGrayscale(workingBitmap);
+            workingBitmap?.Dispose();
         }
-
-        // Apply invert
-        if (settings.Invert)
-        {
-            ApplyInvert(workingBitmap);
-        }
-
-        // Apply dithering
-        switch (settings.DitherAlgorithm)
-        {
-            case "Floyd-Steinberg":
-                ApplyFloydSteinberg(workingBitmap, settings.ColorCount);
-                break;
-            case "Atkinson":
-                ApplyAtkinson(workingBitmap, settings.ColorCount);
-                break;
-            case "Bayer 2x2":
-                ApplyBayerDither(workingBitmap, 2, settings.ColorCount);
-                break;
-            case "Bayer 4x4":
-                ApplyBayerDither(workingBitmap, 4, settings.ColorCount);
-                break;
-            case "Bayer 8x8":
-                ApplyBayerDither(workingBitmap, 8, settings.ColorCount);
-                break;
-            case "Stucki":
-                ApplyStucki(workingBitmap, settings.ColorCount);
-                break;
-            case "Jarvis-Judice-Ninke":
-                ApplyJarvisJudiceNinke(workingBitmap, settings.ColorCount);
-                break;
-            case "Sierra":
-                ApplySierra(workingBitmap, settings.ColorCount);
-                break;
-            case "Sierra Lite":
-                ApplySierraLite(workingBitmap, settings.ColorCount);
-                break;
-            case "Burkes":
-                ApplyBurkes(workingBitmap, settings.ColorCount);
-                break;
-        }
-
-        return BitmapToBitmapImage(workingBitmap);
     }
 
     private void ApplyAdjustments(Bitmap bitmap, int brightness, int contrast, int saturation)
@@ -659,7 +667,7 @@ public class ImageProcessor
 
     private BitmapImage BitmapToBitmapImage(Bitmap bitmap)
     {
-        using var memory = new MemoryStream();
+        var memory = new MemoryStream();
         bitmap.Save(memory, ImageFormat.Png);
         memory.Position = 0;
         var bitmapImage = new BitmapImage();
@@ -668,6 +676,7 @@ public class ImageProcessor
         bitmapImage.CacheOption = BitmapCacheOption.OnLoad;
         bitmapImage.EndInit();
         bitmapImage.Freeze();
+        memory.Dispose();
         return bitmapImage;
     }
 }
