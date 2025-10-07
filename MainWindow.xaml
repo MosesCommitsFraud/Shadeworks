@@ -48,12 +48,12 @@
             <!-- Main Content -->
             <Grid Grid.Row="1" Margin="12">
                 <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="280"/>
                     <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="280"/>
                 </Grid.ColumnDefinitions>
 
-                <!-- Left Sidebar -->
-                <Border Grid.Column="0" Background="#252526" CornerRadius="8" Margin="0,0,12,0" Padding="16">
+                <!-- Right Sidebar -->
+                <Border Grid.Column="1" Background="#252526" CornerRadius="8" Margin="12,0,0,0" Padding="16">
                     <ScrollViewer VerticalScrollBarVisibility="Auto">
                         <StackPanel>
                             <TextBlock Text="Dither Algorithm" FontSize="14" Foreground="#E0E0E0" FontWeight="SemiBold" Margin="0,0,0,8"/>
@@ -129,7 +129,7 @@
                 </Border>
 
                 <!-- Image Preview Area -->
-                <Border Grid.Column="1" Background="#2D2D30" CornerRadius="8">
+                <Border Grid.Column="0" Background="#2D2D30" CornerRadius="8" Margin="0,0,12,0">
                     <Grid>
                         <!-- Placeholder when no image is loaded -->
                         <TextBlock x:Name="PlaceholderText" Text="Open an image to get started" 
