@@ -57,13 +57,13 @@
                     <!-- Window Controls -->
                     <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Stretch">
                         <Button Click="MinimizeButton_Click" Style="{StaticResource WindowButton}" Width="46" Height="32">
-                            <TextBlock Text="─" FontSize="10" Foreground="#CCCCCC" VerticalAlignment="Center"/>
+                            <TextBlock Text="&#xE921;" FontFamily="Segoe MDL2 Assets" FontSize="10" Foreground="#CCCCCC" VerticalAlignment="Center"/>
                         </Button>
                         <Button Click="MaximizeButton_Click" Style="{StaticResource WindowButton}" Width="46" Height="32">
-                            <TextBlock Text="□" FontSize="10" Foreground="#CCCCCC" VerticalAlignment="Center"/>
+                            <TextBlock Text="&#xE922;" FontFamily="Segoe MDL2 Assets" FontSize="10" Foreground="#CCCCCC" VerticalAlignment="Center"/>
                         </Button>
                         <Button Click="CloseButton_Click" Style="{StaticResource WindowButtonClose}" Width="46" Height="32">
-                            <TextBlock Text="✕" FontSize="10" Foreground="#CCCCCC" VerticalAlignment="Center"/>
+                            <TextBlock Text="&#xE10A;" FontFamily="Segoe MDL2 Assets" FontSize="10" Foreground="#CCCCCC" VerticalAlignment="Center"/>
                         </Button>
                     </StackPanel>
                 </Grid>
@@ -128,7 +128,7 @@
                 <!-- Right Sidebar -->
                 <Border Grid.Column="1" Background="#2D2D30" BorderBrush="#3E3E42" BorderThickness="1,0,0,0">
                     <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="0" Margin="0">
-                        <StackPanel Margin="16,16,12,16">
+                        <StackPanel Margin="16,16,10,16">
                             <!-- ACTIONS Section -->
                             <TextBlock Text="Actions" FontSize="16" Foreground="#E0E0E0" FontWeight="SemiBold" Margin="0,0,0,8"/>
                             
