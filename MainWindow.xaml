@@ -25,12 +25,16 @@
 
             <!-- Combined Title Bar and Menu -->
             <Border Grid.Row="0" Background="#252526" CornerRadius="8,8,0,0" BorderBrush="#3E3E42" BorderThickness="0,0,0,1">
-                <Grid MouseLeftButtonDown="TitleBar_MouseLeftButtonDown">
+                <Grid>
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="Auto"/>
                         <ColumnDefinition Width="*"/>
                         <ColumnDefinition Width="Auto"/>
                     </Grid.ColumnDefinitions>
+
+                    <!-- Draggable area behind everything -->
+                    <Border Grid.Column="0" Grid.ColumnSpan="3" Background="Transparent" 
+                            MouseLeftButtonDown="TitleBar_MouseLeftButtonDown"/>
 
                     <!-- Menu Bar -->
                     <Menu Grid.Column="0" Background="Transparent" VerticalAlignment="Center">
