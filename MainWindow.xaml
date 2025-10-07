@@ -84,17 +84,23 @@
                         DragLeave="Canvas_DragLeave">
                     <Grid>
                         <!-- Drag & Drop Placeholder -->
-                        <StackPanel x:Name="DropPlaceholder" HorizontalAlignment="Center" VerticalAlignment="Center">
-                            <Border Background="#3E3E42" CornerRadius="8" Padding="24" HorizontalAlignment="Center">
-                                <StackPanel>
-                                    <TextBlock Text="🖼️" FontSize="48" HorizontalAlignment="Center" Margin="0,0,0,12"/>
-                                    <TextBlock Text="Drop image here or click to browse" 
-                                               FontSize="16" Foreground="#999999" HorizontalAlignment="Center"/>
-                                    <TextBlock Text="Supported: PNG, JPG, BMP, GIF" 
-                                               FontSize="12" Foreground="#666666" HorizontalAlignment="Center" Margin="0,8,0,0"/>
-                                </StackPanel>
-                            </Border>
-                        </StackPanel>
+                        <Grid x:Name="DropPlaceholder" HorizontalAlignment="Center" VerticalAlignment="Center">
+                            <Rectangle Stroke="#555555" 
+                                       StrokeThickness="2" 
+                                       StrokeDashArray="6 4"
+                                       RadiusX="8" 
+                                       RadiusY="8"
+                                       Width="400"
+                                       Height="280"
+                                       Fill="Transparent"/>
+                            <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+                                <TextBlock Text="🖼️" FontSize="64" HorizontalAlignment="Center" Margin="0,0,0,16"/>
+                                <TextBlock Text="Drop image here or click to browse" 
+                                           FontSize="18" Foreground="#999999" HorizontalAlignment="Center" FontWeight="Normal"/>
+                                <TextBlock Text="Supported: PNG, JPG, BMP, GIF" 
+                                           FontSize="14" Foreground="#666666" HorizontalAlignment="Center" Margin="0,12,0,0"/>
+                            </StackPanel>
+                        </Grid>
                         
                         <!-- Image Display -->
                         <ScrollViewer x:Name="ImageScrollViewer" 
@@ -124,7 +130,7 @@
                     <ScrollViewer VerticalScrollBarVisibility="Auto">
                         <StackPanel Margin="16">
                             <!-- ACTIONS Section -->
-                            <TextBlock Text="Actions" FontSize="14" Foreground="#CCCCCC" FontWeight="SemiBold" Margin="0,0,0,8"/>
+                            <TextBlock Text="Actions" FontSize="15" Foreground="#E0E0E0" FontWeight="SemiBold" Margin="0,0,0,8"/>
                             
                             <Grid Margin="0,0,0,8">
                                 <Grid.ColumnDefinitions>
@@ -154,9 +160,9 @@
                             <Separator Margin="0,0,0,12" Background="#3E3E42"/>
 
                             <!-- ALGORITHM Section -->
-                            <TextBlock Text="Algorithm" FontSize="14" Foreground="#CCCCCC" FontWeight="SemiBold" Margin="0,0,0,8"/>
+                            <TextBlock Text="Algorithm" FontSize="15" Foreground="#E0E0E0" FontWeight="SemiBold" Margin="0,0,0,8"/>
                             
-                            <TextBlock Text="Style" FontSize="11" Foreground="#999999" Margin="0,0,0,4"/>
+                            <TextBlock Text="Style" FontSize="12" Foreground="#999999" Margin="0,0,0,4"/>
                             <ComboBox x:Name="StyleComboBox" SelectionChanged="Style_Changed" 
                                       Style="{StaticResource ModernComboBox}" Margin="0,0,0,8">
                                 <ComboBoxItem Content="Uniform Modulation Y" IsSelected="True"/>
@@ -165,7 +171,7 @@
                                 <ComboBoxItem Content="Ordered Bayer"/>
                             </ComboBox>
 
-                            <TextBlock Text="Presets" FontSize="11" Foreground="#999999" Margin="0,0,0,4"/>
+                            <TextBlock Text="Presets" FontSize="12" Foreground="#999999" Margin="0,0,0,4"/>
                             <ComboBox x:Name="PresetsComboBox" SelectionChanged="Presets_Changed" 
                                       Style="{StaticResource ModernComboBox}" Margin="0,0,0,12">
                                 <ComboBoxItem Content="None" IsSelected="True"/>
@@ -177,16 +183,16 @@
                             <Separator Margin="0,0,0,12" Background="#3E3E42"/>
 
                             <!-- PARAMETERS Section -->
-                            <TextBlock Text="Parameters" FontSize="14" Foreground="#CCCCCC" FontWeight="SemiBold" Margin="0,0,0,8"/>
+                            <TextBlock Text="Parameters" FontSize="15" Foreground="#E0E0E0" FontWeight="SemiBold" Margin="0,0,0,8"/>
                             
                             <Grid Margin="0,0,0,4">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*"/>
                                     <ColumnDefinition Width="Auto"/>
                                 </Grid.ColumnDefinitions>
-                                <TextBlock Grid.Column="0" Text="Scale" FontSize="11" Foreground="#999999"/>
+                                <TextBlock Grid.Column="0" Text="Scale" FontSize="12" Foreground="#999999"/>
                                 <TextBlock Grid.Column="1" Text="{Binding ElementName=ScaleSlider, Path=Value, StringFormat={}{0:F0}}" 
-                                           FontSize="11" Foreground="#777777"/>
+                                           FontSize="12" Foreground="#999999"/>
                             </Grid>
                             <Slider x:Name="ScaleSlider" Minimum="1" Maximum="20" Value="11" 
                                     Style="{StaticResource ModernSlider}" Margin="0,0,0,8"/>
@@ -196,9 +202,9 @@
                                     <ColumnDefinition Width="*"/>
                                     <ColumnDefinition Width="Auto"/>
                                 </Grid.ColumnDefinitions>
-                                <TextBlock Grid.Column="0" Text="Line Scale" FontSize="11" Foreground="#999999"/>
+                                <TextBlock Grid.Column="0" Text="Line Scale" FontSize="12" Foreground="#999999"/>
                                 <TextBlock Grid.Column="1" Text="{Binding ElementName=LineScaleSlider, Path=Value, StringFormat={}{0:F0}}" 
-                                           FontSize="11" Foreground="#777777"/>
+                                           FontSize="12" Foreground="#999999"/>
                             </Grid>
                             <Slider x:Name="LineScaleSlider" Minimum="0" Maximum="10" Value="1" 
                                     Style="{StaticResource ModernSlider}" Margin="0,0,0,8"/>
@@ -208,9 +214,9 @@
                                     <ColumnDefinition Width="*"/>
                                     <ColumnDefinition Width="Auto"/>
                                 </Grid.ColumnDefinitions>
-                                <TextBlock Grid.Column="0" Text="Smoothing Factor" FontSize="11" Foreground="#999999"/>
+                                <TextBlock Grid.Column="0" Text="Smoothing Factor" FontSize="12" Foreground="#999999"/>
                                 <TextBlock Grid.Column="1" Text="{Binding ElementName=SmoothingSlider, Path=Value, StringFormat={}{0:F0}}" 
-                                           FontSize="11" Foreground="#777777"/>
+                                           FontSize="12" Foreground="#999999"/>
                             </Grid>
                             <Slider x:Name="SmoothingSlider" Minimum="0" Maximum="10" Value="0" 
                                     Style="{StaticResource ModernSlider}" Margin="0,0,0,8"/>
@@ -220,9 +226,9 @@
                                     <ColumnDefinition Width="*"/>
                                     <ColumnDefinition Width="Auto"/>
                                 </Grid.ColumnDefinitions>
-                                <TextBlock Grid.Column="0" Text="Bleed Fraction" FontSize="11" Foreground="#999999"/>
+                                <TextBlock Grid.Column="0" Text="Bleed Fraction" FontSize="12" Foreground="#999999"/>
                                 <TextBlock Grid.Column="1" Text="{Binding ElementName=BleedSlider, Path=Value, StringFormat={}{0:F0}}" 
-                                           FontSize="11" Foreground="#777777"/>
+                                           FontSize="12" Foreground="#999999"/>
                             </Grid>
                             <Slider x:Name="BleedSlider" Minimum="0" Maximum="100" Value="0" 
                                     Style="{StaticResource ModernSlider}" Margin="0,0,0,12"/>
@@ -230,9 +236,9 @@
                             <Separator Margin="0,0,0,12" Background="#3E3E42"/>
 
                             <!-- COLOR Section -->
-                            <TextBlock Text="Color" FontSize="14" Foreground="#CCCCCC" FontWeight="SemiBold" Margin="0,0,0,8"/>
+                            <TextBlock Text="Color" FontSize="15" Foreground="#E0E0E0" FontWeight="SemiBold" Margin="0,0,0,8"/>
                             
-                            <TextBlock Text="Palette Category" FontSize="11" Foreground="#999999" Margin="0,0,0,4"/>
+                            <TextBlock Text="Palette Category" FontSize="12" Foreground="#999999" Margin="0,0,0,4"/>
                             <ComboBox x:Name="PaletteCategoryComboBox" SelectionChanged="PaletteCategory_Changed" 
                                       Style="{StaticResource ModernComboBox}" Margin="0,0,0,8">
                                 <ComboBoxItem Content="Retro" IsSelected="True"/>
@@ -241,7 +247,7 @@
                                 <ComboBoxItem Content="CMYK"/>
                             </ComboBox>
 
-                            <TextBlock Text="Palette" FontSize="11" Foreground="#999999" Margin="0,0,0,4"/>
+                            <TextBlock Text="Palette" FontSize="12" Foreground="#999999" Margin="0,0,0,4"/>
                             <ComboBox x:Name="PaletteComboBox" SelectionChanged="Palette_Changed" 
                                       Style="{StaticResource ModernComboBox}" Margin="0,0,0,12">
                                 <ComboBoxItem Content="Default" IsSelected="True"/>
@@ -253,7 +259,7 @@
                             <Separator Margin="0,0,0,12" Background="#3E3E42"/>
 
                             <!-- ADJUSTMENTS Section -->
-                            <TextBlock Text="Adjustments" FontSize="14" Foreground="#CCCCCC" FontWeight="SemiBold" Margin="0,0,0,8"/>
+                            <TextBlock Text="Adjustments" FontSize="15" Foreground="#E0E0E0" FontWeight="SemiBold" Margin="0,0,0,8"/>
                             
                             <CheckBox x:Name="InvertCheckBox" Content="Invert" 
                                       Style="{StaticResource ModernCheckBox}" Margin="0,0,0,8"/>
@@ -263,9 +269,9 @@
                                     <ColumnDefinition Width="*"/>
                                     <ColumnDefinition Width="Auto"/>
                                 </Grid.ColumnDefinitions>
-                                <TextBlock Grid.Column="0" Text="Contrast" FontSize="11" Foreground="#999999"/>
+                                <TextBlock Grid.Column="0" Text="Contrast" FontSize="12" Foreground="#999999"/>
                                 <TextBlock Grid.Column="1" Text="{Binding ElementName=ContrastSlider, Path=Value, StringFormat={}{0:F0}}" 
-                                           FontSize="11" Foreground="#777777"/>
+                                           FontSize="12" Foreground="#999999"/>
                             </Grid>
                             <Slider x:Name="ContrastSlider" Minimum="0" Maximum="100" Value="45" 
                                     Style="{StaticResource ModernSlider}" Margin="0,0,0,8"/>
@@ -275,9 +281,9 @@
                                     <ColumnDefinition Width="*"/>
                                     <ColumnDefinition Width="Auto"/>
                                 </Grid.ColumnDefinitions>
-                                <TextBlock Grid.Column="0" Text="Midtones" FontSize="11" Foreground="#999999"/>
+                                <TextBlock Grid.Column="0" Text="Midtones" FontSize="12" Foreground="#999999"/>
                                 <TextBlock Grid.Column="1" Text="{Binding ElementName=MidtonesSlider, Path=Value, StringFormat={}{0:F0}}" 
-                                           FontSize="11" Foreground="#777777"/>
+                                           FontSize="12" Foreground="#999999"/>
                             </Grid>
                             <Slider x:Name="MidtonesSlider" Minimum="0" Maximum="100" Value="50" 
                                     Style="{StaticResource ModernSlider}" Margin="0,0,0,8"/>
@@ -287,9 +293,9 @@
                                     <ColumnDefinition Width="*"/>
                                     <ColumnDefinition Width="Auto"/>
                                 </Grid.ColumnDefinitions>
-                                <TextBlock Grid.Column="0" Text="Highlights" FontSize="11" Foreground="#999999"/>
+                                <TextBlock Grid.Column="0" Text="Highlights" FontSize="12" Foreground="#999999"/>
                                 <TextBlock Grid.Column="1" Text="{Binding ElementName=HighlightsSlider, Path=Value, StringFormat={}{0:F0}}" 
-                                           FontSize="11" Foreground="#777777"/>
+                                           FontSize="12" Foreground="#999999"/>
                             </Grid>
                             <Slider x:Name="HighlightsSlider" Minimum="0" Maximum="100" Value="50" 
                                     Style="{StaticResource ModernSlider}" Margin="0,0,0,8"/>
@@ -299,9 +305,9 @@
                                     <ColumnDefinition Width="*"/>
                                     <ColumnDefinition Width="Auto"/>
                                 </Grid.ColumnDefinitions>
-                                <TextBlock Grid.Column="0" Text="Luminance Threshold" FontSize="11" Foreground="#999999"/>
+                                <TextBlock Grid.Column="0" Text="Luminance Threshold" FontSize="12" Foreground="#999999"/>
                                 <TextBlock Grid.Column="1" Text="{Binding ElementName=LuminanceSlider, Path=Value, StringFormat={}{0:F0}}" 
-                                           FontSize="11" Foreground="#777777"/>
+                                           FontSize="12" Foreground="#999999"/>
                             </Grid>
                             <Slider x:Name="LuminanceSlider" Minimum="0" Maximum="100" Value="50" 
                                     Style="{StaticResource ModernSlider}" Margin="0,0,0,12"/>
@@ -309,16 +315,16 @@
                             <Separator Margin="0,0,0,12" Background="#3E3E42"/>
 
                             <!-- EFFECTS Section -->
-                            <TextBlock Text="Effects" FontSize="14" Foreground="#CCCCCC" FontWeight="SemiBold" Margin="0,0,0,8"/>
+                            <TextBlock Text="Effects" FontSize="15" Foreground="#E0E0E0" FontWeight="SemiBold" Margin="0,0,0,8"/>
                             
                             <Grid Margin="0,0,0,4">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*"/>
                                     <ColumnDefinition Width="Auto"/>
                                 </Grid.ColumnDefinitions>
-                                <TextBlock Grid.Column="0" Text="Blur" FontSize="11" Foreground="#999999"/>
+                                <TextBlock Grid.Column="0" Text="Blur" FontSize="12" Foreground="#999999"/>
                                 <TextBlock Grid.Column="1" Text="{Binding ElementName=BlurSlider, Path=Value, StringFormat={}{0:F0}}" 
-                                           FontSize="11" Foreground="#777777"/>
+                                           FontSize="12" Foreground="#999999"/>
                             </Grid>
                             <Slider x:Name="BlurSlider" Minimum="0" Maximum="20" Value="0" 
                                     Style="{StaticResource ModernSlider}" Margin="0,0,0,8"/>
@@ -328,9 +334,9 @@
                                     <ColumnDefinition Width="*"/>
                                     <ColumnDefinition Width="Auto"/>
                                 </Grid.ColumnDefinitions>
-                                <TextBlock Grid.Column="0" Text="Depth" FontSize="11" Foreground="#999999"/>
+                                <TextBlock Grid.Column="0" Text="Depth" FontSize="12" Foreground="#999999"/>
                                 <TextBlock Grid.Column="1" Text="{Binding ElementName=DepthSlider, Path=Value, StringFormat={}{0:F0}}" 
-                                           FontSize="11" Foreground="#777777"/>
+                                           FontSize="12" Foreground="#999999"/>
                             </Grid>
                             <Slider x:Name="DepthSlider" Minimum="1" Maximum="10" Value="6" 
                                     Style="{StaticResource ModernSlider}" Margin="0,0,0,12"/>
@@ -338,7 +344,7 @@
                             <Separator Margin="0,0,0,12" Background="#3E3E42"/>
 
                             <!-- PRESETS Section -->
-                            <TextBlock Text="Presets" FontSize="14" Foreground="#CCCCCC" FontWeight="SemiBold" Margin="0,0,0,8"/>
+                            <TextBlock Text="Presets" FontSize="15" Foreground="#E0E0E0" FontWeight="SemiBold" Margin="0,0,0,8"/>
                             
                             <Button Content="Save Preset" Click="SavePreset_Click" 
                                     Style="{StaticResource ModernButton}" Margin="0,0,0,8" Padding="0,8"/>
@@ -358,9 +364,9 @@
                         <ColumnDefinition Width="Auto"/>
                     </Grid.ColumnDefinitions>
                     <TextBlock Grid.Column="0" x:Name="StatusText" Text="Ready" 
-                               FontSize="11" Foreground="#999999" VerticalAlignment="Center" Margin="12,0,0,0"/>
+                               FontSize="12" Foreground="#999999" VerticalAlignment="Center" Margin="12,0,0,0"/>
                     <TextBlock Grid.Column="1" Text="ShadeWorks v1.0" 
-                               FontSize="11" Foreground="#666666" VerticalAlignment="Center" Margin="0,0,12,0"/>
+                               FontSize="12" Foreground="#666666" VerticalAlignment="Center" Margin="0,0,12,0"/>
                 </Grid>
             </Border>
         </Grid>

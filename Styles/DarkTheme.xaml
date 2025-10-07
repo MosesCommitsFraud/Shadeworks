@@ -156,7 +156,7 @@
         </Setter>
     </Style>
 
-    <!-- Modern Slider Style - Matching mockup -->
+    <!-- Modern Slider Style - Matching mockup with progress fill -->
     <Style x:Key="ModernSlider" TargetType="Slider">
         <Setter Property="Height" Value="20"/>
         <Setter Property="Template">
@@ -169,20 +169,36 @@
                             <RowDefinition Height="Auto"/>
                         </Grid.RowDefinitions>
                         
-                        <!-- Track -->
+                        <!-- Track Background -->
                         <Border x:Name="TrackBackground"
                                 Grid.Row="1"
-                                Height="4"
+                                Height="6"
                                 Background="#2C2C2C"
                                 BorderBrush="#555555"
                                 BorderThickness="1"
-                                CornerRadius="2"
+                                CornerRadius="3"
                                 VerticalAlignment="Center"/>
                         
-                        <!-- Thumb Track -->
+                        <!-- Track with visual progress -->
                         <Track x:Name="PART_Track" Grid.Row="1">
                             <Track.DecreaseRepeatButton>
-                                <RepeatButton Command="Slider.DecreaseLarge" Style="{StaticResource SliderRepeatButton}"/>
+                                <RepeatButton Command="Slider.DecreaseLarge">
+                                    <RepeatButton.Style>
+                                        <Style TargetType="RepeatButton">
+                                            <Setter Property="Background" Value="#FFFFFF"/>
+                                            <Setter Property="Template">
+                                                <Setter.Value>
+                                                    <ControlTemplate TargetType="RepeatButton">
+                                                        <Border Background="{TemplateBinding Background}" 
+                                                                Height="6" 
+                                                                CornerRadius="3,0,0,3"
+                                                                Margin="1,0,0,0"/>
+                                                    </ControlTemplate>
+                                                </Setter.Value>
+                                            </Setter>
+                                        </Style>
+                                    </RepeatButton.Style>
+                                </RepeatButton>
                             </Track.DecreaseRepeatButton>
                             <Track.IncreaseRepeatButton>
                                 <RepeatButton Command="Slider.IncreaseLarge" Style="{StaticResource SliderRepeatButton}"/>
@@ -191,9 +207,9 @@
                                 <Thumb>
                                     <Thumb.Template>
                                         <ControlTemplate TargetType="Thumb">
-                                            <Ellipse Width="14" Height="14" 
+                                            <Ellipse Width="16" Height="16" 
                                                      Fill="#FFFFFF"
-                                                     Stroke="#999999"
+                                                     Stroke="#888888"
                                                      StrokeThickness="1"
                                                      Cursor="Hand"/>
                                         </ControlTemplate>
