@@ -226,12 +226,40 @@ public partial class MainWindow : Window
         ProcessImage();
     }
 
+    private void PaletteCategory_Changed(object sender, SelectionChangedEventArgs e)
+    {
+        ProcessImage();
+    }
+
+    private void Palette_Changed(object sender, SelectionChangedEventArgs e)
+    {
+        ProcessImage();
+    }
+
+    private void SavePreset_Click(object sender, RoutedEventArgs e)
+    {
+        MessageBox.Show("Preset saving functionality coming soon!", "Save Preset", MessageBoxButton.OK, MessageBoxImage.Information);
+        StatusText.Text = "Preset save requested";
+    }
+
     private void ResetAll_Click(object sender, RoutedEventArgs e)
     {
+        // Reset all controls to defaults
         ScaleSlider.Value = 11;
         LineScaleSlider.Value = 1;
+        SmoothingSlider.Value = 0;
+        BleedSlider.Value = 0;
+        ContrastSlider.Value = 45;
+        MidtonesSlider.Value = 50;
+        HighlightsSlider.Value = 50;
+        LuminanceSlider.Value = 50;
+        BlurSlider.Value = 0;
+        DepthSlider.Value = 6;
         StyleComboBox.SelectedIndex = 0;
         PresetsComboBox.SelectedIndex = 0;
+        PaletteCategoryComboBox.SelectedIndex = 0;
+        PaletteComboBox.SelectedIndex = 0;
+        InvertCheckBox.IsChecked = false;
         StatusText.Text = "Reset all settings";
     }
 
@@ -273,7 +301,6 @@ public partial class MainWindow : Window
             Dispatcher.Invoke(() =>
             {
                 ImagePreview.Source = processed;
-                PreviewImage.Source = processed;
                 System.Diagnostics.Debug.WriteLine("Image source updated");
             });
 
