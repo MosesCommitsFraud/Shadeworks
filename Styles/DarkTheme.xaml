@@ -7,8 +7,8 @@
         <Setter Property="Foreground" Value="#CCCCCC"/>
         <Setter Property="BorderThickness" Value="1"/>
         <Setter Property="BorderBrush" Value="#555555"/>
-        <Setter Property="Padding" Value="16,6"/>
-        <Setter Property="FontSize" Value="13"/>
+        <Setter Property="Padding" Value="16,8"/>
+        <Setter Property="FontSize" Value="15"/>
         <Setter Property="Cursor" Value="Hand"/>
         <Setter Property="Template">
             <Setter.Value>
@@ -41,8 +41,8 @@
         <Setter Property="Foreground" Value="#CCCCCC"/>
         <Setter Property="BorderBrush" Value="#555555"/>
         <Setter Property="BorderThickness" Value="1"/>
-        <Setter Property="Padding" Value="8,6"/>
-        <Setter Property="FontSize" Value="13"/>
+        <Setter Property="Padding" Value="10,8"/>
+        <Setter Property="FontSize" Value="15"/>
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="ComboBox">
@@ -226,7 +226,7 @@
     <!-- CheckBox Style - Matching mockup -->
     <Style x:Key="ModernCheckBox" TargetType="CheckBox">
         <Setter Property="Foreground" Value="#CCCCCC"/>
-        <Setter Property="FontSize" Value="13"/>
+        <Setter Property="FontSize" Value="15"/>
         <Setter Property="Cursor" Value="Hand"/>
         <Setter Property="Template">
             <Setter.Value>
@@ -264,38 +264,67 @@
         </Setter>
     </Style>
 
-    <!-- ScrollBar Styles - Matching mockup -->
+    <!-- ScrollBar Styles - Thin with hover expand -->
     <Style TargetType="ScrollBar">
-        <Setter Property="Background" Value="#2D2D30"/>
+        <Setter Property="Background" Value="Transparent"/>
+        <Setter Property="Width" Value="6"/>
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="ScrollBar">
-                    <Grid>
-                        <Border Background="{TemplateBinding Background}" Width="8"/>
-                        <Track x:Name="PART_Track" IsDirectionReversed="True">
+                    <Grid x:Name="GridRoot" Background="{TemplateBinding Background}">
+                        <Track x:Name="PART_Track" IsDirectionReversed="True" Focusable="False">
                             <Track.Thumb>
-                                <Thumb>
+                                <Thumb x:Name="Thumb">
                                     <Thumb.Template>
                                         <ControlTemplate TargetType="Thumb">
-                                            <Border Background="#555555" 
-                                                    CornerRadius="4"
-                                                    Width="6"
-                                                    Margin="1"/>
+                                            <Border x:Name="ThumbBorder"
+                                                    Background="#555555" 
+                                                    CornerRadius="3"
+                                                    Width="4"
+                                                    Margin="1,0,1,0"/>
+                                            <ControlTemplate.Triggers>
+                                                <Trigger Property="IsMouseOver" Value="True">
+                                                    <Setter TargetName="ThumbBorder" Property="Background" Value="#777777"/>
+                                                </Trigger>
+                                            </ControlTemplate.Triggers>
                                         </ControlTemplate>
                                     </Thumb.Template>
                                 </Thumb>
                             </Track.Thumb>
                         </Track>
                     </Grid>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter Property="Width" Value="12"/>
+                            <Setter TargetName="Thumb" Property="Template">
+                                <Setter.Value>
+                                    <ControlTemplate TargetType="Thumb">
+                                        <Border Background="#777777" 
+                                                CornerRadius="6"
+                                                Width="10"
+                                                Margin="1,0,1,0">
+                                            <Border.Style>
+                                                <Style TargetType="Border">
+                                                    <Style.Triggers>
+                                                        <Trigger Property="IsMouseOver" Value="True">
+                                                            <Setter Property="Background" Value="#999999"/>
+                                                        </Trigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </Border.Style>
+                                        </Border>
+                                    </ControlTemplate>
+                                </Setter.Value>
+                            </Setter>
+                        </Trigger>
+                    </ControlTemplate.Triggers>
                 </ControlTemplate>
             </Setter.Value>
         </Setter>
         <Style.Triggers>
             <Trigger Property="Orientation" Value="Horizontal">
-                <Setter Property="Height" Value="8"/>
-            </Trigger>
-            <Trigger Property="Orientation" Value="Vertical">
-                <Setter Property="Width" Value="8"/>
+                <Setter Property="Width" Value="Auto"/>
+                <Setter Property="Height" Value="6"/>
             </Trigger>
         </Style.Triggers>
     </Style>
@@ -304,8 +333,8 @@
     <Style x:Key="ModernMenuItem" TargetType="MenuItem">
         <Setter Property="Foreground" Value="#CCCCCC"/>
         <Setter Property="Background" Value="Transparent"/>
-        <Setter Property="Padding" Value="12,6"/>
-        <Setter Property="FontSize" Value="13"/>
+        <Setter Property="Padding" Value="14,8"/>
+        <Setter Property="FontSize" Value="15"/>
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="MenuItem">
@@ -346,8 +375,8 @@
     <Style TargetType="MenuItem">
         <Setter Property="Foreground" Value="#CCCCCC"/>
         <Setter Property="Background" Value="Transparent"/>
-        <Setter Property="Padding" Value="24,8,24,8"/>
-        <Setter Property="FontSize" Value="12"/>
+        <Setter Property="Padding" Value="24,10,24,10"/>
+        <Setter Property="FontSize" Value="14"/>
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="MenuItem">
