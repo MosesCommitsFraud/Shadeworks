@@ -36,17 +36,17 @@ public partial class MainWindow : Window
         }
     }
 
-    private void CloseButton_Click(object sender, MouseButtonEventArgs e)
+    private void CloseButton_Click(object sender, RoutedEventArgs e)
     {
         Close();
     }
 
-    private void MinimizeButton_Click(object sender, MouseButtonEventArgs e)
+    private void MinimizeButton_Click(object sender, RoutedEventArgs e)
     {
         WindowState = WindowState.Minimized;
     }
 
-    private void MaximizeButton_Click(object sender, MouseButtonEventArgs e)
+    private void MaximizeButton_Click(object sender, RoutedEventArgs e)
     {
         WindowState = WindowState == WindowState.Maximized ? WindowState.Normal : WindowState.Maximized;
     }
