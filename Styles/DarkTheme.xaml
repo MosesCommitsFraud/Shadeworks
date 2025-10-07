@@ -231,4 +231,74 @@
         <Setter Property="Foreground" Value="#555555"/>
     </Style>
 
+    <!-- MenuItem Style -->
+    <Style x:Key="ModernMenuItem" TargetType="MenuItem">
+        <Setter Property="Foreground" Value="#E0E0E0"/>
+        <Setter Property="Background" Value="Transparent"/>
+        <Setter Property="Padding" Value="12,6"/>
+        <Setter Property="FontSize" Value="13"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="MenuItem">
+                    <Border x:Name="Border" 
+                            Background="{TemplateBinding Background}"
+                            BorderThickness="0"
+                            CornerRadius="0">
+                        <Grid>
+                            <ContentPresenter ContentSource="Header" 
+                                              Margin="{TemplateBinding Padding}"
+                                              VerticalAlignment="Center"/>
+                            <Popup x:Name="PART_Popup" 
+                                   Placement="Bottom" 
+                                   IsOpen="{TemplateBinding IsSubmenuOpen}"
+                                   AllowsTransparency="True" 
+                                   Focusable="False">
+                                <Border Background="#2D2D30" 
+                                        BorderBrush="#3E3E42" 
+                                        BorderThickness="1"
+                                        CornerRadius="4"
+                                        Padding="4">
+                                    <StackPanel IsItemsHost="True"/>
+                                </Border>
+                            </Popup>
+                        </Grid>
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsHighlighted" Value="True">
+                            <Setter TargetName="Border" Property="Background" Value="#3E3E42"/>
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- Submenu MenuItem Style -->
+    <Style TargetType="MenuItem">
+        <Setter Property="Foreground" Value="#E0E0E0"/>
+        <Setter Property="Background" Value="Transparent"/>
+        <Setter Property="Padding" Value="24,8,24,8"/>
+        <Setter Property="FontSize" Value="12"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="MenuItem">
+                    <Border x:Name="Border" 
+                            Background="{TemplateBinding Background}"
+                            BorderThickness="0"
+                            CornerRadius="2"
+                            Margin="2">
+                        <ContentPresenter ContentSource="Header" 
+                                          Margin="{TemplateBinding Padding}"
+                                          VerticalAlignment="Center"/>
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsHighlighted" Value="True">
+                            <Setter TargetName="Border" Property="Background" Value="#3E3E42"/>
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
 </ResourceDictionary>

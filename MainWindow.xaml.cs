@@ -51,6 +51,55 @@ public partial class MainWindow : Window
         WindowState = WindowState == WindowState.Maximized ? WindowState.Normal : WindowState.Maximized;
     }
 
+    // Drag and Drop Event Handlers
+    private void Window_Drop(object sender, DragEventArgs e)
+    {
+        HandleDrop(e);
+    }
+
+    private void Window_DragEnter(object sender, DragEventArgs e)
+    {
+        if (e.Data.GetDataPresent(DataFormats.FileDrop))
+        {
+            e.Effects = DragDropEffects.Copy;
+        }
+    }
+
+    private void Window_DragLeave(object sender, DragEventArgs e)
+    {
+        // Nothing specific needed
+    }
+
+    private void Canvas_Drop(object sender, DragEventArgs e)
+    {
+        HandleDrop(e);
+    }
+
+    private void Canvas_DragEnter(object sender, DragEventArgs e)
+    {
+        if (e.Data.GetDataPresent(DataFormats.FileDrop))
+        {
+            e.Effects = DragDropEffects.Copy;
+        }
+    }
+
+    private void Canvas_DragLeave(object sender, DragEventArgs e)
+    {
+        // Nothing specific needed
+    }
+
+    private void HandleDrop(DragEventArgs e)
+    {
+        if (e.Data.GetDataPresent(DataFormats.FileDrop))
+        {
+            string[] files = (string[])e.Data.GetData(DataFormats.FileDrop);
+            if (files != null && files.Length > 0)
+            {
+                LoadImage(files[0]);
+            }
+        }
+    }
+
     private void OpenImage_Click(object sender, RoutedEventArgs e)
     {
         var openFileDialog = new OpenFileDialog
@@ -61,18 +110,26 @@ public partial class MainWindow : Window
 
         if (openFileDialog.ShowDialog() == true)
         {
-            try
-            {
-                originalImage = new BitmapImage(new Uri(openFileDialog.FileName));
-                processor = new ImageProcessor(originalImage);
-                PlaceholderText.Visibility = Visibility.Collapsed;
-                ResetZoom();
-                ProcessImage();
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show($"Error loading image: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
-            }
+            LoadImage(openFileDialog.FileName);
+        }
+    }
+
+    private void LoadImage(string fileName)
+    {
+        try
+        {
+            originalImage = new BitmapImage(new Uri(fileName));
+            processor = new ImageProcessor(originalImage);
+            DropPlaceholder.Visibility = Visibility.Collapsed;
+            ImageScrollViewer.Visibility = Visibility.Visible;
+            ResetZoomInternal();
+            ProcessImage();
+            StatusText.Text = $"Loaded: {Path.GetFileName(fileName)}";
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show($"Error loading image: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            StatusText.Text = "Error loading image";
         }
     }
 
@@ -102,10 +159,12 @@ public partial class MainWindow : Window
                 encoder.Save(stream);
 
                 MessageBox.Show("Image exported successfully!", "Success", MessageBoxButton.OK, MessageBoxImage.Information);
+                StatusText.Text = $"Exported: {Path.GetFileName(saveFileDialog.FileName)}";
             }
             catch (Exception ex)
             {
                 MessageBox.Show($"Error exporting image: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                StatusText.Text = "Error exporting image";
             }
         }
     }
@@ -123,26 +182,57 @@ public partial class MainWindow : Window
         };
     }
 
-    private void DitherAlgorithm_Changed(object sender, System.Windows.Controls.SelectionChangedEventArgs e)
+    // Zoom Controls
+    private void ZoomIn_Click(object sender, RoutedEventArgs e)
+    {
+        if (originalImage != null)
+        {
+            zoomLevel = Math.Min(MaxZoom, zoomLevel + ZoomIncrement);
+            ApplyZoom();
+        }
+    }
+
+    private void ZoomOut_Click(object sender, RoutedEventArgs e)
+    {
+        if (originalImage != null)
+        {
+            zoomLevel = Math.Max(MinZoom, zoomLevel - ZoomIncrement);
+            ApplyZoom();
+        }
+    }
+
+    private void ResetZoom_Click(object sender, RoutedEventArgs e)
+    {
+        if (originalImage != null)
+        {
+            ResetZoomInternal();
+        }
+    }
+
+    private void ApplyZoom()
+    {
+        ImageScaleTransform.ScaleX = zoomLevel;
+        ImageScaleTransform.ScaleY = zoomLevel;
+        StatusText.Text = $"Zoom: {(int)(zoomLevel * 100)}%";
+    }
+
+    private void Style_Changed(object sender, SelectionChangedEventArgs e)
     {
         ProcessImage();
     }
 
-    private void ImageParameter_Changed(object sender, RoutedEventArgs e)
+    private void Presets_Changed(object sender, SelectionChangedEventArgs e)
     {
-        System.Diagnostics.Debug.WriteLine("ImageParameter_Changed called");
         ProcessImage();
     }
 
     private void ResetAll_Click(object sender, RoutedEventArgs e)
     {
-        BrightnessSlider.Value = 0;
-        ContrastSlider.Value = 0;
-        SaturationSlider.Value = 0;
-        ColorCountSlider.Value = 2;
-        GrayscaleCheckBox.IsChecked = false;
-        InvertCheckBox.IsChecked = false;
-        DitherAlgorithmComboBox.SelectedIndex = 0;
+        ScaleSlider.Value = 11;
+        LineScaleSlider.Value = 1;
+        StyleComboBox.SelectedIndex = 0;
+        PresetsComboBox.SelectedIndex = 0;
+        StatusText.Text = "Reset all settings";
     }
 
     private async void ProcessImage()
@@ -156,24 +246,25 @@ public partial class MainWindow : Window
         }
 
         isProcessing = true;
+        StatusText.Text = "Processing...";
         System.Diagnostics.Debug.WriteLine("Starting image processing...");
 
         try
         {
-            var ditherType = ((System.Windows.Controls.ComboBoxItem)DitherAlgorithmComboBox.SelectedItem)?.Content?.ToString() ?? "None";
+            var ditherType = ((ComboBoxItem)StyleComboBox.SelectedItem)?.Content?.ToString() ?? "None";
             
             var settings = new ImageProcessingSettings
             {
                 DitherAlgorithm = ditherType,
-                ColorCount = (int)ColorCountSlider.Value,
-                Brightness = (int)BrightnessSlider.Value,
-                Contrast = (int)ContrastSlider.Value,
-                Saturation = (int)SaturationSlider.Value,
-                Grayscale = GrayscaleCheckBox.IsChecked == true,
-                Invert = InvertCheckBox.IsChecked == true
+                ColorCount = (int)ScaleSlider.Value,
+                Brightness = 0,
+                Contrast = 0,
+                Saturation = 0,
+                Grayscale = false,
+                Invert = false
             };
 
-            System.Diagnostics.Debug.WriteLine($"Settings: Brightness={settings.Brightness}, Contrast={settings.Contrast}");
+            System.Diagnostics.Debug.WriteLine($"Settings: Scale={settings.ColorCount}, Style={ditherType}");
 
             var processed = await Task.Run(() => processor.Process(settings));
             
@@ -182,8 +273,11 @@ public partial class MainWindow : Window
             Dispatcher.Invoke(() =>
             {
                 ImagePreview.Source = processed;
+                PreviewImage.Source = processed;
                 System.Diagnostics.Debug.WriteLine("Image source updated");
             });
+
+            StatusText.Text = "Ready";
         }
         catch (Exception ex)
         {
@@ -191,6 +285,7 @@ public partial class MainWindow : Window
             Dispatcher.Invoke(() =>
             {
                 MessageBox.Show($"Error processing image: {ex.Message}\n\nStack trace:\n{ex.StackTrace}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                StatusText.Text = "Error processing image";
             });
         }
         finally
@@ -243,18 +338,9 @@ public partial class MainWindow : Window
                 ImageScrollViewer.ScrollToVerticalOffset(newOffsetY);
                 
                 System.Diagnostics.Debug.WriteLine($"Zoom level: {zoomLevel}");
-                UpdateZoomIndicator();
+                StatusText.Text = $"Zoom: {(int)(zoomLevel * 100)}%";
             }
         }
-    }
-
-    private async void UpdateZoomIndicator()
-    {
-        ZoomText.Text = $"{(int)(zoomLevel * 100)}%";
-        ZoomIndicator.Visibility = Visibility.Visible;
-        
-        await Task.Delay(1000);
-        ZoomIndicator.Visibility = Visibility.Collapsed;
     }
 
     private void ImageScrollViewer_MouseDown(object sender, MouseButtonEventArgs e)
@@ -316,14 +402,13 @@ public partial class MainWindow : Window
         }
     }
 
-    private void ResetZoom()
+    private void ResetZoomInternal()
     {
         zoomLevel = 1.0;
         ImageScaleTransform.ScaleX = 1.0;
         ImageScaleTransform.ScaleY = 1.0;
         ImageScrollViewer.ScrollToHorizontalOffset(0);
         ImageScrollViewer.ScrollToVerticalOffset(0);
-        ZoomIndicator.Visibility = Visibility.Collapsed;
+        StatusText.Text = "Ready";
     }
 }
-
