@@ -36,23 +36,33 @@
                     <Border Grid.Column="0" Grid.ColumnSpan="3" Background="Transparent" 
                             MouseLeftButtonDown="TitleBar_MouseLeftButtonDown"/>
 
-                    <!-- Menu Bar -->
-                    <Menu Grid.Column="0" Background="Transparent" VerticalAlignment="Center">
-                        <MenuItem Header="File" Style="{StaticResource ModernMenuItem}">
-                            <MenuItem Header="Open..." Click="OpenImage_Click"/>
-                            <MenuItem Header="Export..." Click="ExportImage_Click"/>
-                            <Separator/>
-                            <MenuItem Header="Exit" Click="CloseButton_Click"/>
-                        </MenuItem>
-                        <MenuItem Header="Edit" Style="{StaticResource ModernMenuItem}">
-                            <MenuItem Header="Reset All" Click="ResetAll_Click"/>
-                        </MenuItem>
-                        <MenuItem Header="Batch" Style="{StaticResource ModernMenuItem}"/>
-                        <MenuItem Header="Adjustments" Style="{StaticResource ModernMenuItem}"/>
-                        <MenuItem Header="Themes" Style="{StaticResource ModernMenuItem}"/>
-                        <MenuItem Header="Extras" Style="{StaticResource ModernMenuItem}"/>
-                        <MenuItem Header="Help" Style="{StaticResource ModernMenuItem}"/>
-                    </Menu>
+                    <!-- Logo and Menu Bar -->
+                    <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
+                        <!-- Logo -->
+                        <Image Source="Assets/logo-white.png" 
+                               Height="20" 
+                               Margin="8,0,8,0" 
+                               VerticalAlignment="Center"
+                               RenderOptions.BitmapScalingMode="HighQuality"/>
+                        
+                        <!-- Menu Bar -->
+                        <Menu Background="Transparent" VerticalAlignment="Center">
+                            <MenuItem Header="File" Style="{StaticResource ModernMenuItem}">
+                                <MenuItem Header="Open..." Click="OpenImage_Click"/>
+                                <MenuItem Header="Export..." Click="ExportImage_Click"/>
+                                <Separator/>
+                                <MenuItem Header="Exit" Click="CloseButton_Click"/>
+                            </MenuItem>
+                            <MenuItem Header="Edit" Style="{StaticResource ModernMenuItem}">
+                                <MenuItem Header="Reset All" Click="ResetAll_Click"/>
+                            </MenuItem>
+                            <MenuItem Header="Batch" Style="{StaticResource ModernMenuItem}"/>
+                            <MenuItem Header="Adjustments" Style="{StaticResource ModernMenuItem}"/>
+                            <MenuItem Header="Themes" Style="{StaticResource ModernMenuItem}"/>
+                            <MenuItem Header="Extras" Style="{StaticResource ModernMenuItem}"/>
+                            <MenuItem Header="Help" Style="{StaticResource ModernMenuItem}"/>
+                        </Menu>
+                    </StackPanel>
 
                     <!-- Window Controls -->
                     <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Stretch">
