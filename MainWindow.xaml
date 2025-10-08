@@ -73,7 +73,7 @@
                             <TextBlock Text="&#xE922;" FontFamily="Segoe MDL2 Assets" FontSize="10" Foreground="#CCCCCC" VerticalAlignment="Center"/>
                         </Button>
                         <Button Click="CloseButton_Click" Style="{StaticResource WindowButtonClose}" Width="46" Height="32">
-                            <TextBlock Text="&#xE10A;" FontFamily="Segoe MDL2 Assets" FontSize="10" Foreground="#CCCCCC" VerticalAlignment="Center"/>
+                            <TextBlock Text="&#xE8BB;" FontFamily="Segoe MDL2 Assets" FontSize="10" Foreground="#CCCCCC" VerticalAlignment="Center"/>
                         </Button>
                     </StackPanel>
                 </Grid>
