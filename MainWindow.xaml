@@ -195,53 +195,73 @@
                             <!-- PARAMETERS Section -->
                             <TextBlock Text="Parameters" FontSize="16" Foreground="#E0E0E0" FontWeight="SemiBold" Margin="0,0,0,8"/>
                             
-                            <Grid Margin="0,0,0,4">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*"/>
-                                    <ColumnDefinition Width="Auto"/>
-                                </Grid.ColumnDefinitions>
-                                <TextBlock Grid.Column="0" Text="Scale" FontSize="13" Foreground="#999999"/>
-                                <TextBlock Grid.Column="1" Text="{Binding ElementName=ScaleSlider, Path=Value, StringFormat={}{0:F0}}" 
-                                           FontSize="13" Foreground="#999999"/>
+                            <Grid Margin="0,0,0,16">
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                </Grid.RowDefinitions>
+                                
+                                <Grid Grid.Row="0" Margin="0,0,0,8">
+                                    <TextBlock Text="Scale" FontSize="13" Foreground="#E0E0E0" VerticalAlignment="Center"/>
+                                    <TextBlock Text="{Binding ElementName=ScaleSlider, Path=Value, StringFormat={}{0:0}}"
+                                               FontSize="13" Foreground="#999999"
+                                               HorizontalAlignment="Right" VerticalAlignment="Center"/>
+                                </Grid>
+                                
+                                <Slider x:Name="ScaleSlider" Grid.Row="1" Minimum="1" Maximum="20" Value="11"
+                                        Style="{StaticResource ModernSlider}" TickFrequency="1" IsSnapToTickEnabled="True"/>
                             </Grid>
-                            <Slider x:Name="ScaleSlider" Minimum="1" Maximum="20" Value="11" 
-                                    Style="{StaticResource ModernSlider}" Margin="0,0,0,8"/>
 
-                            <Grid Margin="0,0,0,4">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*"/>
-                                    <ColumnDefinition Width="Auto"/>
-                                </Grid.ColumnDefinitions>
-                                <TextBlock Grid.Column="0" Text="Line Scale" FontSize="13" Foreground="#999999"/>
-                                <TextBlock Grid.Column="1" Text="{Binding ElementName=LineScaleSlider, Path=Value, StringFormat={}{0:F0}}" 
-                                           FontSize="13" Foreground="#999999"/>
+                            <Grid Margin="0,0,0,16">
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                </Grid.RowDefinitions>
+                                
+                                <Grid Grid.Row="0" Margin="0,0,0,8">
+                                    <TextBlock Text="Line Scale" FontSize="13" Foreground="#E0E0E0" VerticalAlignment="Center"/>
+                                    <TextBlock Text="{Binding ElementName=LineScaleSlider, Path=Value, StringFormat={}{0:0}}"
+                                               FontSize="13" Foreground="#999999"
+                                               HorizontalAlignment="Right" VerticalAlignment="Center"/>
+                                </Grid>
+                                
+                                <Slider x:Name="LineScaleSlider" Grid.Row="1" Minimum="0" Maximum="10" Value="1"
+                                        Style="{StaticResource ModernSlider}" TickFrequency="1" IsSnapToTickEnabled="True"/>
                             </Grid>
-                            <Slider x:Name="LineScaleSlider" Minimum="0" Maximum="10" Value="1" 
-                                    Style="{StaticResource ModernSlider}" Margin="0,0,0,8"/>
 
-                            <Grid Margin="0,0,0,4">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*"/>
-                                    <ColumnDefinition Width="Auto"/>
-                                </Grid.ColumnDefinitions>
-                                <TextBlock Grid.Column="0" Text="Smoothing Factor" FontSize="13" Foreground="#999999"/>
-                                <TextBlock Grid.Column="1" Text="{Binding ElementName=SmoothingSlider, Path=Value, StringFormat={}{0:F0}}" 
-                                           FontSize="13" Foreground="#999999"/>
+                            <Grid Margin="0,0,0,16">
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                </Grid.RowDefinitions>
+                                
+                                <Grid Grid.Row="0" Margin="0,0,0,8">
+                                    <TextBlock Text="Smoothing Factor" FontSize="13" Foreground="#E0E0E0" VerticalAlignment="Center"/>
+                                    <TextBlock Text="{Binding ElementName=SmoothingSlider, Path=Value, StringFormat={}{0:0}}"
+                                               FontSize="13" Foreground="#999999"
+                                               HorizontalAlignment="Right" VerticalAlignment="Center"/>
+                                </Grid>
+                                
+                                <Slider x:Name="SmoothingSlider" Grid.Row="1" Minimum="0" Maximum="10" Value="0"
+                                        Style="{StaticResource ModernSlider}" TickFrequency="1" IsSnapToTickEnabled="True"/>
                             </Grid>
-                            <Slider x:Name="SmoothingSlider" Minimum="0" Maximum="10" Value="0" 
-                                    Style="{StaticResource ModernSlider}" Margin="0,0,0,8"/>
 
-                            <Grid Margin="0,0,0,4">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*"/>
-                                    <ColumnDefinition Width="Auto"/>
-                                </Grid.ColumnDefinitions>
-                                <TextBlock Grid.Column="0" Text="Bleed Fraction" FontSize="13" Foreground="#999999"/>
-                                <TextBlock Grid.Column="1" Text="{Binding ElementName=BleedSlider, Path=Value, StringFormat={}{0:F0}}" 
-                                           FontSize="13" Foreground="#999999"/>
+                            <Grid Margin="0,0,0,16">
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                </Grid.RowDefinitions>
+                                
+                                <Grid Grid.Row="0" Margin="0,0,0,8">
+                                    <TextBlock Text="Bleed Fraction" FontSize="13" Foreground="#E0E0E0" VerticalAlignment="Center"/>
+                                    <TextBlock Text="{Binding ElementName=BleedSlider, Path=Value, StringFormat={}{0:0}}"
+                                               FontSize="13" Foreground="#999999"
+                                               HorizontalAlignment="Right" VerticalAlignment="Center"/>
+                                </Grid>
+                                
+                                <Slider x:Name="BleedSlider" Grid.Row="1" Minimum="0" Maximum="100" Value="0"
+                                        Style="{StaticResource ModernSlider}" TickFrequency="1" IsSnapToTickEnabled="True"/>
                             </Grid>
-                            <Slider x:Name="BleedSlider" Minimum="0" Maximum="100" Value="0" 
-                                    Style="{StaticResource ModernSlider}" Margin="0,0,0,12"/>
 
                             <Separator Margin="0,0,0,12" Background="#3E3E42"/>
 
@@ -272,84 +292,114 @@
                             <TextBlock Text="Adjustments" FontSize="16" Foreground="#E0E0E0" FontWeight="SemiBold" Margin="0,0,0,8"/>
                             
                             <CheckBox x:Name="InvertCheckBox" Content="Invert" 
-                                      Style="{StaticResource ModernCheckBox}" Margin="0,0,0,8"/>
+                                      Style="{StaticResource ModernCheckBox}" Margin="0,0,0,12"/>
 
-                            <Grid Margin="0,0,0,4">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*"/>
-                                    <ColumnDefinition Width="Auto"/>
-                                </Grid.ColumnDefinitions>
-                                <TextBlock Grid.Column="0" Text="Contrast" FontSize="13" Foreground="#999999"/>
-                                <TextBlock Grid.Column="1" Text="{Binding ElementName=ContrastSlider, Path=Value, StringFormat={}{0:F0}}" 
-                                           FontSize="13" Foreground="#999999"/>
+                            <Grid Margin="0,0,0,16">
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                </Grid.RowDefinitions>
+                                
+                                <Grid Grid.Row="0" Margin="0,0,0,8">
+                                    <TextBlock Text="Contrast" FontSize="13" Foreground="#E0E0E0" VerticalAlignment="Center"/>
+                                    <TextBlock Text="{Binding ElementName=ContrastSlider, Path=Value, StringFormat={}{0:0}}"
+                                               FontSize="13" Foreground="#999999"
+                                               HorizontalAlignment="Right" VerticalAlignment="Center"/>
+                                </Grid>
+                                
+                                <Slider x:Name="ContrastSlider" Grid.Row="1" Minimum="0" Maximum="100" Value="45"
+                                        Style="{StaticResource ModernSlider}" TickFrequency="1" IsSnapToTickEnabled="True"/>
                             </Grid>
-                            <Slider x:Name="ContrastSlider" Minimum="0" Maximum="100" Value="45" 
-                                    Style="{StaticResource ModernSlider}" Margin="0,0,0,8"/>
 
-                            <Grid Margin="0,0,0,4">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*"/>
-                                    <ColumnDefinition Width="Auto"/>
-                                </Grid.ColumnDefinitions>
-                                <TextBlock Grid.Column="0" Text="Midtones" FontSize="13" Foreground="#999999"/>
-                                <TextBlock Grid.Column="1" Text="{Binding ElementName=MidtonesSlider, Path=Value, StringFormat={}{0:F0}}" 
-                                           FontSize="13" Foreground="#999999"/>
+                            <Grid Margin="0,0,0,16">
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                </Grid.RowDefinitions>
+                                
+                                <Grid Grid.Row="0" Margin="0,0,0,8">
+                                    <TextBlock Text="Midtones" FontSize="13" Foreground="#E0E0E0" VerticalAlignment="Center"/>
+                                    <TextBlock Text="{Binding ElementName=MidtonesSlider, Path=Value, StringFormat={}{0:0}}"
+                                               FontSize="13" Foreground="#999999"
+                                               HorizontalAlignment="Right" VerticalAlignment="Center"/>
+                                </Grid>
+                                
+                                <Slider x:Name="MidtonesSlider" Grid.Row="1" Minimum="0" Maximum="100" Value="50"
+                                        Style="{StaticResource ModernSlider}" TickFrequency="1" IsSnapToTickEnabled="True"/>
                             </Grid>
-                            <Slider x:Name="MidtonesSlider" Minimum="0" Maximum="100" Value="50" 
-                                    Style="{StaticResource ModernSlider}" Margin="0,0,0,8"/>
 
-                            <Grid Margin="0,0,0,4">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*"/>
-                                    <ColumnDefinition Width="Auto"/>
-                                </Grid.ColumnDefinitions>
-                                <TextBlock Grid.Column="0" Text="Highlights" FontSize="13" Foreground="#999999"/>
-                                <TextBlock Grid.Column="1" Text="{Binding ElementName=HighlightsSlider, Path=Value, StringFormat={}{0:F0}}" 
-                                           FontSize="13" Foreground="#999999"/>
+                            <Grid Margin="0,0,0,16">
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                </Grid.RowDefinitions>
+                                
+                                <Grid Grid.Row="0" Margin="0,0,0,8">
+                                    <TextBlock Text="Highlights" FontSize="13" Foreground="#E0E0E0" VerticalAlignment="Center"/>
+                                    <TextBlock Text="{Binding ElementName=HighlightsSlider, Path=Value, StringFormat={}{0:0}}"
+                                               FontSize="13" Foreground="#999999"
+                                               HorizontalAlignment="Right" VerticalAlignment="Center"/>
+                                </Grid>
+                                
+                                <Slider x:Name="HighlightsSlider" Grid.Row="1" Minimum="0" Maximum="100" Value="50"
+                                        Style="{StaticResource ModernSlider}" TickFrequency="1" IsSnapToTickEnabled="True"/>
                             </Grid>
-                            <Slider x:Name="HighlightsSlider" Minimum="0" Maximum="100" Value="50" 
-                                    Style="{StaticResource ModernSlider}" Margin="0,0,0,8"/>
 
-                            <Grid Margin="0,0,0,4">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*"/>
-                                    <ColumnDefinition Width="Auto"/>
-                                </Grid.ColumnDefinitions>
-                                <TextBlock Grid.Column="0" Text="Luminance Threshold" FontSize="13" Foreground="#999999"/>
-                                <TextBlock Grid.Column="1" Text="{Binding ElementName=LuminanceSlider, Path=Value, StringFormat={}{0:F0}}" 
-                                           FontSize="13" Foreground="#999999"/>
+                            <Grid Margin="0,0,0,16">
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                </Grid.RowDefinitions>
+                                
+                                <Grid Grid.Row="0" Margin="0,0,0,8">
+                                    <TextBlock Text="Luminance Threshold" FontSize="13" Foreground="#E0E0E0" VerticalAlignment="Center"/>
+                                    <TextBlock Text="{Binding ElementName=LuminanceSlider, Path=Value, StringFormat={}{0:0}}"
+                                               FontSize="13" Foreground="#999999"
+                                               HorizontalAlignment="Right" VerticalAlignment="Center"/>
+                                </Grid>
+                                
+                                <Slider x:Name="LuminanceSlider" Grid.Row="1" Minimum="0" Maximum="100" Value="50"
+                                        Style="{StaticResource ModernSlider}" TickFrequency="1" IsSnapToTickEnabled="True"/>
                             </Grid>
-                            <Slider x:Name="LuminanceSlider" Minimum="0" Maximum="100" Value="50" 
-                                    Style="{StaticResource ModernSlider}" Margin="0,0,0,12"/>
 
                             <Separator Margin="0,0,0,12" Background="#3E3E42"/>
 
                             <!-- EFFECTS Section -->
                             <TextBlock Text="Effects" FontSize="16" Foreground="#E0E0E0" FontWeight="SemiBold" Margin="0,0,0,8"/>
                             
-                            <Grid Margin="0,0,0,4">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*"/>
-                                    <ColumnDefinition Width="Auto"/>
-                                </Grid.ColumnDefinitions>
-                                <TextBlock Grid.Column="0" Text="Blur" FontSize="13" Foreground="#999999"/>
-                                <TextBlock Grid.Column="1" Text="{Binding ElementName=BlurSlider, Path=Value, StringFormat={}{0:F0}}" 
-                                           FontSize="13" Foreground="#999999"/>
+                            <Grid Margin="0,0,0,16">
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                </Grid.RowDefinitions>
+                                
+                                <Grid Grid.Row="0" Margin="0,0,0,8">
+                                    <TextBlock Text="Blur" FontSize="13" Foreground="#E0E0E0" VerticalAlignment="Center"/>
+                                    <TextBlock Text="{Binding ElementName=BlurSlider, Path=Value, StringFormat={}{0:0}}"
+                                               FontSize="13" Foreground="#999999"
+                                               HorizontalAlignment="Right" VerticalAlignment="Center"/>
+                                </Grid>
+                                
+                                <Slider x:Name="BlurSlider" Grid.Row="1" Minimum="0" Maximum="20" Value="0"
+                                        Style="{StaticResource ModernSlider}" TickFrequency="1" IsSnapToTickEnabled="True"/>
                             </Grid>
-                            <Slider x:Name="BlurSlider" Minimum="0" Maximum="20" Value="0" 
-                                    Style="{StaticResource ModernSlider}" Margin="0,0,0,8"/>
 
-                            <Grid Margin="0,0,0,4">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*"/>
-                                    <ColumnDefinition Width="Auto"/>
-                                </Grid.ColumnDefinitions>
-                                <TextBlock Grid.Column="0" Text="Depth" FontSize="13" Foreground="#999999"/>
-                                <TextBlock Grid.Column="1" Text="{Binding ElementName=DepthSlider, Path=Value, StringFormat={}{0:F0}}" 
-                                           FontSize="13" Foreground="#999999"/>
+                            <Grid Margin="0,0,0,16">
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                </Grid.RowDefinitions>
+                                
+                                <Grid Grid.Row="0" Margin="0,0,0,8">
+                                    <TextBlock Text="Depth" FontSize="13" Foreground="#E0E0E0" VerticalAlignment="Center"/>
+                                    <TextBlock Text="{Binding ElementName=DepthSlider, Path=Value, StringFormat={}{0:0}}"
+                                               FontSize="13" Foreground="#999999"
+                                               HorizontalAlignment="Right" VerticalAlignment="Center"/>
+                                </Grid>
+                                
+                                <Slider x:Name="DepthSlider" Grid.Row="1" Minimum="1" Maximum="10" Value="6"
+                                        Style="{StaticResource ModernSlider}" TickFrequency="1" IsSnapToTickEnabled="True"/>
                             </Grid>
-                            <Slider x:Name="DepthSlider" Minimum="1" Maximum="10" Value="6" 
-                                    Style="{StaticResource ModernSlider}" Margin="0,0,0,12"/>
 
                             <Separator Margin="0,0,0,12" Background="#3E3E42"/>
 
