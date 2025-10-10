@@ -60,7 +60,15 @@
                             <MenuItem Header="Adjustments" Style="{StaticResource ModernMenuItem}"/>
                             <MenuItem Header="Themes" Style="{StaticResource ModernMenuItem}"/>
                             <MenuItem Header="Extras" Style="{StaticResource ModernMenuItem}"/>
-                            <MenuItem Header="Help" Style="{StaticResource ModernMenuItem}"/>
+                            <MenuItem Header="Help" Style="{StaticResource ModernMenuItem}">
+                                <MenuItem Header="Documentation" Click="Documentation_Click"/>
+                                <MenuItem Header="Keyboard Shortcuts" Click="KeyboardShortcuts_Click"/>
+                                <Separator/>
+                                <MenuItem Header="Report an Issue" Click="ReportIssue_Click"/>
+                                <MenuItem Header="Check for Updates" Click="CheckUpdates_Click"/>
+                                <Separator/>
+                                <MenuItem Header="About ShadeWorks" Click="About_Click"/>
+                            </MenuItem>
                         </Menu>
                     </StackPanel>
 

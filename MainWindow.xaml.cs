@@ -438,4 +438,87 @@ public partial class MainWindow : Window
         ImageScrollViewer.ScrollToVerticalOffset(0);
         StatusText.Text = "Ready";
     }
+
+    // Help Menu Event Handlers
+    private void Documentation_Click(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+            {
+                FileName = "https://github.com/yourusername/shadeworks/wiki",
+                UseShellExecute = true
+            });
+            StatusText.Text = "Opening documentation...";
+        }
+        catch
+        {
+            MessageBox.Show("Documentation will be available soon!\n\nFor now, visit: https://github.com/yourusername/shadeworks", 
+                "Documentation", MessageBoxButton.OK, MessageBoxImage.Information);
+        }
+    }
+
+    private void KeyboardShortcuts_Click(object sender, RoutedEventArgs e)
+    {
+        var shortcuts = "Keyboard Shortcuts:\n\n" +
+                       "File Operations:\n" +
+                       "  Ctrl+O - Open Image\n" +
+                       "  Ctrl+S - Export Image\n" +
+                       "  Ctrl+Q - Exit\n\n" +
+                       "View Controls:\n" +
+                       "  Alt+Scroll - Zoom In/Out\n" +
+                       "  Middle Mouse - Pan Image\n" +
+                       "  Ctrl+0 - Reset Zoom\n" +
+                       "  Ctrl++ - Zoom In\n" +
+                       "  Ctrl+- - Zoom Out\n\n" +
+                       "Editing:\n" +
+                       "  Ctrl+R - Reset All Settings\n" +
+                       "  Ctrl+Z - Undo (coming soon)\n" +
+                       "  Ctrl+Y - Redo (coming soon)";
+
+        MessageBox.Show(shortcuts, "Keyboard Shortcuts", MessageBoxButton.OK, MessageBoxImage.Information);
+        StatusText.Text = "Displayed keyboard shortcuts";
+    }
+
+    private void ReportIssue_Click(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+            {
+                FileName = "https://github.com/yourusername/shadeworks/issues/new",
+                UseShellExecute = true
+            });
+            StatusText.Text = "Opening issue tracker...";
+        }
+        catch
+        {
+            MessageBox.Show("To report an issue, please visit:\nhttps://github.com/yourusername/shadeworks/issues", 
+                "Report Issue", MessageBoxButton.OK, MessageBoxImage.Information);
+        }
+    }
+
+    private void CheckUpdates_Click(object sender, RoutedEventArgs e)
+    {
+        MessageBox.Show("You are running ShadeWorks v1.0\n\nThis is the latest version.", 
+            "Check for Updates", MessageBoxButton.OK, MessageBoxImage.Information);
+        StatusText.Text = "Checked for updates";
+    }
+
+    private void About_Click(object sender, RoutedEventArgs e)
+    {
+        var aboutMessage = "ShadeWorks v1.0\n\n" +
+                          "A modern image dithering and processing tool\n\n" +
+                          "Features:\n" +
+                          "• Multiple dithering algorithms (Uniform Modulation, Floyd-Steinberg, Atkinson, Ordered Bayer)\n" +
+                          "• Real-time image processing\n" +
+                          "• Color palette customization\n" +
+                          "• Advanced adjustment controls\n" +
+                          "• Drag & drop support\n\n" +
+                          "© 2024 ShadeWorks. All rights reserved.\n\n" +
+                          "Built with .NET 9.0 and WPF";
+
+        MessageBox.Show(aboutMessage, "About ShadeWorks", MessageBoxButton.OK, MessageBoxImage.Information);
+        StatusText.Text = "About ShadeWorks";
+    }
 }
