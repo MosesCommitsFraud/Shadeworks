@@ -4,7 +4,7 @@ import { ChevronDown } from "lucide-react"
 
 export function Header() {
   return (
-    <header className="border-b backdrop-blur-sm sticky top-0 z-50 bg-background/80 border-transparent">
+    <header className="border-b border-transparent sticky top-0 z-50">
       <div className="container mx-auto px-4">
         <nav className="flex items-center justify-center gap-8 h-16">
           <div className="flex items-center gap-6">
