@@ -1,3 +1,4 @@
+import Image from "next/image"
 import { Button } from "@/components/ui/button"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { ChevronDown } from "lucide-react"
@@ -6,16 +7,21 @@ export function Header() {
   return (
     <header className="border-b border-transparent sticky top-0 z-50">
       <div className="container mx-auto px-4">
-        <nav className="flex items-center justify-center gap-8 h-16">
-          <div className="flex items-center gap-6">
-            {/* Logo placeholder */}
-            <div className="flex items-center gap-2">
-              <div className="w-8 h-8 bg-accent rounded" />
-              <span className="font-semibold text-lg">shadeworks</span>
-            </div>
+        <nav className="flex items-center justify-center gap-10 h-16">
+          {/* Logo */}
+          <div className="flex items-center">
+            <Image 
+              src="/logo-text-sw-white.svg" 
+              alt="shadeworks" 
+              width={100} 
+              height={20} 
+              className="h-5 w-auto"
+              priority
+            />
+          </div>
 
-            {/* Navigation */}
-            <div className="hidden md:flex items-center gap-6">
+          {/* Navigation */}
+          <div className="hidden md:flex items-center gap-6 pt-[5px]">
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" size="sm" className="gap-1">
@@ -37,8 +43,7 @@ export function Header() {
 
               <Button variant="ghost" size="sm">
                 Docs
-              </Button>
-            </div>
+            </Button>
           </div>
         </nav>
       </div>
