@@ -87,4 +87,8 @@
   body {
     @apply bg-background text-foreground;
   }
+  ::selection {
+    background-color: rgba(216, 64, 64, 0.076);
+    color: rgba(248, 75, 75, 0.998);
+  }
 }
