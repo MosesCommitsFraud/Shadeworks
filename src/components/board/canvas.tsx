@@ -5,6 +5,7 @@ import { v4 as uuid } from 'uuid';
 import getStroke from 'perfect-freehand';
 import type { Tool, BoardElement, Point } from '@/lib/board-types';
 import { CollaborationManager } from '@/lib/collaboration';
+import { CollaboratorCursors } from './collaborator-cursor';
 
 interface CanvasProps {
   tool: Tool;
@@ -971,35 +972,15 @@ export function Canvas({
           )}
         </g>
         
-        {/* Remote Cursors */}
-        {remoteCursors.map((cursor) => (
-          <g key={cursor.id} transform={`translate(${cursor.x + pan.x}, ${cursor.y + pan.y})`}>
-            <path
-              d="M0,0 L0,16 L4,12 L8,20 L10,19 L6,11 L12,11 Z"
-              fill={cursor.color}
-              stroke="#000"
-              strokeWidth={1}
-            />
-            <rect
-              x={14}
-              y={12}
-              rx={4}
-              width={Math.max(cursor.name.length * 7 + 12, 40)}
-              height={20}
-              fill={cursor.color}
-            />
-            <text
-              x={20}
-              y={26}
-              fill="#000"
-              fontSize={12}
-              fontWeight={500}
-            >
-              {cursor.name}
-            </text>
-          </g>
-        ))}
       </svg>
+      
+      {/* Remote Cursors - Animated */}
+      <div 
+        className="absolute inset-0 pointer-events-none overflow-hidden"
+        style={{ transform: `translate(${pan.x}px, ${pan.y}px)` }}
+      >
+        <CollaboratorCursors cursors={remoteCursors} />
+      </div>
       
       {/* Text Input */}
       {textInput && (
