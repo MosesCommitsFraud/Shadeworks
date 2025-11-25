@@ -25,6 +25,15 @@ interface RemoteCursor {
   y: number;
 }
 
+type ResizeHandle = 'nw' | 'n' | 'ne' | 'e' | 'se' | 's' | 'sw' | 'w' | null;
+
+interface BoundingBox {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
 // Convert perfect-freehand points to SVG path
 function getSvgPathFromStroke(stroke: number[][]) {
   if (!stroke.length) return '';
@@ -40,6 +49,49 @@ function getSvgPathFromStroke(stroke: number[][]) {
 
   d.push('Z');
   return d.join(' ');
+}
+
+// Get bounding box for any element
+function getBoundingBox(element: BoardElement): BoundingBox | null {
+  if (element.type === 'pen' || element.type === 'line') {
+    if (element.points.length === 0) return null;
+    const xs = element.points.map(p => p.x);
+    const ys = element.points.map(p => p.y);
+    const minX = Math.min(...xs);
+    const minY = Math.min(...ys);
+    const maxX = Math.max(...xs);
+    const maxY = Math.max(...ys);
+    // Add padding for stroke width
+    const padding = element.strokeWidth * 2;
+    return {
+      x: minX - padding,
+      y: minY - padding,
+      width: Math.max(maxX - minX + padding * 2, 20),
+      height: Math.max(maxY - minY + padding * 2, 20),
+    };
+  }
+  
+  if (element.type === 'rectangle' || element.type === 'ellipse') {
+    return {
+      x: element.x ?? 0,
+      y: element.y ?? 0,
+      width: element.width ?? 0,
+      height: element.height ?? 0,
+    };
+  }
+  
+  if (element.type === 'text') {
+    const fontSize = element.strokeWidth * 4 + 12;
+    const textWidth = (element.text?.length ?? 0) * fontSize * 0.6;
+    return {
+      x: element.x ?? 0,
+      y: (element.y ?? 0) - fontSize,
+      width: Math.max(textWidth, 40),
+      height: fontSize * 1.2,
+    };
+  }
+  
+  return null;
 }
 
 export function Canvas({
@@ -64,6 +116,14 @@ export function Canvas({
   const [textInput, setTextInput] = useState<{ x: number; y: number } | null>(null);
   const [textValue, setTextValue] = useState('');
   const textInputRef = useRef<HTMLInputElement>(null);
+  
+  // Move and resize state
+  const [isDragging, setIsDragging] = useState(false);
+  const [isResizing, setIsResizing] = useState(false);
+  const [resizeHandle, setResizeHandle] = useState<ResizeHandle>(null);
+  const [dragStart, setDragStart] = useState<Point | null>(null);
+  const [originalElement, setOriginalElement] = useState<BoardElement | null>(null);
+  const [originalBounds, setOriginalBounds] = useState<BoundingBox | null>(null);
 
   // Track remote cursors
   useEffect(() => {
@@ -73,7 +133,7 @@ export function Canvas({
       const myId = collaboration.getUserInfo().id;
       const cursors: RemoteCursor[] = [];
       
-      states.forEach((state, clientId) => {
+      states.forEach((state) => {
         if (state.user && state.user.id !== myId && state.user.cursor) {
           cursors.push({
             id: state.user.id,
@@ -102,6 +162,10 @@ export function Canvas({
     };
   }, [pan]);
 
+  // Get selected element
+  const selectedElement = selectedId ? elements.find(el => el.id === selectedId) : null;
+  const selectedBounds = selectedElement ? getBoundingBox(selectedElement) : null;
+
   const handleMouseMove = useCallback((e: React.MouseEvent) => {
     const point = getMousePosition(e);
     
@@ -116,6 +180,108 @@ export function Canvas({
         x: e.clientX - panStart.x,
         y: e.clientY - panStart.y,
       });
+      return;
+    }
+
+    // Handle dragging (moving element)
+    if (isDragging && selectedId && dragStart && originalElement) {
+      const dx = point.x - dragStart.x;
+      const dy = point.y - dragStart.y;
+      
+      if (originalElement.type === 'pen' || originalElement.type === 'line') {
+        const newPoints = originalElement.points.map(p => ({
+          x: p.x + dx,
+          y: p.y + dy,
+        }));
+        onUpdateElement(selectedId, { points: newPoints });
+      } else {
+        onUpdateElement(selectedId, {
+          x: (originalElement.x ?? 0) + dx,
+          y: (originalElement.y ?? 0) + dy,
+        });
+      }
+      return;
+    }
+
+    // Handle resizing
+    if (isResizing && selectedId && dragStart && originalBounds && resizeHandle && originalElement) {
+      const dx = point.x - dragStart.x;
+      const dy = point.y - dragStart.y;
+      
+      let newX = originalBounds.x;
+      let newY = originalBounds.y;
+      let newWidth = originalBounds.width;
+      let newHeight = originalBounds.height;
+      
+      // Calculate new bounds based on handle
+      switch (resizeHandle) {
+        case 'nw':
+          newX = originalBounds.x + dx;
+          newY = originalBounds.y + dy;
+          newWidth = originalBounds.width - dx;
+          newHeight = originalBounds.height - dy;
+          break;
+        case 'n':
+          newY = originalBounds.y + dy;
+          newHeight = originalBounds.height - dy;
+          break;
+        case 'ne':
+          newY = originalBounds.y + dy;
+          newWidth = originalBounds.width + dx;
+          newHeight = originalBounds.height - dy;
+          break;
+        case 'e':
+          newWidth = originalBounds.width + dx;
+          break;
+        case 'se':
+          newWidth = originalBounds.width + dx;
+          newHeight = originalBounds.height + dy;
+          break;
+        case 's':
+          newHeight = originalBounds.height + dy;
+          break;
+        case 'sw':
+          newX = originalBounds.x + dx;
+          newWidth = originalBounds.width - dx;
+          newHeight = originalBounds.height + dy;
+          break;
+        case 'w':
+          newX = originalBounds.x + dx;
+          newWidth = originalBounds.width - dx;
+          break;
+      }
+      
+      // Enforce minimum size
+      if (newWidth < 10) {
+        if (resizeHandle.includes('w')) newX = originalBounds.x + originalBounds.width - 10;
+        newWidth = 10;
+      }
+      if (newHeight < 10) {
+        if (resizeHandle.includes('n')) newY = originalBounds.y + originalBounds.height - 10;
+        newHeight = 10;
+      }
+      
+      // Update element based on type
+      if (originalElement.type === 'rectangle' || originalElement.type === 'ellipse') {
+        onUpdateElement(selectedId, {
+          x: newX,
+          y: newY,
+          width: newWidth,
+          height: newHeight,
+        });
+      } else if (originalElement.type === 'pen' || originalElement.type === 'line') {
+        // Scale points proportionally
+        const scaleX = newWidth / originalBounds.width;
+        const scaleY = newHeight / originalBounds.height;
+        const newPoints = originalElement.points.map(p => ({
+          x: newX + (p.x - originalBounds.x) * scaleX,
+          y: newY + (p.y - originalBounds.y) * scaleY,
+        }));
+        onUpdateElement(selectedId, { points: newPoints });
+      } else if (originalElement.type === 'text') {
+        // For text, just move it
+        onUpdateElement(selectedId, { x: newX, y: newY + newHeight });
+      }
       return;
     }
 
@@ -161,7 +327,6 @@ export function Canvas({
         break;
       }
       case 'eraser': {
-        // Find elements under cursor and delete them
         const eraseRadius = strokeWidth * 2;
         elements.forEach((el) => {
           if (el.type === 'pen' || el.type === 'line') {
@@ -190,7 +355,7 @@ export function Canvas({
         break;
       }
     }
-  }, [isDrawing, currentElement, startPoint, tool, collaboration, getMousePosition, isPanning, panStart, elements, onDeleteElement, strokeWidth]);
+  }, [isDrawing, currentElement, startPoint, tool, collaboration, getMousePosition, isPanning, panStart, elements, onDeleteElement, strokeWidth, isDragging, isResizing, selectedId, dragStart, originalElement, originalBounds, resizeHandle, onUpdateElement]);
 
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
     // Middle mouse button for panning
@@ -206,26 +371,65 @@ export function Canvas({
     setStartPoint(point);
 
     if (tool === 'select') {
+      // Check if clicking on a resize handle first
+      if (selectedBounds && selectedElement) {
+        const handleSize = 8;
+        const handles: { handle: ResizeHandle; x: number; y: number }[] = [
+          { handle: 'nw', x: selectedBounds.x, y: selectedBounds.y },
+          { handle: 'n', x: selectedBounds.x + selectedBounds.width / 2, y: selectedBounds.y },
+          { handle: 'ne', x: selectedBounds.x + selectedBounds.width, y: selectedBounds.y },
+          { handle: 'e', x: selectedBounds.x + selectedBounds.width, y: selectedBounds.y + selectedBounds.height / 2 },
+          { handle: 'se', x: selectedBounds.x + selectedBounds.width, y: selectedBounds.y + selectedBounds.height },
+          { handle: 's', x: selectedBounds.x + selectedBounds.width / 2, y: selectedBounds.y + selectedBounds.height },
+          { handle: 'sw', x: selectedBounds.x, y: selectedBounds.y + selectedBounds.height },
+          { handle: 'w', x: selectedBounds.x, y: selectedBounds.y + selectedBounds.height / 2 },
+        ];
+        
+        for (const h of handles) {
+          if (Math.abs(point.x - h.x) <= handleSize && Math.abs(point.y - h.y) <= handleSize) {
+            setIsResizing(true);
+            setResizeHandle(h.handle);
+            setDragStart(point);
+            setOriginalElement({ ...selectedElement });
+            setOriginalBounds({ ...selectedBounds });
+            return;
+          }
+        }
+        
+        // Check if clicking inside the selection box (for moving)
+        if (
+          point.x >= selectedBounds.x &&
+          point.x <= selectedBounds.x + selectedBounds.width &&
+          point.y >= selectedBounds.y &&
+          point.y <= selectedBounds.y + selectedBounds.height
+        ) {
+          setIsDragging(true);
+          setDragStart(point);
+          setOriginalElement({ ...selectedElement });
+          return;
+        }
+      }
+      
       // Find clicked element
       const clicked = [...elements].reverse().find((el) => {
-        if (el.type === 'pen' || el.type === 'line') {
-          return el.points.some((p) => Math.hypot(p.x - point.x, p.y - point.y) < 10);
-        }
-        if (el.type === 'rectangle' || el.type === 'ellipse') {
-          return (
-            el.x !== undefined &&
-            el.y !== undefined &&
-            el.width !== undefined &&
-            el.height !== undefined &&
-            point.x >= el.x &&
-            point.x <= el.x + el.width &&
-            point.y >= el.y &&
-            point.y <= el.y + el.height
-          );
-        }
-        return false;
+        const bounds = getBoundingBox(el);
+        if (!bounds) return false;
+        return (
+          point.x >= bounds.x &&
+          point.x <= bounds.x + bounds.width &&
+          point.y >= bounds.y &&
+          point.y <= bounds.y + bounds.height
+        );
       });
-      setSelectedId(clicked?.id || null);
+      
+      if (clicked) {
+        setSelectedId(clicked.id);
+        setIsDragging(true);
+        setDragStart(point);
+        setOriginalElement({ ...clicked });
+      } else {
+        setSelectedId(null);
+      }
       return;
     }
 
@@ -258,7 +462,7 @@ export function Canvas({
 
     setCurrentElement(newElement);
     setIsDrawing(true);
-  }, [tool, strokeColor, strokeWidth, getMousePosition, elements, pan]);
+  }, [tool, strokeColor, strokeWidth, getMousePosition, elements, pan, selectedBounds, selectedElement]);
 
   const handleMouseUp = useCallback(() => {
     if (isPanning) {
@@ -266,8 +470,23 @@ export function Canvas({
       return;
     }
 
+    if (isDragging) {
+      setIsDragging(false);
+      setDragStart(null);
+      setOriginalElement(null);
+      return;
+    }
+
+    if (isResizing) {
+      setIsResizing(false);
+      setResizeHandle(null);
+      setDragStart(null);
+      setOriginalElement(null);
+      setOriginalBounds(null);
+      return;
+    }
+
     if (currentElement && isDrawing) {
-      // Don't add empty shapes
       if (currentElement.type === 'pen' && currentElement.points.length > 1) {
         onAddElement(currentElement);
       } else if (currentElement.type === 'line' && currentElement.points.length === 2) {
@@ -286,7 +505,7 @@ export function Canvas({
     setIsDrawing(false);
     setCurrentElement(null);
     setStartPoint(null);
-  }, [currentElement, isDrawing, onAddElement, isPanning]);
+  }, [currentElement, isDrawing, onAddElement, isPanning, isDragging, isResizing]);
 
   const handleTextSubmit = useCallback(() => {
     if (textInput && textValue.trim()) {
@@ -341,7 +560,6 @@ export function Canvas({
             d={pathData}
             fill={element.strokeColor}
             opacity={opacity}
-            className={selectedId === element.id ? 'outline outline-2 outline-accent outline-offset-2' : ''}
           />
         );
       }
@@ -374,7 +592,6 @@ export function Canvas({
             fill="none"
             rx={4}
             opacity={opacity}
-            className={selectedId === element.id ? 'outline outline-2 outline-accent outline-offset-2' : ''}
           />
         );
       }
@@ -392,7 +609,6 @@ export function Canvas({
             strokeWidth={element.strokeWidth}
             fill="none"
             opacity={opacity}
-            className={selectedId === element.id ? 'outline outline-2 outline-accent outline-offset-2' : ''}
           />
         );
       }
@@ -406,7 +622,6 @@ export function Canvas({
             fontSize={element.strokeWidth * 4 + 12}
             fontFamily="inherit"
             opacity={opacity}
-            className={selectedId === element.id ? 'outline outline-2 outline-accent outline-offset-2' : ''}
           >
             {element.text}
           </text>
@@ -417,7 +632,75 @@ export function Canvas({
     }
   };
 
+  // Render selection box with handles
+  const renderSelectionBox = () => {
+    if (!selectedBounds || !selectedId) return null;
+    
+    const handleSize = 8;
+    const handles: { pos: ResizeHandle; x: number; y: number; cursor: string }[] = [
+      { pos: 'nw', x: selectedBounds.x, y: selectedBounds.y, cursor: 'nwse-resize' },
+      { pos: 'n', x: selectedBounds.x + selectedBounds.width / 2, y: selectedBounds.y, cursor: 'ns-resize' },
+      { pos: 'ne', x: selectedBounds.x + selectedBounds.width, y: selectedBounds.y, cursor: 'nesw-resize' },
+      { pos: 'e', x: selectedBounds.x + selectedBounds.width, y: selectedBounds.y + selectedBounds.height / 2, cursor: 'ew-resize' },
+      { pos: 'se', x: selectedBounds.x + selectedBounds.width, y: selectedBounds.y + selectedBounds.height, cursor: 'nwse-resize' },
+      { pos: 's', x: selectedBounds.x + selectedBounds.width / 2, y: selectedBounds.y + selectedBounds.height, cursor: 'ns-resize' },
+      { pos: 'sw', x: selectedBounds.x, y: selectedBounds.y + selectedBounds.height, cursor: 'nesw-resize' },
+      { pos: 'w', x: selectedBounds.x, y: selectedBounds.y + selectedBounds.height / 2, cursor: 'ew-resize' },
+    ];
+    
+    return (
+      <g>
+        {/* Selection border */}
+        <rect
+          x={selectedBounds.x}
+          y={selectedBounds.y}
+          width={selectedBounds.width}
+          height={selectedBounds.height}
+          fill="none"
+          stroke="var(--accent)"
+          strokeWidth={2}
+          strokeDasharray="5,5"
+          pointerEvents="none"
+        />
+        
+        {/* Resize handles */}
+        {handles.map((handle) => (
+          <rect
+            key={handle.pos}
+            x={handle.x - handleSize / 2}
+            y={handle.y - handleSize / 2}
+            width={handleSize}
+            height={handleSize}
+            fill="var(--accent)"
+            stroke="var(--background)"
+            strokeWidth={1}
+            rx={2}
+            style={{ cursor: handle.cursor }}
+          />
+        ))}
+      </g>
+    );
+  };
+
   const getCursorStyle = () => {
+    if (isDragging) return 'grabbing';
+    if (isResizing) {
+      switch (resizeHandle) {
+        case 'nw':
+        case 'se':
+          return 'nwse-resize';
+        case 'ne':
+        case 'sw':
+          return 'nesw-resize';
+        case 'n':
+        case 's':
+          return 'ns-resize';
+        case 'e':
+        case 'w':
+          return 'ew-resize';
+      }
+    }
+    
     switch (tool) {
       case 'pen':
       case 'line':
@@ -425,7 +708,7 @@ export function Canvas({
       case 'eraser':
         return 'cell';
       case 'select':
-        return 'default';
+        return selectedId ? 'grab' : 'default';
       case 'text':
         return 'text';
       default:
@@ -464,6 +747,9 @@ export function Canvas({
           
           {/* Render current element being drawn */}
           {currentElement && renderElement(currentElement, true)}
+          
+          {/* Render selection box */}
+          {tool === 'select' && renderSelectionBox()}
         </g>
         
         {/* Remote Cursors */}
@@ -525,9 +811,8 @@ export function Canvas({
       
       {/* Zoom/Pan Info */}
       <div className="absolute bottom-4 left-4 text-xs text-muted-foreground bg-card/80 backdrop-blur-sm px-3 py-1.5 rounded-lg border border-border">
-        Middle-click to pan • Del to delete selected
+        Middle-click to pan • Del to delete • Drag to move • Handles to resize
       </div>
     </div>
   );
 }
-
