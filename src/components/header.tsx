@@ -1,5 +1,4 @@
 import Image from "next/image"
-import { Button } from "@/components/ui/button"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { ChevronDown } from "lucide-react"
 
@@ -21,13 +20,11 @@ export function Header() {
           </div>
 
           {/* Navigation */}
-          <div className="hidden md:flex items-center gap-6 pt-[01px]">
+          <div className="hidden md:flex items-center gap-6 pt-[1px]">
               <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" size="sm" className="gap-1">
-                    Tools
-                    <ChevronDown className="h-4 w-4" />
-                  </Button>
+                <DropdownMenuTrigger className="flex items-center gap-1 text-sm font-medium transition-colors hover:text-accent focus:outline-none">
+                  Tools
+                  <ChevronDown className="h-4 w-4" />
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="start">
                   <DropdownMenuItem>Image Editor</DropdownMenuItem>
@@ -37,13 +34,13 @@ export function Header() {
                 </DropdownMenuContent>
               </DropdownMenu>
 
-              <Button variant="ghost" size="sm">
+              <a href="/about" className="text-sm font-medium transition-colors hover:text-accent">
                 About
-              </Button>
+              </a>
 
-              <Button variant="ghost" size="sm">
+              <a href="/docs" className="text-sm font-medium transition-colors hover:text-accent">
                 Docs
-            </Button>
+              </a>
           </div>
         </nav>
       </div>
