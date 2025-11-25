@@ -40,7 +40,8 @@ export function Whiteboard({ roomId, isCreator = false }: WhiteboardProps) {
       localStorage.setItem('shadeworks-username', defaultName);
       setUserName(defaultName);
     }
-  }, [isCreator]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Handle user joining with name
   const handleJoin = useCallback((name: string) => {
