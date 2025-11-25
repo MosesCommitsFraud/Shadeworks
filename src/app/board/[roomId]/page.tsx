@@ -1,6 +1,7 @@
 'use client';
 
 import { use } from 'react';
+import { useSearchParams } from 'next/navigation';
 import dynamic from 'next/dynamic';
 
 // Dynamic import to avoid SSR issues with Y.js
@@ -27,7 +28,9 @@ interface PageProps {
 
 export default function BoardRoomPage({ params }: PageProps) {
   const { roomId } = use(params);
+  const searchParams = useSearchParams();
+  const isCreator = searchParams.get('creator') === 'true';
   
-  return <Whiteboard roomId={roomId} />;
+  return <Whiteboard roomId={roomId} isCreator={isCreator} />;
 }
 

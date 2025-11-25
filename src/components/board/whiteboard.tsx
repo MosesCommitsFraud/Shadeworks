@@ -3,31 +3,55 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { Canvas } from './canvas';
 import { Toolbar } from './toolbar';
+import { JoinDialog } from './join-dialog';
 import { CollaborationManager } from '@/lib/collaboration';
 import type { Tool, BoardElement } from '@/lib/board-types';
 
 interface WhiteboardProps {
   roomId: string;
+  isCreator?: boolean;
 }
 
 const MAX_UNDO_STACK = 100;
 
-export function Whiteboard({ roomId }: WhiteboardProps) {
+export function Whiteboard({ roomId, isCreator = false }: WhiteboardProps) {
   const [tool, setTool] = useState<Tool>('pen');
   const [strokeColor, setStrokeColor] = useState('#ffffff');
   const [strokeWidth, setStrokeWidth] = useState(4);
   const [elements, setElements] = useState<BoardElement[]>([]);
   const [collaboration, setCollaboration] = useState<CollaborationManager | null>(null);
   const [connectedUsers, setConnectedUsers] = useState(1);
+  const [userName, setUserName] = useState<string | null>(null);
+  const [isReady, setIsReady] = useState(false);
   
   // Undo/Redo stacks - store snapshots
   const undoStackRef = useRef<BoardElement[][]>([]);
   const redoStackRef = useRef<BoardElement[][]>([]);
   const isUndoingRef = useRef(false);
 
-  // Initialize collaboration
+  // Check for stored username on mount or skip dialog if creator
   useEffect(() => {
-    const collab = new CollaborationManager(roomId);
+    const storedName = localStorage.getItem('shadeworks-username');
+    if (storedName) {
+      setUserName(storedName);
+    } else if (isCreator) {
+      // Creator doesn't need to enter name, use default
+      const defaultName = `User ${Math.random().toString(36).substring(2, 6)}`;
+      localStorage.setItem('shadeworks-username', defaultName);
+      setUserName(defaultName);
+    }
+  }, [isCreator]);
+
+  // Handle user joining with name
+  const handleJoin = useCallback((name: string) => {
+    setUserName(name);
+  }, []);
+
+  // Initialize collaboration after user has joined
+  useEffect(() => {
+    if (!userName) return;
+
+    const collab = new CollaborationManager(roomId, userName);
     setCollaboration(collab);
 
     // Load initial elements
@@ -43,12 +67,14 @@ export function Whiteboard({ roomId }: WhiteboardProps) {
       setConnectedUsers(states.size);
     });
 
+    setIsReady(true);
+
     return () => {
       unsubElements();
       unsubAwareness();
       collab.destroy();
     };
-  }, [roomId]);
+  }, [roomId, userName]);
 
   // Save state to undo stack
   const saveToUndoStack = useCallback(() => {
@@ -182,6 +208,27 @@ export function Whiteboard({ roomId }: WhiteboardProps) {
       setElements([]);
     }
   }, [collaboration, saveToUndoStack]);
+
+  // Show join dialog if no username
+  if (!userName) {
+    return (
+      <div className="relative w-screen h-screen overflow-hidden bg-background">
+        <JoinDialog onJoin={handleJoin} />
+      </div>
+    );
+  }
+
+  // Show loading while connecting
+  if (!isReady) {
+    return (
+      <div className="flex items-center justify-center w-screen h-screen bg-background">
+        <div className="flex flex-col items-center gap-4">
+          <div className="w-10 h-10 border-4 border-accent border-t-transparent rounded-full animate-spin" />
+          <p className="text-muted-foreground">Connecting to board...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="relative w-screen h-screen overflow-hidden">
