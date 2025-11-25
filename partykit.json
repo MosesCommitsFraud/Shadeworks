@@ -1,0 +1,7 @@
+{
+  "$schema": "https://www.partykit.io/schema.json",
+  "name": "shadeworks",
+  "main": "party/index.ts",
+  "compatibilityDate": "2024-01-01"
+}
+

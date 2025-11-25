@@ -10,9 +10,8 @@ const _exo = V0_Font_Exo({ subsets: ['latin'], weight: ["100","200","300","400",
 const _geistMono = V0_Font_Geist_Mono({ subsets: ['latin'], weight: ["100","200","300","400","500","600","700","800","900"] })
 
 export const metadata: Metadata = {
-  title: "shadeworks - Design Tools for Creators",
-  description: "A collection of powerful graphic design features crafted for personal projects",
-  generator: "v0.app",
+  title: "Shadeworks",
+  description: "A collection of tools that i dont want to spend money on.",
   icons: {
     icon: "/logo-sw-white.svg",
   },

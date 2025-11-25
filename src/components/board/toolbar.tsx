@@ -14,6 +14,7 @@ import {
   Copy
 } from 'lucide-react';
 import { Tool, COLORS, STROKE_WIDTHS } from '@/lib/board-types';
+import type { ConnectionStatus } from '@/lib/collaboration';
 import { cn } from '@/lib/utils';
 import { useState } from 'react';
 
@@ -27,6 +28,9 @@ interface ToolbarProps {
   onClear: () => void;
   roomId: string;
   connectedUsers: number;
+  peerCount: number;
+  connectionStatus: ConnectionStatus;
+  myName: string;
 }
 
 const tools: { id: Tool; icon: React.ElementType; label: string }[] = [
@@ -49,6 +53,9 @@ export function Toolbar({
   onClear,
   roomId,
   connectedUsers,
+  peerCount,
+  connectionStatus,
+  myName,
 }: ToolbarProps) {
   const [copied, setCopied] = useState(false);
   const [showColors, setShowColors] = useState(false);
@@ -168,25 +175,35 @@ export function Toolbar({
       
       {/* Collaboration Panel */}
       <div className="flex items-center gap-2 bg-card/95 backdrop-blur-md border border-border rounded-xl p-1.5 shadow-2xl">
-        {/* Connected Users */}
+        {/* Your Name */}
         <div className="flex items-center gap-2 px-3 py-1.5">
-          <div className="flex -space-x-2">
-            {Array.from({ length: Math.min(connectedUsers, 5) }).map((_, i) => (
-              <div
-                key={i}
-                className="w-7 h-7 rounded-full border-2 border-card flex items-center justify-center text-xs font-medium"
-                style={{ 
-                  backgroundColor: COLORS[(i + 1) % COLORS.length],
-                  zIndex: 5 - i 
-                }}
-              >
-                {i === 0 ? 'You' : ''}
-              </div>
-            ))}
-          </div>
-          <span className="text-sm text-muted-foreground">
-            {connectedUsers} online
+          {/* Status indicator */}
+          <div 
+            className={cn(
+              "w-2 h-2 rounded-full shrink-0",
+              connectionStatus === 'connected' && peerCount > 0 ? "bg-green-500" :
+              connectionStatus === 'connected' ? "bg-yellow-500 animate-pulse" :
+              connectionStatus === 'connecting' ? "bg-yellow-500 animate-pulse" :
+              "bg-red-500"
+            )}
+            title={
+              connectionStatus === 'connected' && peerCount > 0 
+                ? `Connected to ${peerCount} peer(s)` 
+                : connectionStatus === 'connected' 
+                  ? 'Waiting for collaborators...' 
+                  : connectionStatus === 'connecting' 
+                    ? 'Connecting...' 
+                    : 'Disconnected'
+            }
+          />
+          <span className="text-sm font-medium text-foreground max-w-[140px] truncate" title={myName}>
+            {myName}
           </span>
+          {connectedUsers > 1 && (
+            <span className="text-xs text-muted-foreground">
+              +{connectedUsers - 1}
+            </span>
+          )}
         </div>
         
         <div className="w-px h-6 bg-border" />

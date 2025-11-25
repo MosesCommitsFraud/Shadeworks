@@ -8,9 +8,9 @@ export default function BoardPage() {
   const router = useRouter();
 
   useEffect(() => {
-    // Generate a new room ID and redirect with creator flag
+    // Generate a new room ID and redirect
     const roomId = uuid().substring(0, 10);
-    router.replace(`/board/${roomId}?creator=true`);
+    router.replace(`/board/${roomId}`);
   }, [router]);
 
   return (

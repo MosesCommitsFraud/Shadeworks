@@ -1,28 +1,51 @@
 'use client';
 
 import * as Y from 'yjs';
-import { WebrtcProvider } from 'y-webrtc';
+import YPartyKitProvider from 'y-partykit/provider';
 import type { BoardElement, Cursor } from './board-types';
+import { generateFunnyName } from './funny-names';
+
+export type ConnectionStatus = 'connecting' | 'connected' | 'disconnected';
+
+// PartyKit host - set NEXT_PUBLIC_PARTYKIT_HOST in .env.local
+const PARTYKIT_HOST = process.env.NEXT_PUBLIC_PARTYKIT_HOST!;
 
 export class CollaborationManager {
   private doc: Y.Doc;
-  private provider: WebrtcProvider | null = null;
+  private provider: YPartyKitProvider | null = null;
   private elements: Y.Array<BoardElement>;
   private awareness: Map<number, Cursor> | null = null;
   private userId: string;
   private userName: string;
   private userColor: string;
+  private connectionStatus: ConnectionStatus = 'connecting';
 
   constructor(roomId: string, userName?: string) {
     this.doc = new Y.Doc();
     this.elements = this.doc.getArray<BoardElement>('elements');
     this.userId = Math.random().toString(36).substring(2, 9);
-    this.userName = userName || `User ${this.userId.substring(0, 4)}`;
+    // Use provided name or generate a funny random name
+    this.userName = userName || generateFunnyName();
     this.userColor = this.getRandomColor();
 
-    // Connect to the room
-    this.provider = new WebrtcProvider(roomId, this.doc, {
-      signaling: ['wss://signaling.yjs.dev'],
+    // Connect to PartyKit
+    this.provider = new YPartyKitProvider(PARTYKIT_HOST, `board-${roomId}`, this.doc, {
+      connect: true,
+    });
+
+    // Track connection status
+    this.provider.on('sync', (isSynced: boolean) => {
+      console.log('[Collaboration] Synced:', isSynced);
+      this.connectionStatus = isSynced ? 'connected' : 'connecting';
+    });
+
+    this.provider.on('status', ({ status }: { status: string }) => {
+      console.log('[Collaboration] Status:', status);
+      if (status === 'connected') {
+        this.connectionStatus = 'connected';
+      } else if (status === 'disconnected') {
+        this.connectionStatus = 'disconnected';
+      }
     });
 
     // Set user awareness
@@ -32,6 +55,8 @@ export class CollaborationManager {
       color: this.userColor,
       cursor: null,
     });
+
+    console.log('[Collaboration] Initialized for room:', roomId, 'as:', this.userName);
   }
 
   private getRandomColor(): string {
@@ -119,9 +144,44 @@ export class CollaborationManager {
     };
   }
 
+  getConnectionStatus(): ConnectionStatus {
+    return this.connectionStatus;
+  }
+
+  onConnectionChange(callback: (status: ConnectionStatus, peers: number) => void): () => void {
+    if (!this.provider) return () => {};
+
+    const syncHandler = (isSynced: boolean) => {
+      this.connectionStatus = isSynced ? 'connected' : 'connecting';
+      callback(this.connectionStatus, this.getConnectedUsers() - 1);
+    };
+
+    const statusHandler = ({ status }: { status: string }) => {
+      if (status === 'connected') {
+        this.connectionStatus = 'connected';
+      } else if (status === 'disconnected') {
+        this.connectionStatus = 'disconnected';
+      }
+      callback(this.connectionStatus, this.getConnectedUsers() - 1);
+    };
+
+    const awarenessHandler = () => {
+      callback(this.connectionStatus, this.getConnectedUsers() - 1);
+    };
+
+    this.provider.on('sync', syncHandler);
+    this.provider.on('status', statusHandler);
+    this.provider.awareness.on('change', awarenessHandler);
+
+    return () => {
+      this.provider?.off('sync', syncHandler);
+      this.provider?.off('status', statusHandler);
+      this.provider?.awareness.off('change', awarenessHandler);
+    };
+  }
+
   destroy(): void {
     this.provider?.destroy();
     this.doc.destroy();
   }
 }
-

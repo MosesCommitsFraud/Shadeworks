@@ -3,25 +3,26 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { Canvas } from './canvas';
 import { Toolbar } from './toolbar';
-import { JoinDialog } from './join-dialog';
-import { CollaborationManager } from '@/lib/collaboration';
+import { CollaborationManager, type ConnectionStatus } from '@/lib/collaboration';
+import { generateFunnyName } from '@/lib/funny-names';
 import type { Tool, BoardElement } from '@/lib/board-types';
 
 interface WhiteboardProps {
   roomId: string;
-  isCreator?: boolean;
 }
 
 const MAX_UNDO_STACK = 100;
 
-export function Whiteboard({ roomId, isCreator = false }: WhiteboardProps) {
+export function Whiteboard({ roomId }: WhiteboardProps) {
   const [tool, setTool] = useState<Tool>('pen');
   const [strokeColor, setStrokeColor] = useState('#ffffff');
   const [strokeWidth, setStrokeWidth] = useState(4);
   const [elements, setElements] = useState<BoardElement[]>([]);
   const [collaboration, setCollaboration] = useState<CollaborationManager | null>(null);
   const [connectedUsers, setConnectedUsers] = useState(1);
-  const [userName, setUserName] = useState<string | null>(null);
+  const [peerCount, setPeerCount] = useState(0);
+  const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>('connecting');
+  const [myName, setMyName] = useState<string | null>(null);
   const [isReady, setIsReady] = useState(false);
   
   // Undo/Redo stacks - store snapshots
@@ -29,30 +30,17 @@ export function Whiteboard({ roomId, isCreator = false }: WhiteboardProps) {
   const redoStackRef = useRef<BoardElement[][]>([]);
   const isUndoingRef = useRef(false);
 
-  // Check for stored username on mount or skip dialog if creator
+  // Initialize collaboration with a random funny name
   useEffect(() => {
-    const storedName = localStorage.getItem('shadeworks-username');
-    if (storedName) {
-      setUserName(storedName);
-    } else if (isCreator) {
-      // Creator doesn't need to enter name, use default
-      const defaultName = `User ${Math.random().toString(36).substring(2, 6)}`;
-      localStorage.setItem('shadeworks-username', defaultName);
-      setUserName(defaultName);
+    // Get or generate a funny name for this session
+    let name = sessionStorage.getItem('shadeworks-name');
+    if (!name) {
+      name = generateFunnyName();
+      sessionStorage.setItem('shadeworks-name', name);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    setMyName(name);
 
-  // Handle user joining with name
-  const handleJoin = useCallback((name: string) => {
-    setUserName(name);
-  }, []);
-
-  // Initialize collaboration after user has joined
-  useEffect(() => {
-    if (!userName) return;
-
-    const collab = new CollaborationManager(roomId, userName);
+    const collab = new CollaborationManager(roomId, name);
     setCollaboration(collab);
 
     // Load initial elements
@@ -68,14 +56,21 @@ export function Whiteboard({ roomId, isCreator = false }: WhiteboardProps) {
       setConnectedUsers(states.size);
     });
 
+    // Subscribe to connection status changes
+    const unsubConnection = collab.onConnectionChange((status, peers) => {
+      setConnectionStatus(status);
+      setPeerCount(peers);
+    });
+
     setIsReady(true);
 
     return () => {
       unsubElements();
       unsubAwareness();
+      unsubConnection();
       collab.destroy();
     };
-  }, [roomId, userName]);
+  }, [roomId]);
 
   // Save state to undo stack
   const saveToUndoStack = useCallback(() => {
@@ -210,15 +205,6 @@ export function Whiteboard({ roomId, isCreator = false }: WhiteboardProps) {
     }
   }, [collaboration, saveToUndoStack]);
 
-  // Show join dialog if no username
-  if (!userName) {
-    return (
-      <div className="relative w-screen h-screen overflow-hidden bg-background">
-        <JoinDialog onJoin={handleJoin} />
-      </div>
-    );
-  }
-
   // Show loading while connecting
   if (!isReady) {
     return (
@@ -243,6 +229,9 @@ export function Whiteboard({ roomId, isCreator = false }: WhiteboardProps) {
         onClear={handleClear}
         roomId={roomId}
         connectedUsers={connectedUsers}
+        peerCount={peerCount}
+        connectionStatus={connectionStatus}
+        myName={myName || 'Connecting...'}
       />
       
       <Canvas
