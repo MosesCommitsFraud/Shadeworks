@@ -81,8 +81,6 @@ function getBoundingBox(element: BoardElement): BoundingBox | null {
   }
   
   if (element.type === 'text') {
-    // Text stores x,y as top-left of bounding box
-    // width/height are the box dimensions
     if (element.width !== undefined && element.height !== undefined) {
       return {
         x: element.x ?? 0,
@@ -91,7 +89,6 @@ function getBoundingBox(element: BoardElement): BoundingBox | null {
         height: element.height,
       };
     }
-    // Fallback for legacy text without stored dimensions
     const fontSize = element.strokeWidth * 4 + 12;
     const textWidth = (element.text?.length ?? 0) * fontSize * 0.55;
     const textHeight = fontSize * 1.2;
@@ -104,6 +101,29 @@ function getBoundingBox(element: BoardElement): BoundingBox | null {
   }
   
   return null;
+}
+
+// Get combined bounding box for multiple elements
+function getCombinedBounds(elementIds: string[], elements: BoardElement[]): BoundingBox | null {
+  const boxes = elementIds
+    .map(id => elements.find(el => el.id === id))
+    .filter(Boolean)
+    .map(el => getBoundingBox(el!))
+    .filter(Boolean) as BoundingBox[];
+  
+  if (boxes.length === 0) return null;
+  
+  const minX = Math.min(...boxes.map(b => b.x));
+  const minY = Math.min(...boxes.map(b => b.y));
+  const maxX = Math.max(...boxes.map(b => b.x + b.width));
+  const maxY = Math.max(...boxes.map(b => b.y + b.height));
+  
+  return {
+    x: minX,
+    y: minY,
+    width: maxX - minX,
+    height: maxY - minY,
+  };
 }
 
 export function Canvas({
@@ -121,7 +141,7 @@ export function Canvas({
   const [isDrawing, setIsDrawing] = useState(false);
   const [currentElement, setCurrentElement] = useState<BoardElement | null>(null);
   const [startPoint, setStartPoint] = useState<Point | null>(null);
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [remoteCursors, setRemoteCursors] = useState<RemoteCursor[]>([]);
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const [isPanning, setIsPanning] = useState(false);
@@ -135,22 +155,26 @@ export function Canvas({
   const [isResizing, setIsResizing] = useState(false);
   const [resizeHandle, setResizeHandle] = useState<ResizeHandle>(null);
   const [dragStart, setDragStart] = useState<Point | null>(null);
-  const [originalElement, setOriginalElement] = useState<BoardElement | null>(null);
+  const [originalElements, setOriginalElements] = useState<BoardElement[]>([]);
   const [originalBounds, setOriginalBounds] = useState<BoundingBox | null>(null);
   
-  // Shift key tracking for aspect ratio lock
+  // Box selection state
+  const [isBoxSelecting, setIsBoxSelecting] = useState(false);
+  const [selectionBox, setSelectionBox] = useState<BoundingBox | null>(null);
+  
+  // Shift key tracking
   const [shiftPressed, setShiftPressed] = useState(false);
 
-  // Track shift key
+  // Track shift key and other shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Shift') setShiftPressed(true);
-      if (e.key === 'Delete' && selectedId) {
-        onDeleteElement(selectedId);
-        setSelectedId(null);
+      if (e.key === 'Delete' && selectedIds.length > 0) {
+        selectedIds.forEach(id => onDeleteElement(id));
+        setSelectedIds([]);
       }
       if (e.key === 'Escape') {
-        setSelectedId(null);
+        setSelectedIds([]);
         setTextInput(null);
       }
     };
@@ -165,7 +189,7 @@ export function Canvas({
       window.removeEventListener('keydown', handleKeyDown);
       window.removeEventListener('keyup', handleKeyUp);
     };
-  }, [selectedId, onDeleteElement]);
+  }, [selectedIds, onDeleteElement]);
 
   // Track remote cursors
   useEffect(() => {
@@ -204,14 +228,13 @@ export function Canvas({
     };
   }, [pan]);
 
-  // Get selected element
-  const selectedElement = selectedId ? elements.find(el => el.id === selectedId) : null;
-  const selectedBounds = selectedElement ? getBoundingBox(selectedElement) : null;
+  // Get selected elements and their combined bounds
+  const selectedElements = selectedIds.map(id => elements.find(el => el.id === id)).filter(Boolean) as BoardElement[];
+  const selectedBounds = getCombinedBounds(selectedIds, elements);
 
   const handleMouseMove = useCallback((e: React.MouseEvent) => {
     const point = getMousePosition(e);
     
-    // Update cursor position for collaboration
     if (collaboration) {
       collaboration.updateCursor(point.x, point.y);
     }
@@ -225,28 +248,41 @@ export function Canvas({
       return;
     }
 
-    // Handle dragging (moving element)
-    if (isDragging && selectedId && dragStart && originalElement) {
-      const dx = point.x - dragStart.x;
-      const dy = point.y - dragStart.y;
-      
-      if (originalElement.type === 'pen' || originalElement.type === 'line') {
-        const newPoints = originalElement.points.map(p => ({
-          x: p.x + dx,
-          y: p.y + dy,
-        }));
-        onUpdateElement(selectedId, { points: newPoints });
-      } else {
-        onUpdateElement(selectedId, {
-          x: (originalElement.x ?? 0) + dx,
-          y: (originalElement.y ?? 0) + dy,
-        });
-      }
+    // Handle box selection
+    if (isBoxSelecting && startPoint) {
+      const x = Math.min(startPoint.x, point.x);
+      const y = Math.min(startPoint.y, point.y);
+      const width = Math.abs(point.x - startPoint.x);
+      const height = Math.abs(point.y - startPoint.y);
+      setSelectionBox({ x, y, width, height });
       return;
     }
 
-    // Handle resizing
-    if (isResizing && selectedId && dragStart && originalBounds && resizeHandle && originalElement) {
+    // Handle dragging (moving elements)
+    if (isDragging && dragStart && originalElements.length > 0) {
+      const dx = point.x - dragStart.x;
+      const dy = point.y - dragStart.y;
+      
+      originalElements.forEach(origEl => {
+        if (origEl.type === 'pen' || origEl.type === 'line') {
+          const newPoints = origEl.points.map(p => ({
+            x: p.x + dx,
+            y: p.y + dy,
+          }));
+          onUpdateElement(origEl.id, { points: newPoints });
+        } else {
+          onUpdateElement(origEl.id, {
+            x: (origEl.x ?? 0) + dx,
+            y: (origEl.y ?? 0) + dy,
+          });
+        }
+      });
+      return;
+    }
+
+    // Handle resizing (single element only for now)
+    if (isResizing && selectedIds.length === 1 && dragStart && originalBounds && resizeHandle && originalElements.length === 1) {
+      const originalElement = originalElements[0];
       const dx = point.x - dragStart.x;
       const dy = point.y - dragStart.y;
       
@@ -255,10 +291,8 @@ export function Canvas({
       let newWidth = originalBounds.width;
       let newHeight = originalBounds.height;
       
-      // Calculate aspect ratio for shift-constrained resize
       const aspectRatio = originalBounds.width / originalBounds.height;
       
-      // Calculate new bounds based on handle
       switch (resizeHandle) {
         case 'nw':
           newX = originalBounds.x + dx;
@@ -336,7 +370,6 @@ export function Canvas({
           break;
       }
       
-      // Enforce minimum size
       const minSize = 10;
       if (newWidth < minSize) {
         if (resizeHandle.includes('w')) newX = originalBounds.x + originalBounds.width - minSize;
@@ -347,31 +380,28 @@ export function Canvas({
         newHeight = minSize;
       }
       
-      // Update element based on type
       if (originalElement.type === 'rectangle' || originalElement.type === 'ellipse') {
-        onUpdateElement(selectedId, {
+        onUpdateElement(selectedIds[0], {
           x: newX,
           y: newY,
           width: newWidth,
           height: newHeight,
         });
       } else if (originalElement.type === 'pen' || originalElement.type === 'line') {
-        // Scale points proportionally
         const scaleX = newWidth / originalBounds.width;
         const scaleY = newHeight / originalBounds.height;
         const newPoints = originalElement.points.map(p => ({
           x: newX + (p.x - originalBounds.x) * scaleX,
           y: newY + (p.y - originalBounds.y) * scaleY,
         }));
-        onUpdateElement(selectedId, { points: newPoints });
+        onUpdateElement(selectedIds[0], { points: newPoints });
       } else if (originalElement.type === 'text') {
-        // For text, use scaleX and scaleY for squishing/stretching
         const scaleX = newWidth / originalBounds.width;
         const scaleY = newHeight / originalBounds.height;
         const origScaleX = originalElement.scaleX ?? 1;
         const origScaleY = originalElement.scaleY ?? 1;
         
-        onUpdateElement(selectedId, { 
+        onUpdateElement(selectedIds[0], { 
           x: newX,
           y: newY,
           width: newWidth,
@@ -406,7 +436,6 @@ export function Canvas({
         let finalWidth = Math.abs(width);
         let finalHeight = Math.abs(height);
         
-        // Shift for square
         if (shiftPressed) {
           const size = Math.max(finalWidth, finalHeight);
           finalWidth = size;
@@ -428,7 +457,6 @@ export function Canvas({
         let finalWidth = Math.abs(width);
         let finalHeight = Math.abs(height);
         
-        // Shift for circle
         if (shiftPressed) {
           const size = Math.max(finalWidth, finalHeight);
           finalWidth = size;
@@ -473,7 +501,7 @@ export function Canvas({
         break;
       }
     }
-  }, [isDrawing, currentElement, startPoint, tool, collaboration, getMousePosition, isPanning, panStart, elements, onDeleteElement, strokeWidth, isDragging, isResizing, selectedId, dragStart, originalElement, originalBounds, resizeHandle, onUpdateElement, shiftPressed]);
+  }, [isDrawing, currentElement, startPoint, tool, collaboration, getMousePosition, isPanning, panStart, elements, onDeleteElement, strokeWidth, isDragging, isResizing, selectedIds, dragStart, originalElements, originalBounds, resizeHandle, onUpdateElement, shiftPressed, isBoxSelecting]);
 
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
     // Middle mouse button for panning
@@ -489,8 +517,8 @@ export function Canvas({
     setStartPoint(point);
 
     if (tool === 'select') {
-      // Check if clicking on a resize handle first
-      if (selectedBounds && selectedElement) {
+      // Check if clicking on a resize handle first (single selection only)
+      if (selectedBounds && selectedIds.length === 1) {
         const handleSize = 8;
         const handles: { handle: ResizeHandle; x: number; y: number }[] = [
           { handle: 'nw', x: selectedBounds.x, y: selectedBounds.y },
@@ -509,25 +537,25 @@ export function Canvas({
             setIsResizing(true);
             setResizeHandle(h.handle);
             setDragStart(point);
-            setOriginalElement({ ...selectedElement });
+            setOriginalElements(selectedElements.map(el => ({ ...el })));
             setOriginalBounds({ ...selectedBounds });
             return;
           }
         }
-        
-        // Check if clicking inside the selection box (for moving)
-        if (
-          point.x >= selectedBounds.x &&
-          point.x <= selectedBounds.x + selectedBounds.width &&
-          point.y >= selectedBounds.y &&
-          point.y <= selectedBounds.y + selectedBounds.height
-        ) {
-          onStartTransform?.();
-          setIsDragging(true);
-          setDragStart(point);
-          setOriginalElement({ ...selectedElement });
-          return;
-        }
+      }
+      
+      // Check if clicking inside the selection box (for moving)
+      if (selectedBounds &&
+        point.x >= selectedBounds.x &&
+        point.x <= selectedBounds.x + selectedBounds.width &&
+        point.y >= selectedBounds.y &&
+        point.y <= selectedBounds.y + selectedBounds.height
+      ) {
+        onStartTransform?.();
+        setIsDragging(true);
+        setDragStart(point);
+        setOriginalElements(selectedElements.map(el => ({ ...el })));
+        return;
       }
       
       // Find clicked element
@@ -543,13 +571,25 @@ export function Canvas({
       });
       
       if (clicked) {
-        setSelectedId(clicked.id);
-        onStartTransform?.();
-        setIsDragging(true);
-        setDragStart(point);
-        setOriginalElement({ ...clicked });
+        // Shift-click to add to selection
+        if (shiftPressed) {
+          if (selectedIds.includes(clicked.id)) {
+            setSelectedIds(selectedIds.filter(id => id !== clicked.id));
+          } else {
+            setSelectedIds([...selectedIds, clicked.id]);
+          }
+        } else {
+          setSelectedIds([clicked.id]);
+          onStartTransform?.();
+          setIsDragging(true);
+          setDragStart(point);
+          setOriginalElements([{ ...clicked }]);
+        }
       } else {
-        setSelectedId(null);
+        // Start box selection
+        setSelectedIds([]);
+        setIsBoxSelecting(true);
+        setSelectionBox({ x: point.x, y: point.y, width: 0, height: 0 });
       }
       return;
     }
@@ -583,7 +623,7 @@ export function Canvas({
 
     setCurrentElement(newElement);
     setIsDrawing(true);
-  }, [tool, strokeColor, strokeWidth, getMousePosition, elements, pan, selectedBounds, selectedElement]);
+  }, [tool, strokeColor, strokeWidth, getMousePosition, elements, pan, selectedBounds, selectedElements, selectedIds, shiftPressed, onStartTransform]);
 
   const handleMouseUp = useCallback(() => {
     if (isPanning) {
@@ -591,10 +631,33 @@ export function Canvas({
       return;
     }
 
+    // Finish box selection
+    if (isBoxSelecting && selectionBox) {
+      const selected: string[] = [];
+      elements.forEach(el => {
+        const bounds = getBoundingBox(el);
+        if (bounds) {
+          // Check if element is within selection box
+          if (
+            bounds.x >= selectionBox.x &&
+            bounds.y >= selectionBox.y &&
+            bounds.x + bounds.width <= selectionBox.x + selectionBox.width &&
+            bounds.y + bounds.height <= selectionBox.y + selectionBox.height
+          ) {
+            selected.push(el.id);
+          }
+        }
+      });
+      setSelectedIds(selected);
+      setIsBoxSelecting(false);
+      setSelectionBox(null);
+      return;
+    }
+
     if (isDragging) {
       setIsDragging(false);
       setDragStart(null);
-      setOriginalElement(null);
+      setOriginalElements([]);
       return;
     }
 
@@ -602,7 +665,7 @@ export function Canvas({
       setIsResizing(false);
       setResizeHandle(null);
       setDragStart(null);
-      setOriginalElement(null);
+      setOriginalElements([]);
       setOriginalBounds(null);
       return;
     }
@@ -626,7 +689,7 @@ export function Canvas({
     setIsDrawing(false);
     setCurrentElement(null);
     setStartPoint(null);
-  }, [currentElement, isDrawing, onAddElement, isPanning, isDragging, isResizing]);
+  }, [currentElement, isDrawing, onAddElement, isPanning, isDragging, isResizing, isBoxSelecting, selectionBox, elements]);
 
   const handleTextSubmit = useCallback(() => {
     if (textInput && textValue.trim()) {
@@ -634,7 +697,9 @@ export function Canvas({
       const textWidth = textValue.length * fontSize * 0.55;
       const textHeight = fontSize * 1.2;
       
-      // Store x,y as top-left of bounding box
+      // x,y is top-left of bounding box
+      // The text input is positioned at textInput.y - 10 (see input style below)
+      // So the actual top of the text should be around that position
       const newElement: BoardElement = {
         id: uuid(),
         type: 'text',
@@ -643,7 +708,7 @@ export function Canvas({
         strokeWidth,
         text: textValue,
         x: textInput.x,
-        y: textInput.y - fontSize, // Adjust so text appears at click position
+        y: textInput.y - fontSize * 0.82, // Adjust for baseline
         width: Math.max(textWidth, 60),
         height: textHeight,
         scaleX: 1,
@@ -654,6 +719,25 @@ export function Canvas({
     setTextInput(null);
     setTextValue('');
   }, [textInput, textValue, strokeColor, strokeWidth, onAddElement]);
+
+  // Auto-save text on blur or after typing stops
+  const textSaveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  
+  const handleTextChange = useCallback((value: string) => {
+    setTextValue(value);
+    
+    // Clear existing timeout
+    if (textSaveTimeoutRef.current) {
+      clearTimeout(textSaveTimeoutRef.current);
+    }
+    
+    // Auto-save after 2 seconds of no typing (optional, can be removed if unwanted)
+    // textSaveTimeoutRef.current = setTimeout(() => {
+    //   if (textInput && value.trim()) {
+    //     handleTextSubmit();
+    //   }
+    // }, 2000);
+  }, []);
 
   const renderElement = (element: BoardElement, isPreview = false) => {
     const opacity = isPreview ? 0.7 : 1;
@@ -731,12 +815,8 @@ export function Canvas({
         const scaleY = element.scaleY ?? 1;
         const x = element.x ?? 0;
         const y = element.y ?? 0;
-        
-        // Text baseline offset from top of bounding box
         const baselineOffset = fontSize * 0.82;
         
-        // Scale the text around top-left corner (x, y) of bounding box
-        // Transform sequence: translate to origin, scale, translate back
         return (
           <text
             key={element.id}
@@ -759,10 +839,10 @@ export function Canvas({
 
   // Render selection box with handles
   const renderSelectionBox = () => {
-    if (!selectedBounds || !selectedId) return null;
+    if (!selectedBounds || selectedIds.length === 0) return null;
     
     const handleSize = 8;
-    const handles: { pos: ResizeHandle; x: number; y: number; cursor: string }[] = [
+    const handles: { pos: ResizeHandle; x: number; y: number; cursor: string }[] = selectedIds.length === 1 ? [
       { pos: 'nw', x: selectedBounds.x, y: selectedBounds.y, cursor: 'nwse-resize' },
       { pos: 'n', x: selectedBounds.x + selectedBounds.width / 2, y: selectedBounds.y, cursor: 'ns-resize' },
       { pos: 'ne', x: selectedBounds.x + selectedBounds.width, y: selectedBounds.y, cursor: 'nesw-resize' },
@@ -771,7 +851,7 @@ export function Canvas({
       { pos: 's', x: selectedBounds.x + selectedBounds.width / 2, y: selectedBounds.y + selectedBounds.height, cursor: 'ns-resize' },
       { pos: 'sw', x: selectedBounds.x, y: selectedBounds.y + selectedBounds.height, cursor: 'nesw-resize' },
       { pos: 'w', x: selectedBounds.x, y: selectedBounds.y + selectedBounds.height / 2, cursor: 'ew-resize' },
-    ];
+    ] : [];
     
     return (
       <g>
@@ -788,7 +868,7 @@ export function Canvas({
           pointerEvents="none"
         />
         
-        {/* Resize handles */}
+        {/* Resize handles (only for single selection) */}
         {handles.map((handle) => (
           <rect
             key={handle.pos}
@@ -833,7 +913,7 @@ export function Canvas({
       case 'eraser':
         return 'cell';
       case 'select':
-        return selectedId ? 'grab' : 'default';
+        return selectedIds.length > 0 ? 'grab' : 'crosshair';
       case 'text':
         return 'text';
       default:
@@ -875,6 +955,20 @@ export function Canvas({
           
           {/* Render selection box */}
           {tool === 'select' && renderSelectionBox()}
+          
+          {/* Render box selection rectangle */}
+          {isBoxSelecting && selectionBox && (
+            <rect
+              x={selectionBox.x}
+              y={selectionBox.y}
+              width={selectionBox.width}
+              height={selectionBox.height}
+              fill="rgba(98, 114, 164, 0.2)"
+              stroke="var(--accent)"
+              strokeWidth={1}
+              strokeDasharray="4,4"
+            />
+          )}
         </g>
         
         {/* Remote Cursors */}
@@ -913,30 +1007,41 @@ export function Canvas({
           ref={textInputRef}
           type="text"
           value={textValue}
-          onChange={(e) => setTextValue(e.target.value)}
+          onChange={(e) => handleTextChange(e.target.value)}
           onKeyDown={(e) => {
-            if (e.key === 'Enter') handleTextSubmit();
+            if (e.key === 'Enter') {
+              e.preventDefault();
+              handleTextSubmit();
+            }
             if (e.key === 'Escape') {
               setTextInput(null);
               setTextValue('');
             }
           }}
-          onBlur={handleTextSubmit}
+          onBlur={() => {
+            // Save text on blur if there's content
+            if (textValue.trim()) {
+              handleTextSubmit();
+            } else {
+              setTextInput(null);
+              setTextValue('');
+            }
+          }}
           className="absolute bg-transparent border-none outline-none text-foreground"
           style={{
             left: textInput.x + pan.x,
-            top: textInput.y + pan.y - 10,
+            top: textInput.y + pan.y - (strokeWidth * 4 + 12) * 0.82,
             fontSize: strokeWidth * 4 + 12,
             color: strokeColor,
             minWidth: '100px',
           }}
-          placeholder="Type here..."
+          placeholder="Type..."
         />
       )}
       
       {/* Zoom/Pan Info */}
       <div className="absolute bottom-4 left-4 text-xs text-muted-foreground bg-card/80 backdrop-blur-sm px-3 py-1.5 rounded-lg border border-border">
-        Ctrl+Z to undo • Del to delete • Shift to constrain ratio
+        Ctrl+Z undo • Drag to select multiple • Shift+click to add
       </div>
     </div>
   );

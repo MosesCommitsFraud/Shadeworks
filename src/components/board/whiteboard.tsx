@@ -10,7 +10,7 @@ interface WhiteboardProps {
   roomId: string;
 }
 
-const MAX_UNDO_STACK = 50;
+const MAX_UNDO_STACK = 100;
 
 export function Whiteboard({ roomId }: WhiteboardProps) {
   const [tool, setTool] = useState<Tool>('pen');
@@ -20,9 +20,9 @@ export function Whiteboard({ roomId }: WhiteboardProps) {
   const [collaboration, setCollaboration] = useState<CollaborationManager | null>(null);
   const [connectedUsers, setConnectedUsers] = useState(1);
   
-  // Undo/Redo stacks
-  const [undoStack, setUndoStack] = useState<BoardElement[][]>([]);
-  const [redoStack, setRedoStack] = useState<BoardElement[][]>([]);
+  // Undo/Redo stacks - store snapshots
+  const undoStackRef = useRef<BoardElement[][]>([]);
+  const redoStackRef = useRef<BoardElement[][]>([]);
   const isUndoingRef = useRef(false);
 
   // Initialize collaboration
@@ -51,76 +51,76 @@ export function Whiteboard({ roomId }: WhiteboardProps) {
   }, [roomId]);
 
   // Save state to undo stack
-  const saveToUndoStack = useCallback((currentElements: BoardElement[]) => {
+  const saveToUndoStack = useCallback(() => {
     if (isUndoingRef.current) return;
     
-    setUndoStack(prev => {
-      const newStack = [...prev, currentElements];
-      // Limit stack size
-      if (newStack.length > MAX_UNDO_STACK) {
-        return newStack.slice(-MAX_UNDO_STACK);
-      }
-      return newStack;
-    });
-    // Clear redo stack when new action is performed
-    setRedoStack([]);
-  }, []);
+    const snapshot = JSON.parse(JSON.stringify(elements));
+    undoStackRef.current = [...undoStackRef.current, snapshot].slice(-MAX_UNDO_STACK);
+    redoStackRef.current = []; // Clear redo on new action
+  }, [elements]);
 
-  // Undo function
+  // Apply state to collaboration
+  const applyState = useCallback((newElements: BoardElement[]) => {
+    if (collaboration) {
+      collaboration.clearAll();
+      newElements.forEach(el => collaboration.addElement(el));
+    } else {
+      setElements(newElements);
+    }
+  }, [collaboration]);
+
+  // Undo function - instant
   const handleUndo = useCallback(() => {
-    if (undoStack.length === 0) return;
+    if (undoStackRef.current.length === 0) return;
     
     isUndoingRef.current = true;
     
-    const previousState = undoStack[undoStack.length - 1];
-    const newUndoStack = undoStack.slice(0, -1);
+    // Save current to redo
+    const currentSnapshot = JSON.parse(JSON.stringify(elements));
+    redoStackRef.current = [...redoStackRef.current, currentSnapshot];
     
-    // Save current state to redo stack
-    setRedoStack(prev => [...prev, elements]);
-    setUndoStack(newUndoStack);
+    // Pop from undo
+    const previousState = undoStackRef.current.pop()!;
     
-    // Apply previous state
-    if (collaboration) {
-      collaboration.clearAll();
-      previousState.forEach(el => collaboration.addElement(el));
-    } else {
-      setElements(previousState);
-    }
+    // Apply
+    applyState(previousState);
     
-    setTimeout(() => {
+    // Reset flag immediately
+    requestAnimationFrame(() => {
       isUndoingRef.current = false;
-    }, 100);
-  }, [undoStack, elements, collaboration]);
+    });
+  }, [elements, applyState]);
 
-  // Redo function
+  // Redo function - instant
   const handleRedo = useCallback(() => {
-    if (redoStack.length === 0) return;
+    if (redoStackRef.current.length === 0) return;
     
     isUndoingRef.current = true;
     
-    const nextState = redoStack[redoStack.length - 1];
-    const newRedoStack = redoStack.slice(0, -1);
+    // Save current to undo
+    const currentSnapshot = JSON.parse(JSON.stringify(elements));
+    undoStackRef.current = [...undoStackRef.current, currentSnapshot];
     
-    // Save current state to undo stack
-    setUndoStack(prev => [...prev, elements]);
-    setRedoStack(newRedoStack);
+    // Pop from redo
+    const nextState = redoStackRef.current.pop()!;
     
-    // Apply next state
-    if (collaboration) {
-      collaboration.clearAll();
-      nextState.forEach(el => collaboration.addElement(el));
-    } else {
-      setElements(nextState);
-    }
+    // Apply
+    applyState(nextState);
     
-    setTimeout(() => {
+    // Reset flag immediately
+    requestAnimationFrame(() => {
       isUndoingRef.current = false;
-    }, 100);
-  }, [redoStack, elements, collaboration]);
+    });
+  }, [elements, applyState]);
 
   // Handle keyboard shortcuts for undo/redo
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      // Don't trigger if typing in input
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
+        return;
+      }
+      
       if ((e.ctrlKey || e.metaKey) && e.key === 'z') {
         e.preventDefault();
         if (e.shiftKey) {
@@ -140,15 +140,14 @@ export function Whiteboard({ roomId }: WhiteboardProps) {
   }, [handleUndo, handleRedo]);
 
   const handleAddElement = useCallback((element: BoardElement) => {
-    // Save current state before adding
-    saveToUndoStack(elements);
+    saveToUndoStack();
     
     if (collaboration) {
       collaboration.addElement(element);
     } else {
       setElements((prev) => [...prev, element]);
     }
-  }, [collaboration, elements, saveToUndoStack]);
+  }, [collaboration, saveToUndoStack]);
 
   const handleUpdateElement = useCallback((id: string, updates: Partial<BoardElement>) => {
     if (collaboration) {
@@ -160,32 +159,29 @@ export function Whiteboard({ roomId }: WhiteboardProps) {
     }
   }, [collaboration]);
 
-  // Save state when starting to move/resize (called from canvas)
   const handleStartTransform = useCallback(() => {
-    saveToUndoStack(elements);
-  }, [elements, saveToUndoStack]);
+    saveToUndoStack();
+  }, [saveToUndoStack]);
 
   const handleDeleteElement = useCallback((id: string) => {
-    // Save current state before deleting
-    saveToUndoStack(elements);
+    saveToUndoStack();
     
     if (collaboration) {
       collaboration.deleteElement(id);
     } else {
       setElements((prev) => prev.filter((el) => el.id !== id));
     }
-  }, [collaboration, elements, saveToUndoStack]);
+  }, [collaboration, saveToUndoStack]);
 
   const handleClear = useCallback(() => {
-    // Save current state before clearing
-    saveToUndoStack(elements);
+    saveToUndoStack();
     
     if (collaboration) {
       collaboration.clearAll();
     } else {
       setElements([]);
     }
-  }, [collaboration, elements, saveToUndoStack]);
+  }, [collaboration, saveToUndoStack]);
 
   return (
     <div className="relative w-screen h-screen overflow-hidden">
