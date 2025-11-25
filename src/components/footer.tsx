@@ -1,7 +1,7 @@
 export function Footer() {
   return (
     <footer className="border-t py-12 border-transparent">
-      <div className="container mx-auto px-4">
+      <div className="max-w-4xl mx-auto px-4">
         <div className="flex flex-wrap items-center justify-center gap-6 text-sm text-muted-foreground">
           <a href="/terms" className="hover:text-foreground transition-colors">
             Terms of Service

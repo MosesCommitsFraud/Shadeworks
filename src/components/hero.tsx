@@ -7,8 +7,8 @@ export function Hero() {
       {/* Background grid */}
       <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.02)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.02)_1px,transparent_1px)] bg-[size:64px_64px] [mask-image:radial-gradient(ellipse_80%_50%_at_50%_50%,black,transparent)]" />
 
-      <div className="container mx-auto px-4 relative">
-        <div className="max-w-4xl mx-auto text-center">
+      <div className="max-w-6xl mx-auto px-4 relative">
+        <div className="text-center">
           {/* Badge */}
           
 

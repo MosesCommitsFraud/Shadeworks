@@ -6,22 +6,22 @@ import { ChevronDown } from "lucide-react"
 export function Header() {
   return (
     <header className="border-b border-transparent sticky top-0 z-50">
-      <div className="container mx-auto px-4">
-        <nav className="flex items-center justify-center gap-10 h-16">
+      <div className="max-w-6xl mx-auto px-4">
+        <nav className="flex items-center justify-start gap-10 h-16">
           {/* Logo */}
           <div className="flex items-center">
             <Image 
               src="/logo-text-sw-white.svg" 
               alt="shadeworks" 
-              width={100} 
-              height={20} 
-              className="h-5 w-auto"
+              width={160} 
+              height={32} 
+              className="h-8 w-auto"
               priority
             />
           </div>
 
           {/* Navigation */}
-          <div className="hidden md:flex items-center gap-6 pt-[5px]">
+          <div className="hidden md:flex items-center gap-6 pt-[01px]">
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" size="sm" className="gap-1">
