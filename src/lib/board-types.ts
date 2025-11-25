@@ -17,6 +17,9 @@ export interface BoardElement {
   y?: number;
   width?: number;
   height?: number;
+  // For text scaling/squishing
+  scaleX?: number;
+  scaleY?: number;
 }
 
 export interface Cursor {

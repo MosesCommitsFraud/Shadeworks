@@ -61,7 +61,6 @@ function getBoundingBox(element: BoardElement): BoundingBox | null {
     const minY = Math.min(...ys);
     const maxX = Math.max(...xs);
     const maxY = Math.max(...ys);
-    // Add padding for stroke width
     const padding = element.strokeWidth * 2;
     return {
       x: minX - padding,
@@ -81,13 +80,26 @@ function getBoundingBox(element: BoardElement): BoundingBox | null {
   }
   
   if (element.type === 'text') {
+    // Use stored width/height if available (for scaled text)
+    if (element.width && element.height) {
+      return {
+        x: element.x ?? 0,
+        y: element.y ?? 0,
+        width: element.width,
+        height: element.height,
+      };
+    }
+    // Calculate initial bounds for new text
     const fontSize = element.strokeWidth * 4 + 12;
-    const textWidth = (element.text?.length ?? 0) * fontSize * 0.6;
+    const scaleX = element.scaleX ?? 1;
+    const scaleY = element.scaleY ?? 1;
+    const textWidth = (element.text?.length ?? 0) * fontSize * 0.55 * scaleX;
+    const textHeight = fontSize * 1.2 * scaleY;
     return {
-      x: element.x ?? 0,
-      y: (element.y ?? 0) - fontSize,
-      width: Math.max(textWidth, 40),
-      height: fontSize * 1.2,
+      x: (element.x ?? 0) - 4,
+      y: (element.y ?? 0) - fontSize * scaleY,
+      width: Math.max(textWidth, 60) + 8,
+      height: textHeight + 8,
     };
   }
   
@@ -124,6 +136,35 @@ export function Canvas({
   const [dragStart, setDragStart] = useState<Point | null>(null);
   const [originalElement, setOriginalElement] = useState<BoardElement | null>(null);
   const [originalBounds, setOriginalBounds] = useState<BoundingBox | null>(null);
+  
+  // Shift key tracking for aspect ratio lock
+  const [shiftPressed, setShiftPressed] = useState(false);
+
+  // Track shift key
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Shift') setShiftPressed(true);
+      if (e.key === 'Delete' && selectedId) {
+        onDeleteElement(selectedId);
+        setSelectedId(null);
+      }
+      if (e.key === 'Escape') {
+        setSelectedId(null);
+        setTextInput(null);
+      }
+    };
+    
+    const handleKeyUp = (e: KeyboardEvent) => {
+      if (e.key === 'Shift') setShiftPressed(false);
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('keyup', handleKeyUp);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('keyup', handleKeyUp);
+    };
+  }, [selectedId, onDeleteElement]);
 
   // Track remote cursors
   useEffect(() => {
@@ -213,6 +254,9 @@ export function Canvas({
       let newWidth = originalBounds.width;
       let newHeight = originalBounds.height;
       
+      // Calculate aspect ratio for shift-constrained resize
+      const aspectRatio = originalBounds.width / originalBounds.height;
+      
       // Calculate new bounds based on handle
       switch (resizeHandle) {
         case 'nw':
@@ -220,45 +264,86 @@ export function Canvas({
           newY = originalBounds.y + dy;
           newWidth = originalBounds.width - dx;
           newHeight = originalBounds.height - dy;
+          if (shiftPressed) {
+            const avgDelta = (dx + dy) / 2;
+            newX = originalBounds.x + avgDelta;
+            newY = originalBounds.y + avgDelta / aspectRatio;
+            newWidth = originalBounds.width - avgDelta;
+            newHeight = newWidth / aspectRatio;
+          }
           break;
         case 'n':
           newY = originalBounds.y + dy;
           newHeight = originalBounds.height - dy;
+          if (shiftPressed) {
+            newWidth = newHeight * aspectRatio;
+            newX = originalBounds.x + (originalBounds.width - newWidth) / 2;
+          }
           break;
         case 'ne':
           newY = originalBounds.y + dy;
           newWidth = originalBounds.width + dx;
           newHeight = originalBounds.height - dy;
+          if (shiftPressed) {
+            const avgDelta = (dx - dy) / 2;
+            newWidth = originalBounds.width + avgDelta;
+            newHeight = newWidth / aspectRatio;
+            newY = originalBounds.y + originalBounds.height - newHeight;
+          }
           break;
         case 'e':
           newWidth = originalBounds.width + dx;
+          if (shiftPressed) {
+            newHeight = newWidth / aspectRatio;
+            newY = originalBounds.y + (originalBounds.height - newHeight) / 2;
+          }
           break;
         case 'se':
           newWidth = originalBounds.width + dx;
           newHeight = originalBounds.height + dy;
+          if (shiftPressed) {
+            const avgDelta = (dx + dy) / 2;
+            newWidth = originalBounds.width + avgDelta;
+            newHeight = newWidth / aspectRatio;
+          }
           break;
         case 's':
           newHeight = originalBounds.height + dy;
+          if (shiftPressed) {
+            newWidth = newHeight * aspectRatio;
+            newX = originalBounds.x + (originalBounds.width - newWidth) / 2;
+          }
           break;
         case 'sw':
           newX = originalBounds.x + dx;
           newWidth = originalBounds.width - dx;
           newHeight = originalBounds.height + dy;
+          if (shiftPressed) {
+            const avgDelta = (-dx + dy) / 2;
+            newWidth = originalBounds.width + avgDelta;
+            newHeight = newWidth / aspectRatio;
+            newX = originalBounds.x + originalBounds.width - newWidth;
+          }
           break;
         case 'w':
           newX = originalBounds.x + dx;
           newWidth = originalBounds.width - dx;
+          if (shiftPressed) {
+            newHeight = newWidth / aspectRatio;
+            newY = originalBounds.y + (originalBounds.height - newHeight) / 2;
+          }
           break;
       }
       
       // Enforce minimum size
-      if (newWidth < 10) {
-        if (resizeHandle.includes('w')) newX = originalBounds.x + originalBounds.width - 10;
-        newWidth = 10;
+      const minSize = 10;
+      if (newWidth < minSize) {
+        if (resizeHandle.includes('w')) newX = originalBounds.x + originalBounds.width - minSize;
+        newWidth = minSize;
       }
-      if (newHeight < 10) {
-        if (resizeHandle.includes('n')) newY = originalBounds.y + originalBounds.height - 10;
-        newHeight = 10;
+      if (newHeight < minSize) {
+        if (resizeHandle.includes('n')) newY = originalBounds.y + originalBounds.height - minSize;
+        newHeight = minSize;
       }
       
       // Update element based on type
@@ -279,8 +364,20 @@ export function Canvas({
         }));
         onUpdateElement(selectedId, { points: newPoints });
       } else if (originalElement.type === 'text') {
-        // For text, just move it
-        onUpdateElement(selectedId, { x: newX, y: newY + newHeight });
+        // For text, use scaleX and scaleY for squishing/stretching
+        const scaleX = newWidth / originalBounds.width;
+        const scaleY = newHeight / originalBounds.height;
+        const origScaleX = originalElement.scaleX ?? 1;
+        const origScaleY = originalElement.scaleY ?? 1;
+        
+        onUpdateElement(selectedId, { 
+          x: newX + 4, // Offset for padding
+          y: newY + newHeight - 4, // Text baseline is at bottom
+          width: newWidth,
+          height: newHeight,
+          scaleX: origScaleX * scaleX,
+          scaleY: origScaleY * scaleY,
+        });
       }
       return;
     }
@@ -305,24 +402,44 @@ export function Canvas({
       case 'rectangle': {
         const width = point.x - startPoint.x;
         const height = point.y - startPoint.y;
+        let finalWidth = Math.abs(width);
+        let finalHeight = Math.abs(height);
+        
+        // Shift for square
+        if (shiftPressed) {
+          const size = Math.max(finalWidth, finalHeight);
+          finalWidth = size;
+          finalHeight = size;
+        }
+        
         setCurrentElement({
           ...currentElement,
-          x: width < 0 ? point.x : startPoint.x,
-          y: height < 0 ? point.y : startPoint.y,
-          width: Math.abs(width),
-          height: Math.abs(height),
+          x: width < 0 ? startPoint.x - finalWidth : startPoint.x,
+          y: height < 0 ? startPoint.y - finalHeight : startPoint.y,
+          width: finalWidth,
+          height: finalHeight,
         });
         break;
       }
       case 'ellipse': {
         const width = point.x - startPoint.x;
         const height = point.y - startPoint.y;
+        let finalWidth = Math.abs(width);
+        let finalHeight = Math.abs(height);
+        
+        // Shift for circle
+        if (shiftPressed) {
+          const size = Math.max(finalWidth, finalHeight);
+          finalWidth = size;
+          finalHeight = size;
+        }
+        
         setCurrentElement({
           ...currentElement,
-          x: width < 0 ? point.x : startPoint.x,
-          y: height < 0 ? point.y : startPoint.y,
-          width: Math.abs(width),
-          height: Math.abs(height),
+          x: width < 0 ? startPoint.x - finalWidth : startPoint.x,
+          y: height < 0 ? startPoint.y - finalHeight : startPoint.y,
+          width: finalWidth,
+          height: finalHeight,
         });
         break;
       }
@@ -355,7 +472,7 @@ export function Canvas({
         break;
       }
     }
-  }, [isDrawing, currentElement, startPoint, tool, collaboration, getMousePosition, isPanning, panStart, elements, onDeleteElement, strokeWidth, isDragging, isResizing, selectedId, dragStart, originalElement, originalBounds, resizeHandle, onUpdateElement]);
+  }, [isDrawing, currentElement, startPoint, tool, collaboration, getMousePosition, isPanning, panStart, elements, onDeleteElement, strokeWidth, isDragging, isResizing, selectedId, dragStart, originalElement, originalBounds, resizeHandle, onUpdateElement, shiftPressed]);
 
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
     // Middle mouse button for panning
@@ -509,6 +626,10 @@ export function Canvas({
 
   const handleTextSubmit = useCallback(() => {
     if (textInput && textValue.trim()) {
+      const fontSize = strokeWidth * 4 + 12;
+      const textWidth = textValue.length * fontSize * 0.55;
+      const textHeight = fontSize * 1.2;
+      
       const newElement: BoardElement = {
         id: uuid(),
         type: 'text',
@@ -518,29 +639,16 @@ export function Canvas({
         text: textValue,
         x: textInput.x,
         y: textInput.y,
+        width: Math.max(textWidth, 60) + 8,
+        height: textHeight + 8,
+        scaleX: 1,
+        scaleY: 1,
       };
       onAddElement(newElement);
     }
     setTextInput(null);
     setTextValue('');
   }, [textInput, textValue, strokeColor, strokeWidth, onAddElement]);
-
-  // Handle keyboard shortcuts
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Delete' && selectedId) {
-        onDeleteElement(selectedId);
-        setSelectedId(null);
-      }
-      if (e.key === 'Escape') {
-        setSelectedId(null);
-        setTextInput(null);
-      }
-    };
-
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [selectedId, onDeleteElement]);
 
   const renderElement = (element: BoardElement, isPreview = false) => {
     const opacity = isPreview ? 0.7 : 1;
@@ -613,15 +721,23 @@ export function Canvas({
         );
       }
       case 'text': {
+        const fontSize = element.strokeWidth * 4 + 12;
+        const scaleX = element.scaleX ?? 1;
+        const scaleY = element.scaleY ?? 1;
+        const x = element.x ?? 0;
+        const y = element.y ?? 0;
+        
         return (
           <text
             key={element.id}
-            x={element.x}
-            y={element.y}
+            x={0}
+            y={0}
             fill={element.strokeColor}
-            fontSize={element.strokeWidth * 4 + 12}
+            fontSize={fontSize}
             fontFamily="inherit"
             opacity={opacity}
+            transform={`translate(${x}, ${y}) scale(${scaleX}, ${scaleY})`}
+            style={{ transformOrigin: '0 0' }}
           >
             {element.text}
           </text>
@@ -811,7 +927,7 @@ export function Canvas({
       
       {/* Zoom/Pan Info */}
       <div className="absolute bottom-4 left-4 text-xs text-muted-foreground bg-card/80 backdrop-blur-sm px-3 py-1.5 rounded-lg border border-border">
-        Middle-click to pan • Del to delete • Drag to move • Handles to resize
+        Middle-click to pan • Del to delete • Shift to constrain ratio
       </div>
     </div>
   );
