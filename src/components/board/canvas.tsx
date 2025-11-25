@@ -15,6 +15,7 @@ interface CanvasProps {
   onAddElement: (element: BoardElement) => void;
   onUpdateElement: (id: string, updates: Partial<BoardElement>) => void;
   onDeleteElement: (id: string) => void;
+  onStartTransform?: () => void;
 }
 
 interface RemoteCursor {
@@ -80,8 +81,9 @@ function getBoundingBox(element: BoardElement): BoundingBox | null {
   }
   
   if (element.type === 'text') {
-    // Use stored width/height if available (for scaled text)
-    if (element.width && element.height) {
+    // Text stores x,y as top-left of bounding box
+    // width/height are the box dimensions
+    if (element.width !== undefined && element.height !== undefined) {
       return {
         x: element.x ?? 0,
         y: element.y ?? 0,
@@ -89,17 +91,15 @@ function getBoundingBox(element: BoardElement): BoundingBox | null {
         height: element.height,
       };
     }
-    // Calculate initial bounds for new text
+    // Fallback for legacy text without stored dimensions
     const fontSize = element.strokeWidth * 4 + 12;
-    const scaleX = element.scaleX ?? 1;
-    const scaleY = element.scaleY ?? 1;
-    const textWidth = (element.text?.length ?? 0) * fontSize * 0.55 * scaleX;
-    const textHeight = fontSize * 1.2 * scaleY;
+    const textWidth = (element.text?.length ?? 0) * fontSize * 0.55;
+    const textHeight = fontSize * 1.2;
     return {
-      x: (element.x ?? 0) - 4,
-      y: (element.y ?? 0) - fontSize * scaleY,
-      width: Math.max(textWidth, 60) + 8,
-      height: textHeight + 8,
+      x: element.x ?? 0,
+      y: element.y ?? 0,
+      width: Math.max(textWidth, 60),
+      height: textHeight,
     };
   }
   
@@ -115,6 +115,7 @@ export function Canvas({
   onAddElement,
   onUpdateElement,
   onDeleteElement,
+  onStartTransform,
 }: CanvasProps) {
   const svgRef = useRef<SVGSVGElement>(null);
   const [isDrawing, setIsDrawing] = useState(false);
@@ -371,8 +372,8 @@ export function Canvas({
         const origScaleY = originalElement.scaleY ?? 1;
         
         onUpdateElement(selectedId, { 
-          x: newX + 4, // Offset for padding
-          y: newY + newHeight - 4, // Text baseline is at bottom
+          x: newX,
+          y: newY,
           width: newWidth,
           height: newHeight,
           scaleX: origScaleX * scaleX,
@@ -504,6 +505,7 @@ export function Canvas({
         
         for (const h of handles) {
           if (Math.abs(point.x - h.x) <= handleSize && Math.abs(point.y - h.y) <= handleSize) {
+            onStartTransform?.();
             setIsResizing(true);
             setResizeHandle(h.handle);
             setDragStart(point);
@@ -520,6 +522,7 @@ export function Canvas({
           point.y >= selectedBounds.y &&
           point.y <= selectedBounds.y + selectedBounds.height
         ) {
+          onStartTransform?.();
           setIsDragging(true);
           setDragStart(point);
           setOriginalElement({ ...selectedElement });
@@ -541,6 +544,7 @@ export function Canvas({
       
       if (clicked) {
         setSelectedId(clicked.id);
+        onStartTransform?.();
         setIsDragging(true);
         setDragStart(point);
         setOriginalElement({ ...clicked });
@@ -630,6 +634,7 @@ export function Canvas({
       const textWidth = textValue.length * fontSize * 0.55;
       const textHeight = fontSize * 1.2;
       
+      // Store x,y as top-left of bounding box
       const newElement: BoardElement = {
         id: uuid(),
         type: 'text',
@@ -638,9 +643,9 @@ export function Canvas({
         strokeWidth,
         text: textValue,
         x: textInput.x,
-        y: textInput.y,
-        width: Math.max(textWidth, 60) + 8,
-        height: textHeight + 8,
+        y: textInput.y - fontSize, // Adjust so text appears at click position
+        width: Math.max(textWidth, 60),
+        height: textHeight,
         scaleX: 1,
         scaleY: 1,
       };
@@ -727,17 +732,21 @@ export function Canvas({
         const x = element.x ?? 0;
         const y = element.y ?? 0;
         
+        // Text baseline offset from top of bounding box
+        const baselineOffset = fontSize * 0.82;
+        
+        // Scale the text around top-left corner (x, y) of bounding box
+        // Transform sequence: translate to origin, scale, translate back
         return (
           <text
             key={element.id}
-            x={0}
-            y={0}
+            opacity={opacity}
             fill={element.strokeColor}
             fontSize={fontSize}
             fontFamily="inherit"
-            opacity={opacity}
+            x={0}
+            y={baselineOffset}
             transform={`translate(${x}, ${y}) scale(${scaleX}, ${scaleY})`}
-            style={{ transformOrigin: '0 0' }}
           >
             {element.text}
           </text>
@@ -927,7 +936,7 @@ export function Canvas({
       
       {/* Zoom/Pan Info */}
       <div className="absolute bottom-4 left-4 text-xs text-muted-foreground bg-card/80 backdrop-blur-sm px-3 py-1.5 rounded-lg border border-border">
-        Middle-click to pan • Del to delete • Shift to constrain ratio
+        Ctrl+Z to undo • Del to delete • Shift to constrain ratio
       </div>
     </div>
   );
