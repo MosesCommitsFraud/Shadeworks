@@ -854,9 +854,12 @@ export function Canvas({
         elementAdded = true;
       }
 
-      // Switch back to select tool after drawing
-      if (elementAdded && onToolChange) {
-        onToolChange('select');
+      // Switch back to select tool and select the new element
+      if (elementAdded) {
+        setSelectedIds([currentElement.id]);
+        if (onToolChange) {
+          onToolChange('select');
+        }
       }
     }
 
@@ -891,7 +894,8 @@ export function Canvas({
       };
       onAddElement(newElement);
 
-      // Switch back to select tool after adding text
+      // Select the new text element and switch back to select tool
+      setSelectedIds([newElement.id]);
       if (onToolChange) {
         onToolChange('select');
       }
