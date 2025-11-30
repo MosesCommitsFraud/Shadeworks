@@ -71,8 +71,8 @@ function getBoundingBox(element: BoardElement): BoundingBox | null {
       height: Math.max(maxY - minY + padding * 2, 20),
     };
   }
-  
-  if (element.type === 'rectangle' || element.type === 'ellipse') {
+
+  if (element.type === 'rectangle' || element.type === 'ellipse' || element.type === 'frame' || element.type === 'web-embed') {
     return {
       x: element.x ?? 0,
       y: element.y ?? 0,
@@ -80,7 +80,7 @@ function getBoundingBox(element: BoardElement): BoundingBox | null {
       height: element.height ?? 0,
     };
   }
-  
+
   if (element.type === 'text') {
     if (element.width !== undefined && element.height !== undefined) {
       return {
@@ -100,7 +100,24 @@ function getBoundingBox(element: BoardElement): BoundingBox | null {
       height: textHeight,
     };
   }
-  
+
+  if (element.type === 'laser') {
+    if (element.points.length === 0) return null;
+    const xs = element.points.map(p => p.x);
+    const ys = element.points.map(p => p.y);
+    const minX = Math.min(...xs);
+    const minY = Math.min(...ys);
+    const maxX = Math.max(...xs);
+    const maxY = Math.max(...ys);
+    const padding = 20;
+    return {
+      x: minX - padding,
+      y: minY - padding,
+      width: Math.max(maxX - minX + padding * 2, 20),
+      height: Math.max(maxY - minY + padding * 2, 20),
+    };
+  }
+
   return null;
 }
 
@@ -147,9 +164,11 @@ export function Canvas({
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const [isPanning, setIsPanning] = useState(false);
   const [panStart, setPanStart] = useState({ x: 0, y: 0 });
+  const [zoom, setZoom] = useState(1);
   const [textInput, setTextInput] = useState<{ x: number; y: number } | null>(null);
   const [textValue, setTextValue] = useState('');
   const textInputRef = useRef<HTMLInputElement>(null);
+  const [lassoPoints, setLassoPoints] = useState<Point[]>([]);
   
   // Move and resize state
   const [isDragging, setIsDragging] = useState(false);
@@ -179,7 +198,7 @@ export function Canvas({
         setTextInput(null);
       }
     };
-    
+
     const handleKeyUp = (e: KeyboardEvent) => {
       if (e.key === 'Shift') setShiftPressed(false);
     };
@@ -191,6 +210,15 @@ export function Canvas({
       window.removeEventListener('keyup', handleKeyUp);
     };
   }, [selectedIds, onDeleteElement]);
+
+  // Wheel zoom handler
+  const handleWheel = useCallback((e: React.WheelEvent) => {
+    if (e.ctrlKey || e.metaKey) {
+      e.preventDefault();
+      const delta = e.deltaY > 0 ? 0.9 : 1.1;
+      setZoom(prev => Math.max(0.1, Math.min(5, prev * delta)));
+    }
+  }, []);
 
   // Track remote cursors
   useEffect(() => {
@@ -221,13 +249,13 @@ export function Canvas({
   const getMousePosition = useCallback((e: React.MouseEvent): Point => {
     const svg = svgRef.current;
     if (!svg) return { x: 0, y: 0 };
-    
+
     const rect = svg.getBoundingClientRect();
     return {
-      x: e.clientX - rect.left - pan.x,
-      y: e.clientY - rect.top - pan.y,
+      x: (e.clientX - rect.left - pan.x) / zoom,
+      y: (e.clientY - rect.top - pan.y) / zoom,
     };
-  }, [pan]);
+  }, [pan, zoom]);
 
   // Get selected elements and their combined bounds
   const selectedElements = selectedIds.map(id => elements.find(el => el.id === id)).filter(Boolean) as BoardElement[];
@@ -381,14 +409,14 @@ export function Canvas({
         newHeight = minSize;
       }
       
-      if (originalElement.type === 'rectangle' || originalElement.type === 'ellipse') {
+      if (originalElement.type === 'rectangle' || originalElement.type === 'ellipse' || originalElement.type === 'frame' || originalElement.type === 'web-embed') {
         onUpdateElement(selectedIds[0], {
           x: newX,
           y: newY,
           width: newWidth,
           height: newHeight,
         });
-      } else if (originalElement.type === 'pen' || originalElement.type === 'line') {
+      } else if (originalElement.type === 'pen' || originalElement.type === 'line' || originalElement.type === 'laser') {
         const scaleX = newWidth / originalBounds.width;
         const scaleY = newHeight / originalBounds.height;
         const newPoints = originalElement.points.map(p => ({
@@ -501,8 +529,41 @@ export function Canvas({
         });
         break;
       }
+      case 'frame':
+      case 'web-embed': {
+        const width = point.x - startPoint.x;
+        const height = point.y - startPoint.y;
+        let finalWidth = Math.abs(width);
+        let finalHeight = Math.abs(height);
+
+        if (shiftPressed) {
+          const size = Math.max(finalWidth, finalHeight);
+          finalWidth = size;
+          finalHeight = size;
+        }
+
+        setCurrentElement({
+          ...currentElement,
+          x: width < 0 ? startPoint.x - finalWidth : startPoint.x,
+          y: height < 0 ? startPoint.y - finalHeight : startPoint.y,
+          width: finalWidth,
+          height: finalHeight,
+        });
+        break;
+      }
+      case 'laser': {
+        setCurrentElement({
+          ...currentElement,
+          points: [...currentElement.points, point],
+        });
+        break;
+      }
+      case 'lasso': {
+        setLassoPoints([...lassoPoints, point]);
+        break;
+      }
     }
-  }, [isDrawing, currentElement, startPoint, tool, collaboration, getMousePosition, isPanning, panStart, elements, onDeleteElement, strokeWidth, isDragging, isResizing, selectedIds, dragStart, originalElements, originalBounds, resizeHandle, onUpdateElement, shiftPressed, isBoxSelecting]);
+  }, [isDrawing, currentElement, startPoint, tool, collaboration, getMousePosition, isPanning, panStart, elements, onDeleteElement, strokeWidth, isDragging, isResizing, selectedIds, dragStart, originalElements, originalBounds, resizeHandle, onUpdateElement, shiftPressed, isBoxSelecting, lassoPoints]);
 
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
     // Middle mouse button for panning
@@ -607,15 +668,35 @@ export function Canvas({
       return;
     }
 
+    if (tool === 'lasso') {
+      setLassoPoints([point]);
+      setIsDrawing(true);
+      return;
+    }
+
+    if (tool === 'laser') {
+      const newElement: BoardElement = {
+        id: uuid(),
+        type: 'laser',
+        points: [point],
+        strokeColor,
+        strokeWidth,
+        timestamp: Date.now(),
+      };
+      setCurrentElement(newElement);
+      setIsDrawing(true);
+      return;
+    }
+
     const newElement: BoardElement = {
       id: uuid(),
-      type: tool as 'pen' | 'line' | 'rectangle' | 'ellipse',
+      type: tool as 'pen' | 'line' | 'rectangle' | 'ellipse' | 'frame' | 'web-embed',
       points: [point],
       strokeColor,
       strokeWidth,
     };
 
-    if (tool === 'rectangle' || tool === 'ellipse') {
+    if (tool === 'rectangle' || tool === 'ellipse' || tool === 'frame' || tool === 'web-embed') {
       newElement.x = point.x;
       newElement.y = point.y;
       newElement.width = 0;
@@ -671,13 +752,45 @@ export function Canvas({
       return;
     }
 
+    // Handle lasso selection
+    if (tool === 'lasso' && lassoPoints.length > 2) {
+      const selected: string[] = [];
+      elements.forEach(el => {
+        const bounds = getBoundingBox(el);
+        if (bounds) {
+          // Simple point-in-polygon check for center of element
+          const centerX = bounds.x + bounds.width / 2;
+          const centerY = bounds.y + bounds.height / 2;
+          let inside = false;
+          for (let i = 0, j = lassoPoints.length - 1; i < lassoPoints.length; j = i++) {
+            const xi = lassoPoints[i].x, yi = lassoPoints[i].y;
+            const xj = lassoPoints[j].x, yj = lassoPoints[j].y;
+            const intersect = ((yi > centerY) !== (yj > centerY))
+              && (centerX < (xj - xi) * (centerY - yi) / (yj - yi) + xi);
+            if (intersect) inside = !inside;
+          }
+          if (inside) selected.push(el.id);
+        }
+      });
+      setSelectedIds(selected);
+      setLassoPoints([]);
+      setIsDrawing(false);
+      return;
+    }
+
     if (currentElement && isDrawing) {
       if (currentElement.type === 'pen' && currentElement.points.length > 1) {
         onAddElement(currentElement);
       } else if (currentElement.type === 'line' && currentElement.points.length === 2) {
         onAddElement(currentElement);
+      } else if (currentElement.type === 'laser' && currentElement.points.length > 1) {
+        // Add laser element and schedule it for removal after 2 seconds
+        onAddElement(currentElement);
+        setTimeout(() => {
+          onDeleteElement(currentElement.id);
+        }, 2000);
       } else if (
-        (currentElement.type === 'rectangle' || currentElement.type === 'ellipse') &&
+        (currentElement.type === 'rectangle' || currentElement.type === 'ellipse' || currentElement.type === 'frame' || currentElement.type === 'web-embed') &&
         currentElement.width &&
         currentElement.height &&
         currentElement.width > 2 &&
@@ -690,7 +803,8 @@ export function Canvas({
     setIsDrawing(false);
     setCurrentElement(null);
     setStartPoint(null);
-  }, [currentElement, isDrawing, onAddElement, isPanning, isDragging, isResizing, isBoxSelecting, selectionBox, elements]);
+    setLassoPoints([]);
+  }, [currentElement, isDrawing, onAddElement, isPanning, isDragging, isResizing, isBoxSelecting, selectionBox, elements, tool, lassoPoints, onDeleteElement]);
 
   const handleTextSubmit = useCallback(() => {
     if (textInput && textValue.trim()) {
@@ -817,7 +931,7 @@ export function Canvas({
         const x = element.x ?? 0;
         const y = element.y ?? 0;
         const baselineOffset = fontSize * 0.82;
-        
+
         return (
           <text
             key={element.id}
@@ -831,6 +945,85 @@ export function Canvas({
           >
             {element.text}
           </text>
+        );
+      }
+      case 'frame': {
+        return (
+          <g key={element.id}>
+            <rect
+              x={element.x}
+              y={element.y}
+              width={element.width}
+              height={element.height}
+              stroke={element.strokeColor}
+              strokeWidth={element.strokeWidth}
+              fill="none"
+              rx={8}
+              opacity={opacity}
+              strokeDasharray="8,4"
+            />
+            {element.label && (
+              <text
+                x={(element.x ?? 0) + 8}
+                y={(element.y ?? 0) - 4}
+                fill={element.strokeColor}
+                fontSize={14}
+                fontFamily="inherit"
+                fontWeight="600"
+              >
+                {element.label}
+              </text>
+            )}
+          </g>
+        );
+      }
+      case 'web-embed': {
+        return (
+          <g key={element.id}>
+            <rect
+              x={element.x}
+              y={element.y}
+              width={element.width}
+              height={element.height}
+              stroke={element.strokeColor}
+              strokeWidth={element.strokeWidth}
+              fill="rgba(100, 100, 255, 0.05)"
+              rx={4}
+              opacity={opacity}
+            />
+            {element.url && (
+              <text
+                x={(element.x ?? 0) + (element.width ?? 0) / 2}
+                y={(element.y ?? 0) + (element.height ?? 0) / 2}
+                fill={element.strokeColor}
+                fontSize={12}
+                fontFamily="inherit"
+                textAnchor="middle"
+                opacity={0.7}
+              >
+                {element.url}
+              </text>
+            )}
+          </g>
+        );
+      }
+      case 'laser': {
+        if (element.points.length < 2) return null;
+        const stroke = getStroke(element.points.map((p) => [p.x, p.y]), {
+          size: 8,
+          thinning: 0.3,
+          smoothing: 0.5,
+          streamline: 0.5,
+        });
+        const pathData = getSvgPathFromStroke(stroke);
+        return (
+          <path
+            key={element.id}
+            d={pathData}
+            fill={element.strokeColor}
+            opacity={Math.max(0.3, opacity * 0.7)}
+            filter="url(#laser-glow)"
+          />
         );
       }
       default:
@@ -906,10 +1099,14 @@ export function Canvas({
           return 'ew-resize';
       }
     }
-    
+
     switch (tool) {
       case 'pen':
       case 'line':
+      case 'rectangle':
+      case 'ellipse':
+      case 'frame':
+      case 'web-embed':
         return 'crosshair';
       case 'eraser':
         return 'cell';
@@ -917,6 +1114,10 @@ export function Canvas({
         return selectedIds.length > 0 ? 'grab' : 'crosshair';
       case 'text':
         return 'text';
+      case 'laser':
+        return 'pointer';
+      case 'lasso':
+        return 'crosshair';
       default:
         return 'crosshair';
     }
@@ -925,14 +1126,14 @@ export function Canvas({
   return (
     <div className="relative w-full h-full overflow-hidden bg-[#0a0a0a]">
       {/* Grid Background */}
-      <div 
+      <div
         className="absolute inset-0 pointer-events-none opacity-[0.03]"
         style={{
           backgroundImage: `
             linear-gradient(to right, #fff 1px, transparent 1px),
             linear-gradient(to bottom, #fff 1px, transparent 1px)
           `,
-          backgroundSize: '40px 40px',
+          backgroundSize: `${40 * zoom}px ${40 * zoom}px`,
           backgroundPosition: `${pan.x}px ${pan.y}px`,
         }}
       />
@@ -946,17 +1147,27 @@ export function Canvas({
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}
         onMouseLeave={handleMouseUp}
+        onWheel={handleWheel}
       >
-        <g transform={`translate(${pan.x}, ${pan.y})`}>
+        <defs>
+          <filter id="laser-glow">
+            <feGaussianBlur stdDeviation="2" result="coloredBlur"/>
+            <feMerge>
+              <feMergeNode in="coloredBlur"/>
+              <feMergeNode in="SourceGraphic"/>
+            </feMerge>
+          </filter>
+        </defs>
+        <g transform={`translate(${pan.x}, ${pan.y}) scale(${zoom})`}>
           {/* Render all elements */}
           {elements.map((el) => renderElement(el))}
-          
+
           {/* Render current element being drawn */}
           {currentElement && renderElement(currentElement, true)}
-          
+
           {/* Render selection box */}
           {tool === 'select' && renderSelectionBox()}
-          
+
           {/* Render box selection rectangle */}
           {isBoxSelecting && selectionBox && (
             <rect
@@ -970,18 +1181,30 @@ export function Canvas({
               strokeDasharray="4,4"
             />
           )}
+
+          {/* Render lasso selection path */}
+          {tool === 'lasso' && lassoPoints.length > 0 && (
+            <polyline
+              points={lassoPoints.map(p => `${p.x},${p.y}`).join(' ')}
+              fill="none"
+              stroke="var(--accent)"
+              strokeWidth={2}
+              strokeDasharray="5,5"
+              opacity={0.7}
+            />
+          )}
         </g>
-        
+
       </svg>
       
       {/* Remote Cursors - Animated */}
-      <div 
+      <div
         className="absolute inset-0 pointer-events-none overflow-hidden"
-        style={{ transform: `translate(${pan.x}px, ${pan.y}px)` }}
+        style={{ transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})` }}
       >
         <CollaboratorCursors cursors={remoteCursors} />
       </div>
-      
+
       {/* Text Input */}
       {textInput && (
         <input
@@ -1010,19 +1233,52 @@ export function Canvas({
           }}
           className="absolute bg-transparent border-none outline-none text-foreground"
           style={{
-            left: textInput.x + pan.x,
-            top: textInput.y + pan.y - (strokeWidth * 4 + 12) * 0.82,
-            fontSize: strokeWidth * 4 + 12,
+            left: textInput.x * zoom + pan.x,
+            top: textInput.y * zoom + pan.y - (strokeWidth * 4 + 12) * 0.82 * zoom,
+            fontSize: (strokeWidth * 4 + 12) * zoom,
             color: strokeColor,
             minWidth: '100px',
           }}
           placeholder="Type..."
         />
       )}
-      
-      {/* Zoom/Pan Info */}
-      <div className="absolute bottom-4 left-4 text-xs text-muted-foreground bg-card/80 backdrop-blur-sm px-3 py-1.5 rounded-lg border border-border">
-        Ctrl+Z undo • Drag to select multiple • Shift+click to add
+
+      {/* Zoom Control */}
+      <div className="absolute bottom-4 left-4 flex flex-col gap-2">
+        <div className="flex items-center gap-2 bg-card/95 backdrop-blur-md border border-border rounded-lg p-1.5 shadow-xl">
+          <button
+            onClick={() => setZoom(prev => Math.max(0.1, prev - 0.1))}
+            className="p-1.5 rounded hover:bg-secondary/80 text-muted-foreground hover:text-foreground transition-all"
+            title="Zoom Out"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 12H4" />
+            </svg>
+          </button>
+          <span className="text-xs font-medium text-foreground min-w-[3rem] text-center">
+            {Math.round(zoom * 100)}%
+          </span>
+          <button
+            onClick={() => setZoom(prev => Math.min(5, prev + 0.1))}
+            className="p-1.5 rounded hover:bg-secondary/80 text-muted-foreground hover:text-foreground transition-all"
+            title="Zoom In"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+            </svg>
+          </button>
+          <div className="w-px h-4 bg-border" />
+          <button
+            onClick={() => setZoom(1)}
+            className="p-1.5 rounded hover:bg-secondary/80 text-muted-foreground hover:text-foreground transition-all text-xs"
+            title="Reset Zoom"
+          >
+            Reset
+          </button>
+        </div>
+        <div className="text-xs text-muted-foreground bg-card/80 backdrop-blur-sm px-3 py-1.5 rounded-lg border border-border">
+          Ctrl+Scroll to zoom • Middle-click to pan
+        </div>
       </div>
     </div>
   );

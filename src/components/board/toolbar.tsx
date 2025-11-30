@@ -1,17 +1,21 @@
 'use client';
 
-import { 
-  MousePointer2, 
-  Pencil, 
-  Minus, 
-  Square, 
-  Circle, 
-  Eraser, 
+import {
+  MousePointer2,
+  Pencil,
+  Minus,
+  Square,
+  Circle,
+  Eraser,
   Type,
   Trash2,
   Share2,
   Check,
-  Copy
+  Copy,
+  LayoutTemplate,
+  Globe,
+  Pointer,
+  Lasso
 } from 'lucide-react';
 import { Tool, COLORS, STROKE_WIDTHS } from '@/lib/board-types';
 import type { ConnectionStatus } from '@/lib/collaboration';
@@ -41,6 +45,10 @@ const tools: { id: Tool; icon: React.ElementType; label: string }[] = [
   { id: 'ellipse', icon: Circle, label: 'Ellipse' },
   { id: 'text', icon: Type, label: 'Text' },
   { id: 'eraser', icon: Eraser, label: 'Eraser' },
+  { id: 'frame', icon: LayoutTemplate, label: 'Frame' },
+  { id: 'web-embed', icon: Globe, label: 'Web Embed' },
+  { id: 'laser', icon: Pointer, label: 'Laser Pointer' },
+  { id: 'lasso', icon: Lasso, label: 'Lasso Selection' },
 ];
 
 export function Toolbar({
