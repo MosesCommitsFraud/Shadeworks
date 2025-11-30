@@ -156,6 +156,7 @@ export function Canvas({
   onStartTransform,
 }: CanvasProps) {
   const svgRef = useRef<SVGSVGElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
   const [isDrawing, setIsDrawing] = useState(false);
   const [currentElement, setCurrentElement] = useState<BoardElement | null>(null);
   const [startPoint, setStartPoint] = useState<Point | null>(null);
@@ -211,13 +212,21 @@ export function Canvas({
     };
   }, [selectedIds, onDeleteElement]);
 
-  // Wheel zoom handler
-  const handleWheel = useCallback((e: React.WheelEvent) => {
-    if (e.ctrlKey || e.metaKey) {
-      e.preventDefault();
-      const delta = e.deltaY > 0 ? 0.9 : 1.1;
-      setZoom(prev => Math.max(0.1, Math.min(5, prev * delta)));
-    }
+  // Wheel zoom handler with native event listener to prevent browser zoom
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+
+    const handleWheel = (e: WheelEvent) => {
+      if (e.ctrlKey || e.metaKey) {
+        e.preventDefault();
+        const delta = e.deltaY > 0 ? 0.9 : 1.1;
+        setZoom(prev => Math.max(0.1, Math.min(5, prev * delta)));
+      }
+    };
+
+    container.addEventListener('wheel', handleWheel, { passive: false });
+    return () => container.removeEventListener('wheel', handleWheel);
   }, []);
 
   // Track remote cursors
@@ -1124,7 +1133,7 @@ export function Canvas({
   };
 
   return (
-    <div className="relative w-full h-full overflow-hidden bg-[#0a0a0a]">
+    <div ref={containerRef} className="relative w-full h-full overflow-hidden bg-[#0a0a0a]">
       {/* Grid Background */}
       <div
         className="absolute inset-0 pointer-events-none opacity-[0.03]"
@@ -1147,7 +1156,6 @@ export function Canvas({
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}
         onMouseLeave={handleMouseUp}
-        onWheel={handleWheel}
       >
         <defs>
           <filter id="laser-glow">
