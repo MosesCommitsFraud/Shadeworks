@@ -17,6 +17,8 @@ interface CanvasProps {
   onUpdateElement: (id: string, updates: Partial<BoardElement>) => void;
   onDeleteElement: (id: string) => void;
   onStartTransform?: () => void;
+  onUndo?: () => void;
+  onRedo?: () => void;
 }
 
 interface RemoteCursor {
@@ -154,6 +156,8 @@ export function Canvas({
   onUpdateElement,
   onDeleteElement,
   onStartTransform,
+  onUndo,
+  onRedo,
 }: CanvasProps) {
   const svgRef = useRef<SVGSVGElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -1271,8 +1275,8 @@ export function Canvas({
         />
       )}
 
-      {/* Zoom Control */}
-      <div className="absolute bottom-4 left-4 flex flex-col gap-2">
+      {/* Zoom and Undo/Redo Controls */}
+      <div className="absolute bottom-4 left-4 flex items-center gap-2">
         <div className="flex items-center gap-2 bg-card/95 backdrop-blur-md border border-border rounded-lg p-1.5 shadow-xl">
           <button
             onClick={() => setZoom(prev => Math.max(0.1, prev - 0.1))}
@@ -1304,9 +1308,31 @@ export function Canvas({
             Reset
           </button>
         </div>
-        <div className="text-xs text-muted-foreground bg-card/80 backdrop-blur-sm px-3 py-1.5 rounded-lg border border-border">
-          Ctrl+Scroll to zoom • Middle-click to pan
+        <div className="flex items-center gap-2 bg-card/95 backdrop-blur-md border border-border rounded-lg p-1.5 shadow-xl">
+          <button
+            onClick={onUndo}
+            className="p-1.5 rounded hover:bg-secondary/80 text-muted-foreground hover:text-foreground transition-all"
+            title="Undo (Ctrl+Z)"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
+            </svg>
+          </button>
+          <button
+            onClick={onRedo}
+            className="p-1.5 rounded hover:bg-secondary/80 text-muted-foreground hover:text-foreground transition-all"
+            title="Redo (Ctrl+Y)"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 10h-10a8 8 0 00-8 8v2m18-10l-6 6m6-6l-6-6" />
+            </svg>
+          </button>
         </div>
+      </div>
+
+      {/* Tooltip */}
+      <div className="absolute bottom-4 right-4 text-xs text-muted-foreground bg-card/80 backdrop-blur-sm px-3 py-1.5 rounded-lg border border-border">
+        Ctrl+Scroll to zoom • Middle-click to pan
       </div>
     </div>
   );

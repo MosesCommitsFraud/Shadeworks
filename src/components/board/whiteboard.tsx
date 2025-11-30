@@ -244,6 +244,8 @@ export function Whiteboard({ roomId }: WhiteboardProps) {
         onUpdateElement={handleUpdateElement}
         onDeleteElement={handleDeleteElement}
         onStartTransform={handleStartTransform}
+        onUndo={handleUndo}
+        onRedo={handleRedo}
       />
     </div>
   );
