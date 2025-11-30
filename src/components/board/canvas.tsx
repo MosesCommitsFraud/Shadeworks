@@ -220,14 +220,34 @@ export function Canvas({
     const handleWheel = (e: WheelEvent) => {
       if (e.ctrlKey || e.metaKey) {
         e.preventDefault();
+
+        const rect = container.getBoundingClientRect();
+        const mouseX = e.clientX - rect.left;
+        const mouseY = e.clientY - rect.top;
+
         const delta = e.deltaY > 0 ? 0.9 : 1.1;
-        setZoom(prev => Math.max(0.1, Math.min(5, prev * delta)));
+
+        setZoom(prevZoom => {
+          const newZoom = Math.max(0.1, Math.min(5, prevZoom * delta));
+
+          // Calculate world position under cursor before zoom
+          const worldX = (mouseX - pan.x) / prevZoom;
+          const worldY = (mouseY - pan.y) / prevZoom;
+
+          // Adjust pan so the same world position stays under cursor
+          setPan({
+            x: mouseX - worldX * newZoom,
+            y: mouseY - worldY * newZoom,
+          });
+
+          return newZoom;
+        });
       }
     };
 
     container.addEventListener('wheel', handleWheel, { passive: false });
     return () => container.removeEventListener('wheel', handleWheel);
-  }, []);
+  }, [pan]);
 
   // Track remote cursors
   useEffect(() => {
