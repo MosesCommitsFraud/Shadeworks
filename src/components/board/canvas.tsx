@@ -19,6 +19,7 @@ interface CanvasProps {
   onStartTransform?: () => void;
   onUndo?: () => void;
   onRedo?: () => void;
+  onToolChange?: (tool: Tool) => void;
 }
 
 interface RemoteCursor {
@@ -158,6 +159,7 @@ export function Canvas({
   onStartTransform,
   onUndo,
   onRedo,
+  onToolChange,
 }: CanvasProps) {
   const svgRef = useRef<SVGSVGElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -611,6 +613,25 @@ export function Canvas({
     const point = getMousePosition(e);
     setStartPoint(point);
 
+    // Get the element ID from the clicked SVG element (check parent if needed)
+    let target = e.target as SVGElement;
+    let clickedElementId = target.getAttribute('data-element-id');
+
+    // If not found on target, check parent elements up to the SVG root
+    if (!clickedElementId && target.parentElement) {
+      let parent = target.parentElement as SVGElement;
+      while (parent && parent.tagName !== 'svg' && !clickedElementId) {
+        clickedElementId = parent.getAttribute('data-element-id');
+        if (!clickedElementId && parent.parentElement) {
+          parent = parent.parentElement as SVGElement;
+        } else {
+          break;
+        }
+      }
+    }
+
+    const clickedElement = clickedElementId ? elements.find(el => el.id === clickedElementId) : null;
+
     if (tool === 'select') {
       // Check if clicking on a resize handle first (single selection only)
       if (selectedBounds && selectedIds.length === 1) {
@@ -653,32 +674,21 @@ export function Canvas({
         return;
       }
       
-      // Find clicked element
-      const clicked = [...elements].reverse().find((el) => {
-        const bounds = getBoundingBox(el);
-        if (!bounds) return false;
-        return (
-          point.x >= bounds.x &&
-          point.x <= bounds.x + bounds.width &&
-          point.y >= bounds.y &&
-          point.y <= bounds.y + bounds.height
-        );
-      });
-      
-      if (clicked) {
+      // Use clicked element from event target
+      if (clickedElement) {
         // Shift-click to add to selection
         if (shiftPressed) {
-          if (selectedIds.includes(clicked.id)) {
-            setSelectedIds(selectedIds.filter(id => id !== clicked.id));
+          if (selectedIds.includes(clickedElement.id)) {
+            setSelectedIds(selectedIds.filter(id => id !== clickedElement.id));
           } else {
-            setSelectedIds([...selectedIds, clicked.id]);
+            setSelectedIds([...selectedIds, clickedElement.id]);
           }
         } else {
-          setSelectedIds([clicked.id]);
+          setSelectedIds([clickedElement.id]);
           onStartTransform?.();
           setIsDragging(true);
           setDragStart(point);
-          setOriginalElements([{ ...clicked }]);
+          setOriginalElements([{ ...clickedElement }]);
         }
       } else {
         // Start box selection
@@ -686,6 +696,12 @@ export function Canvas({
         setIsBoxSelecting(true);
         setSelectionBox({ x: point.x, y: point.y, width: 0, height: 0 });
       }
+      return;
+    }
+
+    // For drawing tools, if we clicked on an element, select it instead
+    if (tool !== 'eraser' && tool !== 'text' && tool !== 'lasso' && clickedElement) {
+      setSelectedIds([clickedElement.id]);
       return;
     }
 
@@ -812,16 +828,21 @@ export function Canvas({
     }
 
     if (currentElement && isDrawing) {
+      let elementAdded = false;
+
       if (currentElement.type === 'pen' && currentElement.points.length > 1) {
         onAddElement(currentElement);
+        elementAdded = true;
       } else if (currentElement.type === 'line' && currentElement.points.length === 2) {
         onAddElement(currentElement);
+        elementAdded = true;
       } else if (currentElement.type === 'laser' && currentElement.points.length > 1) {
         // Add laser element and schedule it for removal after 2 seconds
         onAddElement(currentElement);
         setTimeout(() => {
           onDeleteElement(currentElement.id);
         }, 2000);
+        // Don't switch tool for laser
       } else if (
         (currentElement.type === 'rectangle' || currentElement.type === 'ellipse' || currentElement.type === 'frame' || currentElement.type === 'web-embed') &&
         currentElement.width &&
@@ -830,6 +851,12 @@ export function Canvas({
         currentElement.height > 2
       ) {
         onAddElement(currentElement);
+        elementAdded = true;
+      }
+
+      // Switch back to select tool after drawing
+      if (elementAdded && onToolChange) {
+        onToolChange('select');
       }
     }
 
@@ -837,14 +864,14 @@ export function Canvas({
     setCurrentElement(null);
     setStartPoint(null);
     setLassoPoints([]);
-  }, [currentElement, isDrawing, onAddElement, isPanning, isDragging, isResizing, isBoxSelecting, selectionBox, elements, tool, lassoPoints, onDeleteElement]);
+  }, [currentElement, isDrawing, onAddElement, isPanning, isDragging, isResizing, isBoxSelecting, selectionBox, elements, tool, lassoPoints, onDeleteElement, onToolChange]);
 
   const handleTextSubmit = useCallback(() => {
     if (textInput && textValue.trim()) {
       const fontSize = strokeWidth * 4 + 12;
       const textWidth = textValue.length * fontSize * 0.55;
       const textHeight = fontSize * 1.2;
-      
+
       // x,y is top-left of bounding box
       // The text input is positioned at textInput.y - 10 (see input style below)
       // So the actual top of the text should be around that position
@@ -863,10 +890,15 @@ export function Canvas({
         scaleY: 1,
       };
       onAddElement(newElement);
+
+      // Switch back to select tool after adding text
+      if (onToolChange) {
+        onToolChange('select');
+      }
     }
     setTextInput(null);
     setTextValue('');
-  }, [textInput, textValue, strokeColor, strokeWidth, onAddElement]);
+  }, [textInput, textValue, strokeColor, strokeWidth, onAddElement, onToolChange]);
 
   // Auto-save text on blur or after typing stops
   const textSaveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -902,9 +934,11 @@ export function Canvas({
         return (
           <path
             key={element.id}
+            data-element-id={element.id}
             d={pathData}
             fill={element.strokeColor}
             opacity={opacity}
+            pointerEvents="auto"
           />
         );
       }
@@ -913,6 +947,7 @@ export function Canvas({
         return (
           <line
             key={element.id}
+            data-element-id={element.id}
             x1={element.points[0].x}
             y1={element.points[0].y}
             x2={element.points[1].x}
@@ -921,6 +956,7 @@ export function Canvas({
             strokeWidth={element.strokeWidth}
             strokeLinecap="round"
             opacity={opacity}
+            pointerEvents="stroke"
           />
         );
       }
@@ -928,6 +964,7 @@ export function Canvas({
         return (
           <rect
             key={element.id}
+            data-element-id={element.id}
             x={element.x}
             y={element.y}
             width={element.width}
@@ -937,6 +974,7 @@ export function Canvas({
             fill="none"
             rx={4}
             opacity={opacity}
+            pointerEvents="stroke"
           />
         );
       }
@@ -946,6 +984,7 @@ export function Canvas({
         return (
           <ellipse
             key={element.id}
+            data-element-id={element.id}
             cx={cx}
             cy={cy}
             rx={(element.width || 0) / 2}
@@ -954,6 +993,7 @@ export function Canvas({
             strokeWidth={element.strokeWidth}
             fill="none"
             opacity={opacity}
+            pointerEvents="stroke"
           />
         );
       }
@@ -968,6 +1008,7 @@ export function Canvas({
         return (
           <text
             key={element.id}
+            data-element-id={element.id}
             opacity={opacity}
             fill={element.strokeColor}
             fontSize={fontSize}
@@ -975,6 +1016,7 @@ export function Canvas({
             x={0}
             y={baselineOffset}
             transform={`translate(${x}, ${y}) scale(${scaleX}, ${scaleY})`}
+            pointerEvents="auto"
           >
             {element.text}
           </text>
@@ -984,6 +1026,7 @@ export function Canvas({
         return (
           <g key={element.id}>
             <rect
+              data-element-id={element.id}
               x={element.x}
               y={element.y}
               width={element.width}
@@ -994,6 +1037,7 @@ export function Canvas({
               rx={8}
               opacity={opacity}
               strokeDasharray="8,4"
+              pointerEvents="stroke"
             />
             {element.label && (
               <text
@@ -1003,6 +1047,7 @@ export function Canvas({
                 fontSize={14}
                 fontFamily="inherit"
                 fontWeight="600"
+                pointerEvents="none"
               >
                 {element.label}
               </text>
@@ -1014,6 +1059,7 @@ export function Canvas({
         return (
           <g key={element.id}>
             <rect
+              data-element-id={element.id}
               x={element.x}
               y={element.y}
               width={element.width}
@@ -1023,6 +1069,7 @@ export function Canvas({
               fill="rgba(100, 100, 255, 0.05)"
               rx={4}
               opacity={opacity}
+              pointerEvents="auto"
             />
             {element.url && (
               <text
@@ -1033,6 +1080,7 @@ export function Canvas({
                 fontFamily="inherit"
                 textAnchor="middle"
                 opacity={0.7}
+                pointerEvents="none"
               >
                 {element.url}
               </text>
@@ -1052,10 +1100,12 @@ export function Canvas({
         return (
           <path
             key={element.id}
+            data-element-id={element.id}
             d={pathData}
             fill={element.strokeColor}
             opacity={Math.max(0.3, opacity * 0.7)}
             filter="url(#laser-glow)"
+            pointerEvents="auto"
           />
         );
       }
