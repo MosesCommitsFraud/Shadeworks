@@ -11,11 +11,14 @@ interface CollaboratorUser {
   id: string;
   name: string;
   color: string;
+  viewport?: { pan: { x: number; y: number }; zoom: number };
 }
 
 interface CollaboratorAvatarsProps {
   users: CollaboratorUser[];
   maxDisplay?: number;
+  onFollowUser: (userId: string) => void;
+  followedUserId: string | null;
 }
 
 /**
@@ -24,18 +27,29 @@ interface CollaboratorAvatarsProps {
  */
 export function CollaboratorAvatars({
   users,
-  maxDisplay = 5
+  maxDisplay = 5,
+  onFollowUser,
+  followedUserId
 }: CollaboratorAvatarsProps) {
   if (users.length === 0) return null;
 
   const avatarElements = users.slice(0, maxDisplay).map((user) => {
     const AnimalIcon = getAnimalIcon(user.name);
+    const isFollowed = followedUserId === user.id;
 
     return (
       <Avatar
         key={user.id}
-        className="size-7 border-2 border-background"
-        style={{ backgroundColor: user.color }}
+        className={`size-7 border-2 cursor-pointer transition-all ${
+          isFollowed
+            ? 'border-white ring-2 ring-offset-2 ring-offset-background scale-110'
+            : 'border-background hover:ring-2 hover:ring-white/30'
+        }`}
+        style={{
+          backgroundColor: user.color,
+          ...(isFollowed && { ringColor: user.color })
+        }}
+        onClick={() => onFollowUser(user.id)}
       >
         <AvatarFallback
           className="bg-transparent text-white/90"
@@ -46,12 +60,17 @@ export function CollaboratorAvatars({
           <AnimalIcon className="size-3.5" strokeWidth={2.5} />
         </AvatarFallback>
         <AvatarGroupTooltip>
-          <div className="flex items-center gap-2">
-            <div
-              className="w-2 h-2 rounded-full shrink-0"
-              style={{ backgroundColor: user.color }}
-            />
-            <span className="font-medium">{user.name}</span>
+          <div className="flex flex-col gap-1">
+            <div className="flex items-center gap-2">
+              <div
+                className="w-2 h-2 rounded-full shrink-0"
+                style={{ backgroundColor: user.color }}
+              />
+              <span className="font-medium">{user.name}</span>
+            </div>
+            <span className="text-xs text-muted-foreground">
+              {isFollowed ? 'Click to unfollow' : 'Click to follow'}
+            </span>
           </div>
         </AvatarGroupTooltip>
       </Avatar>

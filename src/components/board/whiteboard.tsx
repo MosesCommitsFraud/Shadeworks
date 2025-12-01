@@ -23,13 +23,17 @@ export function Whiteboard({ roomId }: WhiteboardProps) {
   const [peerCount, setPeerCount] = useState(0);
   const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>('connecting');
   const [myName, setMyName] = useState<string | null>(null);
-  const [collaboratorUsers, setCollaboratorUsers] = useState<Array<{ id: string; name: string; color: string }>>([]);
+  const [collaboratorUsers, setCollaboratorUsers] = useState<Array<{ id: string; name: string; color: string; viewport?: { pan: { x: number; y: number }; zoom: number } }>>([]);
   const [isReady, setIsReady] = useState(false);
-  
+  const [followedUserId, setFollowedUserId] = useState<string | null>(null);
+
   // Undo/Redo stacks - store snapshots
   const undoStackRef = useRef<BoardElement[][]>([]);
   const redoStackRef = useRef<BoardElement[][]>([]);
   const isUndoingRef = useRef(false);
+
+  // Ref to store the setViewport function from Canvas
+  const setViewportRef = useRef<((pan: { x: number; y: number }, zoom: number) => void) | null>(null);
 
   // Initialize collaboration with a random funny name
   useEffect(() => {
@@ -57,13 +61,14 @@ export function Whiteboard({ roomId }: WhiteboardProps) {
       setConnectedUsers(states.size);
 
       // Extract collaborator user info (excluding current user)
-      const users: Array<{ id: string; name: string; color: string }> = [];
+      const users: Array<{ id: string; name: string; color: string; viewport?: { pan: { x: number; y: number }; zoom: number } }> = [];
       states.forEach((state) => {
         if (state.user && state.user.id !== collab.getUserInfo().id) {
           users.push({
             id: state.user.id,
             name: state.user.name,
             color: state.user.color,
+            viewport: state.user.viewport,
           });
         }
       });
@@ -211,13 +216,28 @@ export function Whiteboard({ roomId }: WhiteboardProps) {
 
   const handleClear = useCallback(() => {
     saveToUndoStack();
-    
+
     if (collaboration) {
       collaboration.clearAll();
     } else {
       setElements([]);
     }
   }, [collaboration, saveToUndoStack]);
+
+  const handleFollowUser = useCallback((userId: string) => {
+    // Toggle follow mode - if clicking the same user, unfollow
+    setFollowedUserId(prev => prev === userId ? null : userId);
+  }, []);
+
+  // Continuously track followed user's viewport
+  useEffect(() => {
+    if (!followedUserId || !setViewportRef.current) return;
+
+    const followedUser = collaboratorUsers.find(u => u.id === followedUserId);
+    if (followedUser && followedUser.viewport) {
+      setViewportRef.current(followedUser.viewport.pan, followedUser.viewport.zoom);
+    }
+  }, [followedUserId, collaboratorUsers]);
 
   // Show loading while connecting
   if (!isReady) {
@@ -231,8 +251,33 @@ export function Whiteboard({ roomId }: WhiteboardProps) {
     );
   }
 
+  const followedUser = followedUserId ? collaboratorUsers.find(u => u.id === followedUserId) : null;
+
   return (
     <div className="relative w-screen h-screen overflow-hidden">
+      {/* Colored frame when following a user */}
+      {followedUser && (
+        <div
+          className="absolute inset-0 pointer-events-none z-[100]"
+          style={{
+            boxShadow: `inset 0 0 0 4px ${followedUser.color}`,
+          }}
+        >
+          <div className="absolute top-4 left-4 px-3 py-1.5 rounded-lg bg-card/95 backdrop-blur-md border-2 shadow-lg flex items-center gap-2"
+            style={{ borderColor: followedUser.color }}
+          >
+            <div className="w-2 h-2 rounded-full" style={{ backgroundColor: followedUser.color }} />
+            <span className="text-sm font-medium">Following {followedUser.name}</span>
+            <button
+              onClick={() => setFollowedUserId(null)}
+              className="ml-2 text-muted-foreground hover:text-foreground transition-colors pointer-events-auto"
+            >
+              ✕
+            </button>
+          </div>
+        </div>
+      )}
+
       <Toolbar
         selectedTool={tool}
         onToolChange={setTool}
@@ -247,6 +292,8 @@ export function Whiteboard({ roomId }: WhiteboardProps) {
         connectionStatus={connectionStatus}
         myName={myName || 'Connecting...'}
         collaboratorUsers={collaboratorUsers}
+        onFollowUser={handleFollowUser}
+        followedUserId={followedUserId}
       />
       
       <Canvas
@@ -262,6 +309,9 @@ export function Whiteboard({ roomId }: WhiteboardProps) {
         onUndo={handleUndo}
         onRedo={handleRedo}
         onToolChange={setTool}
+        onSetViewport={(setter) => {
+          setViewportRef.current = setter;
+        }}
       />
     </div>
   );

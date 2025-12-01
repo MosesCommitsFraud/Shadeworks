@@ -36,7 +36,9 @@ interface ToolbarProps {
   peerCount: number;
   connectionStatus: ConnectionStatus;
   myName: string;
-  collaboratorUsers: Array<{ id: string; name: string; color: string }>;
+  collaboratorUsers: Array<{ id: string; name: string; color: string; viewport?: { pan: { x: number; y: number }; zoom: number } }>;
+  onFollowUser: (userId: string) => void;
+  followedUserId: string | null;
 }
 
 const tools: { id: Tool; icon: React.ElementType; label: string }[] = [
@@ -67,6 +69,8 @@ export function Toolbar({
   connectionStatus,
   myName,
   collaboratorUsers,
+  onFollowUser,
+  followedUserId,
 }: ToolbarProps) {
   const [copied, setCopied] = useState(false);
   const [showColors, setShowColors] = useState(false);
@@ -210,7 +214,7 @@ export function Toolbar({
           <span className="text-sm font-medium text-foreground max-w-[140px] truncate" title={myName}>
             {myName}
           </span>
-          <CollaboratorAvatars users={collaboratorUsers} maxDisplay={5} />
+          <CollaboratorAvatars users={collaboratorUsers} maxDisplay={5} onFollowUser={onFollowUser} followedUserId={followedUserId} />
         </div>
         
         <div className="w-px h-6 bg-border" />

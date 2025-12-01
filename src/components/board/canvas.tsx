@@ -20,6 +20,7 @@ interface CanvasProps {
   onUndo?: () => void;
   onRedo?: () => void;
   onToolChange?: (tool: Tool) => void;
+  onSetViewport?: (setter: (pan: { x: number; y: number }, zoom: number) => void) => void;
 }
 
 interface RemoteCursor {
@@ -160,6 +161,7 @@ export function Canvas({
   onUndo,
   onRedo,
   onToolChange,
+  onSetViewport,
 }: CanvasProps) {
   const svgRef = useRef<SVGSVGElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -280,6 +282,22 @@ export function Canvas({
 
     return unsubscribe;
   }, [collaboration]);
+
+  // Broadcast viewport changes to other users
+  useEffect(() => {
+    if (!collaboration) return;
+    collaboration.updateViewport(pan, zoom);
+  }, [collaboration, pan, zoom]);
+
+  // Expose viewport setter to parent component
+  useEffect(() => {
+    if (onSetViewport) {
+      onSetViewport((newPan, newZoom) => {
+        setPan(newPan);
+        setZoom(newZoom);
+      });
+    }
+  }, [onSetViewport]);
 
   const getMousePosition = useCallback((e: React.MouseEvent): Point => {
     const svg = svgRef.current;

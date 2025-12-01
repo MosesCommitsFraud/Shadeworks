@@ -7,6 +7,14 @@ import { generateFunnyName } from './funny-names';
 
 export type ConnectionStatus = 'connecting' | 'connected' | 'disconnected';
 
+export interface UserState {
+  id: string;
+  name: string;
+  color: string;
+  cursor?: { x: number; y: number } | null;
+  viewport?: { pan: { x: number; y: number }; zoom: number };
+}
+
 // PartyKit host - set NEXT_PUBLIC_PARTYKIT_HOST in .env.local
 const PARTYKIT_HOST = process.env.NEXT_PUBLIC_PARTYKIT_HOST!;
 
@@ -106,7 +114,9 @@ export class CollaborationManager {
 
   updateCursor(x: number, y: number): void {
     if (this.provider) {
+      const currentState = this.provider.awareness.getLocalState() as { user?: any } | null;
       this.provider.awareness.setLocalStateField('user', {
+        ...(currentState?.user || {}),
         id: this.userId,
         name: this.userName,
         color: this.userColor,
@@ -115,11 +125,24 @@ export class CollaborationManager {
     }
   }
 
-  onAwarenessChange(callback: (users: Map<number, { user: { id: string; name: string; color: string; cursor: { x: number; y: number } | null } }>) => void): () => void {
+  updateViewport(pan: { x: number; y: number }, zoom: number): void {
+    if (this.provider) {
+      const currentState = this.provider.awareness.getLocalState() as { user?: any } | null;
+      this.provider.awareness.setLocalStateField('user', {
+        ...(currentState?.user || {}),
+        id: this.userId,
+        name: this.userName,
+        color: this.userColor,
+        viewport: { pan, zoom },
+      });
+    }
+  }
+
+  onAwarenessChange(callback: (users: Map<number, { user: UserState }>) => void): () => void {
     if (!this.provider) return () => {};
-    
+
     const handler = () => {
-      const states = this.provider!.awareness.getStates() as Map<number, { user: { id: string; name: string; color: string; cursor: { x: number; y: number } | null } }>;
+      const states = this.provider!.awareness.getStates() as Map<number, { user: UserState }>;
       callback(states);
     };
     
