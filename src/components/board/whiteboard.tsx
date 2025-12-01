@@ -23,6 +23,7 @@ export function Whiteboard({ roomId }: WhiteboardProps) {
   const [peerCount, setPeerCount] = useState(0);
   const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>('connecting');
   const [myName, setMyName] = useState<string | null>(null);
+  const [collaboratorUsers, setCollaboratorUsers] = useState<Array<{ id: string; name: string; color: string }>>([]);
   const [isReady, setIsReady] = useState(false);
   
   // Undo/Redo stacks - store snapshots
@@ -51,9 +52,22 @@ export function Whiteboard({ roomId }: WhiteboardProps) {
       setElements(newElements);
     });
 
-    // Subscribe to awareness changes for user count
+    // Subscribe to awareness changes for user count and collaborator info
     const unsubAwareness = collab.onAwarenessChange((states) => {
       setConnectedUsers(states.size);
+
+      // Extract collaborator user info (excluding current user)
+      const users: Array<{ id: string; name: string; color: string }> = [];
+      states.forEach((state) => {
+        if (state.user && state.user.id !== collab.getUserInfo().id) {
+          users.push({
+            id: state.user.id,
+            name: state.user.name,
+            color: state.user.color,
+          });
+        }
+      });
+      setCollaboratorUsers(users);
     });
 
     // Subscribe to connection status changes
@@ -232,6 +246,7 @@ export function Whiteboard({ roomId }: WhiteboardProps) {
         peerCount={peerCount}
         connectionStatus={connectionStatus}
         myName={myName || 'Connecting...'}
+        collaboratorUsers={collaboratorUsers}
       />
       
       <Canvas

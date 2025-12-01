@@ -619,11 +619,11 @@ export function Canvas({
 
     // If not found on target, check parent elements up to the SVG root
     if (!clickedElementId && target.parentElement) {
-      let parent = target.parentElement as SVGElement;
+      let parent: Element | null = target.parentElement;
       while (parent && parent.tagName !== 'svg' && !clickedElementId) {
         clickedElementId = parent.getAttribute('data-element-id');
         if (!clickedElementId && parent.parentElement) {
-          parent = parent.parentElement as SVGElement;
+          parent = parent.parentElement;
         } else {
           break;
         }
