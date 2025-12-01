@@ -34,7 +34,7 @@ export function CollaboratorAvatars({
     return (
       <Avatar
         key={user.id}
-        className="size-8 border-2 border-background"
+        className="size-7 border-2 border-background"
         style={{ backgroundColor: user.color }}
       >
         <AvatarFallback
@@ -43,7 +43,7 @@ export function CollaboratorAvatars({
             backgroundColor: user.color,
           }}
         >
-          <AnimalIcon className="size-4" strokeWidth={2.5} />
+          <AnimalIcon className="size-3.5" strokeWidth={2.5} />
         </AvatarFallback>
         <AvatarGroupTooltip>
           <div className="flex items-center gap-2">
@@ -63,7 +63,7 @@ export function CollaboratorAvatars({
     avatarElements.push(
       <Avatar
         key="overflow"
-        className="size-8 border-2 border-background bg-muted"
+        className="size-7 border-2 border-background bg-muted"
       >
         <AvatarFallback className="bg-muted text-muted-foreground text-xs font-semibold">
           +{users.length - maxDisplay}
@@ -73,7 +73,7 @@ export function CollaboratorAvatars({
   }
 
   return (
-    <AvatarGroup className="ml-2">
+    <AvatarGroup className="ml-2 -space-x-2 h-7" translate="-12%">
       {avatarElements}
     </AvatarGroup>
   );
