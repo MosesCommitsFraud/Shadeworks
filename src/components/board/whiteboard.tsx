@@ -14,7 +14,7 @@ interface WhiteboardProps {
 const MAX_UNDO_STACK = 100;
 
 export function Whiteboard({ roomId }: WhiteboardProps) {
-  const [tool, setTool] = useState<Tool>('pen');
+  const [tool, setTool] = useState<Tool>('select');
   const [strokeColor, setStrokeColor] = useState('#ffffff');
   const [strokeWidth, setStrokeWidth] = useState(4);
   const [elements, setElements] = useState<BoardElement[]>([]);

@@ -848,7 +848,7 @@ export function Canvas({
     if (currentElement && isDrawing) {
       let elementAdded = false;
 
-      if (currentElement.type === 'pen' && currentElement.points.length > 1) {
+      if (currentElement.type === 'pen' && currentElement.points.length >= 1) {
         onAddElement(currentElement);
         elementAdded = true;
       } else if (currentElement.type === 'line' && currentElement.points.length === 2) {
@@ -872,8 +872,8 @@ export function Canvas({
         elementAdded = true;
       }
 
-      // Switch back to select tool and select the new element
-      if (elementAdded) {
+      // Switch back to select tool and select the new element (except for pen tool)
+      if (elementAdded && currentElement.type !== 'pen') {
         setSelectedIds([currentElement.id]);
         if (onToolChange) {
           onToolChange('select');
