@@ -57,6 +57,38 @@ function getSvgPathFromStroke(stroke: number[][]) {
   return d.join(' ');
 }
 
+// Wrap text to fit within a given width
+function wrapText(text: string, maxWidth: number, fontSize: number): string[] {
+  if (!text) return [''];
+
+  const words = text.split(' ');
+  const lines: string[] = [];
+  let currentLine = '';
+  // More accurate character width estimation for typical fonts
+  const avgCharWidth = fontSize * 0.6;
+
+  for (let i = 0; i < words.length; i++) {
+    const word = words[i];
+    const testLine = currentLine ? currentLine + ' ' + word : word;
+    const estimatedWidth = testLine.length * avgCharWidth;
+
+    if (estimatedWidth > maxWidth && currentLine) {
+      // Current line is too long, push it and start new line
+      lines.push(currentLine);
+      currentLine = word;
+    } else {
+      currentLine = testLine;
+    }
+  }
+
+  // Add the last line
+  if (currentLine) {
+    lines.push(currentLine);
+  }
+
+  return lines.length > 0 ? lines : [''];
+}
+
 // Get bounding box for any element
 function getBoundingBox(element: BoardElement): BoundingBox | null {
   if (element.type === 'pen' || element.type === 'line') {
@@ -95,6 +127,15 @@ function getBoundingBox(element: BoardElement): BoundingBox | null {
       };
     }
     const fontSize = element.strokeWidth * 4 + 12;
+    if (element.isTextBox) {
+      // For text boxes, use the defined dimensions
+      return {
+        x: element.x ?? 0,
+        y: element.y ?? 0,
+        width: element.width ?? 200,
+        height: element.height ?? 100,
+      };
+    }
     const textWidth = (element.text?.length ?? 0) * fontSize * 0.55;
     const textHeight = fontSize * 1.2;
     return {
@@ -174,10 +215,11 @@ export function Canvas({
   const [isPanning, setIsPanning] = useState(false);
   const [panStart, setPanStart] = useState({ x: 0, y: 0 });
   const [zoom, setZoom] = useState(1);
-  const [textInput, setTextInput] = useState<{ x: number; y: number } | null>(null);
+  const [textInput, setTextInput] = useState<{ x: number; y: number; width?: number; height?: number; isTextBox?: boolean } | null>(null);
   const [textValue, setTextValue] = useState('');
-  const textInputRef = useRef<HTMLInputElement>(null);
+  const textInputRef = useRef<HTMLTextAreaElement>(null);
   const [lassoPoints, setLassoPoints] = useState<Point[]>([]);
+  const [lastMousePos, setLastMousePos] = useState<Point>({ x: 0, y: 0 });
   
   // Move and resize state
   const [isDragging, setIsDragging] = useState(false);
@@ -316,7 +358,8 @@ export function Canvas({
 
   const handleMouseMove = useCallback((e: React.MouseEvent) => {
     const point = getMousePosition(e);
-    
+    setLastMousePos(point);
+
     if (collaboration) {
       collaboration.updateCursor(point.x, point.y);
     }
@@ -616,7 +659,7 @@ export function Canvas({
         break;
       }
     }
-  }, [isDrawing, currentElement, startPoint, tool, collaboration, getMousePosition, isPanning, panStart, elements, onDeleteElement, strokeWidth, isDragging, isResizing, selectedIds, dragStart, originalElements, originalBounds, resizeHandle, onUpdateElement, shiftPressed, isBoxSelecting, lassoPoints]);
+  }, [isDrawing, currentElement, startPoint, tool, collaboration, getMousePosition, isPanning, panStart, elements, onDeleteElement, strokeWidth, isDragging, isResizing, selectedIds, dragStart, originalElements, originalBounds, resizeHandle, onUpdateElement, shiftPressed, isBoxSelecting, lassoPoints, lastMousePos, setLastMousePos]);
 
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
     // Middle mouse button for panning
@@ -724,9 +767,9 @@ export function Canvas({
     }
 
     if (tool === 'text') {
-      setTextInput(point);
-      setTextValue('');
-      setTimeout(() => textInputRef.current?.focus(), 10);
+      // Start tracking if user drags to create a text box
+      setStartPoint(point);
+      setIsDrawing(true);
       return;
     }
 
@@ -819,6 +862,34 @@ export function Canvas({
       return;
     }
 
+    // Handle text tool - determine if it was a click or drag
+    if (tool === 'text' && isDrawing && startPoint) {
+      const currentPoint = lastMousePos;
+      const dragDistance = Math.hypot(currentPoint.x - startPoint.x, currentPoint.y - startPoint.y);
+
+      if (dragDistance < 5) {
+        // It was a click - create simple text
+        setTextInput({ x: startPoint.x, y: startPoint.y, isTextBox: false });
+        setTextValue('');
+        setTimeout(() => textInputRef.current?.focus(), 10);
+      } else {
+        // It was a drag - create text box
+        const width = Math.abs(currentPoint.x - startPoint.x);
+        const height = Math.abs(currentPoint.y - startPoint.y);
+        const x = Math.min(startPoint.x, currentPoint.x);
+        const y = Math.min(startPoint.y, currentPoint.y);
+
+        if (width > 10 && height > 10) {
+          setTextInput({ x, y, width, height, isTextBox: true });
+          setTextValue('');
+          setTimeout(() => textInputRef.current?.focus(), 10);
+        }
+      }
+      setIsDrawing(false);
+      setStartPoint(null);
+      return;
+    }
+
     // Handle lasso selection
     if (tool === 'lasso' && lassoPoints.length > 2) {
       const selected: string[] = [];
@@ -885,42 +956,67 @@ export function Canvas({
     setCurrentElement(null);
     setStartPoint(null);
     setLassoPoints([]);
-  }, [currentElement, isDrawing, onAddElement, isPanning, isDragging, isResizing, isBoxSelecting, selectionBox, elements, tool, lassoPoints, onDeleteElement, onToolChange]);
+  }, [currentElement, isDrawing, onAddElement, isPanning, isDragging, isResizing, isBoxSelecting, selectionBox, elements, tool, lassoPoints, onDeleteElement, onToolChange, lastMousePos, startPoint, textInputRef, setTextInput, setTextValue, setIsDrawing, setStartPoint, setSelectedIds]);
 
   const handleTextSubmit = useCallback(() => {
     if (textInput && textValue.trim()) {
       const fontSize = strokeWidth * 4 + 12;
-      const textWidth = textValue.length * fontSize * 0.55;
-      const textHeight = fontSize * 1.2;
 
-      // x,y is top-left of bounding box
-      // The text input is positioned at textInput.y - 10 (see input style below)
-      // So the actual top of the text should be around that position
-      const newElement: BoardElement = {
-        id: uuid(),
-        type: 'text',
-        points: [],
-        strokeColor,
-        strokeWidth,
-        text: textValue,
-        x: textInput.x,
-        y: textInput.y - fontSize * 0.82, // Adjust for baseline
-        width: Math.max(textWidth, 60),
-        height: textHeight,
-        scaleX: 1,
-        scaleY: 1,
-      };
-      onAddElement(newElement);
+      if (textInput.isTextBox) {
+        // Create a text box with defined dimensions
+        const newElement: BoardElement = {
+          id: uuid(),
+          type: 'text',
+          points: [],
+          strokeColor,
+          strokeWidth,
+          text: textValue,
+          x: textInput.x,
+          y: textInput.y,
+          width: textInput.width,
+          height: textInput.height,
+          isTextBox: true,
+          scaleX: 1,
+          scaleY: 1,
+        };
+        onAddElement(newElement);
 
-      // Select the new text element and switch back to select tool
-      setSelectedIds([newElement.id]);
-      if (onToolChange) {
-        onToolChange('select');
+        // Select the new text element and switch back to select tool
+        setSelectedIds([newElement.id]);
+        if (onToolChange) {
+          onToolChange('select');
+        }
+      } else {
+        // Create simple single-line text
+        const textWidth = textValue.length * fontSize * 0.55;
+        const textHeight = fontSize * 1.2;
+
+        const newElement: BoardElement = {
+          id: uuid(),
+          type: 'text',
+          points: [],
+          strokeColor,
+          strokeWidth,
+          text: textValue,
+          x: textInput.x,
+          y: textInput.y - fontSize * 0.82, // Adjust for baseline
+          width: Math.max(textWidth, 60),
+          height: textHeight,
+          scaleX: 1,
+          scaleY: 1,
+        };
+        onAddElement(newElement);
+
+        // Select the new text element and switch back to select tool
+        setSelectedIds([newElement.id]);
+        if (onToolChange) {
+          onToolChange('select');
+        }
       }
     }
     setTextInput(null);
     setTextValue('');
-  }, [textInput, textValue, strokeColor, strokeWidth, onAddElement, onToolChange]);
+  }, [textInput, textValue, strokeColor, strokeWidth, onAddElement, onToolChange, setSelectedIds]);
 
   // Auto-save text on blur or after typing stops
   const textSaveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -1027,6 +1123,43 @@ export function Canvas({
         const y = element.y ?? 0;
         const baselineOffset = fontSize * 0.82;
 
+        if (element.isTextBox && element.width && element.height) {
+          // Render text box with wrapping
+          const padding = 8;
+          const lines = wrapText(element.text || '', element.width - padding * 2, fontSize);
+          const lineHeight = fontSize * 1.4;
+
+          return (
+            <g key={element.id} data-element-id={element.id}>
+              {/* Invisible clickable area for the entire text box */}
+              <rect
+                x={x}
+                y={y}
+                width={element.width}
+                height={element.height}
+                fill="transparent"
+                pointerEvents="fill"
+              />
+              {/* Wrapped text */}
+              {lines.map((line, i) => (
+                <text
+                  key={i}
+                  fill={element.strokeColor}
+                  fontSize={fontSize}
+                  fontFamily="inherit"
+                  x={x + padding}
+                  y={y + padding + baselineOffset + i * lineHeight}
+                  opacity={opacity}
+                  pointerEvents="none"
+                >
+                  {line}
+                </text>
+              ))}
+            </g>
+          );
+        }
+
+        // Render simple single-line text
         return (
           <text
             key={element.id}
@@ -1297,6 +1430,22 @@ export function Canvas({
               opacity={0.7}
             />
           )}
+
+          {/* Render text box preview while dragging */}
+          {tool === 'text' && isDrawing && startPoint && (
+            <rect
+              x={Math.min(startPoint.x, lastMousePos.x)}
+              y={Math.min(startPoint.y, lastMousePos.y)}
+              width={Math.abs(lastMousePos.x - startPoint.x)}
+              height={Math.abs(lastMousePos.y - startPoint.y)}
+              fill="none"
+              stroke={strokeColor}
+              strokeWidth={strokeWidth * 0.5}
+              strokeDasharray="4,4"
+              opacity={0.5}
+              rx={4}
+            />
+          )}
         </g>
 
       </svg>
@@ -1311,40 +1460,74 @@ export function Canvas({
 
       {/* Text Input */}
       {textInput && (
-        <input
-          ref={textInputRef}
-          type="text"
-          value={textValue}
-          onChange={(e) => handleTextChange(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter') {
-              e.preventDefault();
-              handleTextSubmit();
-            }
-            if (e.key === 'Escape') {
-              setTextInput(null);
-              setTextValue('');
-            }
-          }}
-          onBlur={() => {
-            // Save text on blur if there's content
-            if (textValue.trim()) {
-              handleTextSubmit();
-            } else {
-              setTextInput(null);
-              setTextValue('');
-            }
-          }}
-          className="absolute bg-transparent border-none outline-none text-foreground"
-          style={{
-            left: textInput.x * zoom + pan.x,
-            top: textInput.y * zoom + pan.y - (strokeWidth * 4 + 12) * 0.82 * zoom,
-            fontSize: (strokeWidth * 4 + 12) * zoom,
-            color: strokeColor,
-            minWidth: '100px',
-          }}
-          placeholder="Type..."
-        />
+        textInput.isTextBox ? (
+          <textarea
+            ref={textInputRef}
+            value={textValue}
+            onChange={(e) => handleTextChange(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Escape') {
+                setTextInput(null);
+                setTextValue('');
+              }
+            }}
+            onBlur={() => {
+              // Save text on blur if there's content
+              if (textValue.trim()) {
+                handleTextSubmit();
+              } else {
+                setTextInput(null);
+                setTextValue('');
+              }
+            }}
+            className="absolute bg-transparent border-2 border-dashed border-accent/50 outline-none text-foreground resize-none p-2"
+            style={{
+              left: textInput.x * zoom + pan.x,
+              top: textInput.y * zoom + pan.y,
+              width: (textInput.width ?? 200) * zoom,
+              height: (textInput.height ?? 100) * zoom,
+              fontSize: (strokeWidth * 4 + 12) * zoom,
+              color: strokeColor,
+              lineHeight: '1.4',
+            }}
+            placeholder="Type..."
+          />
+        ) : (
+          <input
+            ref={textInputRef as any}
+            type="text"
+            value={textValue}
+            onChange={(e) => handleTextChange(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                e.preventDefault();
+                handleTextSubmit();
+              }
+              if (e.key === 'Escape') {
+                setTextInput(null);
+                setTextValue('');
+              }
+            }}
+            onBlur={() => {
+              // Save text on blur if there's content
+              if (textValue.trim()) {
+                handleTextSubmit();
+              } else {
+                setTextInput(null);
+                setTextValue('');
+              }
+            }}
+            className="absolute bg-transparent border-none outline-none text-foreground"
+            style={{
+              left: textInput.x * zoom + pan.x,
+              top: textInput.y * zoom + pan.y - (strokeWidth * 4 + 12) * 0.82 * zoom,
+              fontSize: (strokeWidth * 4 + 12) * zoom,
+              color: strokeColor,
+              minWidth: '100px',
+            }}
+            placeholder="Type..."
+          />
+        )
       )}
 
       {/* Zoom and Undo/Redo Controls */}

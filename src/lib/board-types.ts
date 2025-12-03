@@ -20,6 +20,8 @@ export interface BoardElement {
   // For text scaling/squishing
   scaleX?: number;
   scaleY?: number;
+  // For text wrapping in textbox mode
+  isTextBox?: boolean;
   // For frame tool
   label?: string;
   // For web embed
