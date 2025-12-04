@@ -268,7 +268,13 @@ export function Canvas({
     if (!container) return;
 
     const handleWheel = (e: WheelEvent) => {
+      // Prevent browser back/forward navigation on horizontal scroll
+      if (Math.abs(e.deltaX) > 0) {
+        e.preventDefault();
+      }
+
       if (e.ctrlKey || e.metaKey) {
+        // Zoom with Ctrl/Cmd + Scroll
         e.preventDefault();
 
         const rect = container.getBoundingClientRect();
@@ -292,6 +298,13 @@ export function Canvas({
 
           return newZoom;
         });
+      } else if (!e.ctrlKey && !e.metaKey && (Math.abs(e.deltaX) > 0 || Math.abs(e.deltaY) > 0)) {
+        // Two-finger trackpad pan (no modifier keys)
+        e.preventDefault();
+        setPan(prev => ({
+          x: prev.x - e.deltaX,
+          y: prev.y - e.deltaY,
+        }));
       }
     };
 
@@ -1675,7 +1688,7 @@ export function Canvas({
 
       {/* Tooltip */}
       <div className="absolute bottom-4 right-4 text-xs text-muted-foreground bg-card/80 backdrop-blur-sm px-3 py-1.5 rounded-lg border border-border">
-        Ctrl+Scroll to zoom • Middle-click to pan
+        Ctrl+Scroll to zoom • Two-finger/Middle-click to pan
       </div>
     </div>
   );
