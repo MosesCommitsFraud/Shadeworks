@@ -963,18 +963,26 @@ export function Canvas({
       const fontSize = strokeWidth * 4 + 12;
 
       if (textInput.isTextBox) {
-        // Get actual height from textarea or calculate it
+        // Get actual height from textarea
         let contentHeight = textInput.height ?? 100;
+        const padding = 8;
+        const fontSize = strokeWidth * 4 + 12;
 
         if (textInputRef.current) {
-          // Use the textarea's actual scrollHeight (unscaled)
+          // The textarea's scrollHeight includes its asymmetric padding and border (2px top + 2px bottom)
+          const textareaScrollHeight = textInputRef.current.scrollHeight;
+          const paddingTop = (8 - fontSize * 0.18) * zoom;
+          const paddingBottom = 8 * zoom;
+          const borderWidth = 4 * zoom; // 2px top + 2px bottom
+          const textareaPadding = paddingTop + paddingBottom + borderWidth;
+          const contentOnlyHeight = (textareaScrollHeight - textareaPadding) / zoom;
+
           contentHeight = Math.max(
             textInput.height ?? 100,
-            textInputRef.current.scrollHeight / zoom
+            contentOnlyHeight + padding * 2 // Add back unscaled padding
           );
         } else {
           // Fallback: Calculate height based on content
-          const padding = 8;
           const lineHeight = fontSize * 1.4;
           const lines = textValue.split('\n');
           const totalLines = lines.reduce((acc, line) => {
@@ -1181,13 +1189,15 @@ export function Canvas({
 
           return (
             <g key={element.id} data-element-id={element.id}>
-              {/* Invisible clickable area for the entire text box */}
+              {/* Clickable area for the entire text box */}
               <rect
                 x={x}
                 y={y}
                 width={element.width}
                 height={element.height}
                 fill="transparent"
+                stroke="transparent"
+                strokeWidth={1}
                 pointerEvents="fill"
               />
               {/* Wrapped text */}
@@ -1537,14 +1547,19 @@ export function Canvas({
             className="absolute bg-transparent border-2 border-dashed border-accent/50 outline-none text-foreground resize-none overflow-hidden"
             style={{
               left: textInput.x * zoom + pan.x,
-              top: textInput.y * zoom + pan.y,
+              top: textInput.y * zoom + pan.y - 2 * zoom, // Account for 2px border
               width: (textInput.width ?? 200) * zoom,
               fontSize: (strokeWidth * 4 + 12) * zoom,
               color: strokeColor,
               lineHeight: '1.4',
-              padding: `${8 * zoom}px`,
+              // Match SVG padding: horizontal is 8, vertical is 8 but adjusted for baseline
+              paddingLeft: `${8 * zoom}px`,
+              paddingRight: `${8 * zoom}px`,
+              paddingTop: `${(8 - (strokeWidth * 4 + 12) * 0.18) * zoom}px`,
+              paddingBottom: `${8 * zoom}px`,
               wordWrap: 'break-word',
               whiteSpace: 'pre-wrap',
+              boxSizing: 'border-box',
             }}
             placeholder="Type..."
           />
