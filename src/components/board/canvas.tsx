@@ -963,6 +963,32 @@ export function Canvas({
       const fontSize = strokeWidth * 4 + 12;
 
       if (textInput.isTextBox) {
+        // Get actual height from textarea or calculate it
+        let contentHeight = textInput.height ?? 100;
+
+        if (textInputRef.current) {
+          // Use the textarea's actual scrollHeight (unscaled)
+          contentHeight = Math.max(
+            textInput.height ?? 100,
+            textInputRef.current.scrollHeight / zoom
+          );
+        } else {
+          // Fallback: Calculate height based on content
+          const padding = 8;
+          const lineHeight = fontSize * 1.4;
+          const lines = textValue.split('\n');
+          const totalLines = lines.reduce((acc, line) => {
+            if (!line) return acc + 1; // Empty line
+            const wrappedLines = wrapText(line, (textInput.width ?? 200) - padding * 2, fontSize);
+            return acc + wrappedLines.length;
+          }, 0);
+
+          contentHeight = Math.max(
+            textInput.height ?? 100,
+            totalLines * lineHeight + padding * 2 + fontSize * 0.82
+          );
+        }
+
         // Create a text box with defined dimensions
         const newElement: BoardElement = {
           id: uuid(),
@@ -974,7 +1000,7 @@ export function Canvas({
           x: textInput.x,
           y: textInput.y,
           width: textInput.width,
-          height: textInput.height,
+          height: contentHeight,
           isTextBox: true,
           scaleX: 1,
           scaleY: 1,
@@ -1016,19 +1042,19 @@ export function Canvas({
     }
     setTextInput(null);
     setTextValue('');
-  }, [textInput, textValue, strokeColor, strokeWidth, onAddElement, onToolChange, setSelectedIds]);
+  }, [textInput, textValue, strokeColor, strokeWidth, onAddElement, onToolChange, setSelectedIds, textInputRef, zoom]);
 
   // Auto-save text on blur or after typing stops
   const textSaveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  
+
   const handleTextChange = useCallback((value: string) => {
     setTextValue(value);
-    
+
     // Clear existing timeout
     if (textSaveTimeoutRef.current) {
       clearTimeout(textSaveTimeoutRef.current);
     }
-    
+
     // Auto-save after 2 seconds of no typing (optional, can be removed if unwanted)
     // textSaveTimeoutRef.current = setTimeout(() => {
     //   if (textInput && value.trim()) {
@@ -1036,6 +1062,18 @@ export function Canvas({
     //   }
     // }, 2000);
   }, []);
+
+  // Auto-resize textarea to fit content
+  useEffect(() => {
+    if (textInputRef.current && textInput?.isTextBox) {
+      const textarea = textInputRef.current;
+      // Reset height to auto to get the correct scrollHeight
+      textarea.style.height = 'auto';
+      // Set height to scrollHeight to fit content
+      const newHeight = Math.max(textarea.scrollHeight, (textInput.height ?? 100) * zoom);
+      textarea.style.height = `${newHeight}px`;
+    }
+  }, [textValue, textInput, zoom]);
 
   const renderElement = (element: BoardElement, isPreview = false) => {
     const opacity = isPreview ? 0.7 : 1;
@@ -1126,8 +1164,20 @@ export function Canvas({
         if (element.isTextBox && element.width && element.height) {
           // Render text box with wrapping
           const padding = 8;
-          const lines = wrapText(element.text || '', element.width - padding * 2, fontSize);
           const lineHeight = fontSize * 1.4;
+
+          // Split by newlines first, then wrap each line
+          const paragraphs = (element.text || '').split('\n');
+          const allLines: string[] = [];
+
+          paragraphs.forEach((paragraph) => {
+            if (!paragraph) {
+              allLines.push(''); // Preserve empty lines
+            } else {
+              const wrappedLines = wrapText(paragraph, (element.width ?? 200) - padding * 2, fontSize);
+              allLines.push(...wrappedLines);
+            }
+          });
 
           return (
             <g key={element.id} data-element-id={element.id}>
@@ -1141,7 +1191,7 @@ export function Canvas({
                 pointerEvents="fill"
               />
               {/* Wrapped text */}
-              {lines.map((line, i) => (
+              {allLines.map((line, i) => (
                 <text
                   key={i}
                   fill={element.strokeColor}
@@ -1466,6 +1516,10 @@ export function Canvas({
             value={textValue}
             onChange={(e) => handleTextChange(e.target.value)}
             onKeyDown={(e) => {
+              if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                handleTextSubmit();
+              }
               if (e.key === 'Escape') {
                 setTextInput(null);
                 setTextValue('');
@@ -1480,15 +1534,17 @@ export function Canvas({
                 setTextValue('');
               }
             }}
-            className="absolute bg-transparent border-2 border-dashed border-accent/50 outline-none text-foreground resize-none p-2"
+            className="absolute bg-transparent border-2 border-dashed border-accent/50 outline-none text-foreground resize-none overflow-hidden"
             style={{
               left: textInput.x * zoom + pan.x,
               top: textInput.y * zoom + pan.y,
               width: (textInput.width ?? 200) * zoom,
-              height: (textInput.height ?? 100) * zoom,
               fontSize: (strokeWidth * 4 + 12) * zoom,
               color: strokeColor,
               lineHeight: '1.4',
+              padding: `${8 * zoom}px`,
+              wordWrap: 'break-word',
+              whiteSpace: 'pre-wrap',
             }}
             placeholder="Type..."
           />
