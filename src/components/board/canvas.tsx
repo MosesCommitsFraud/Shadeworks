@@ -767,6 +767,23 @@ export function Canvas({
     }
 
     if (tool === 'text') {
+      // Check if we clicked on an existing text element to edit it
+      if (clickedElement && clickedElement.type === 'text') {
+        // Enter edit mode for the existing text element
+        setTextInput({
+          x: clickedElement.x ?? 0,
+          y: clickedElement.y ?? 0,
+          width: clickedElement.width,
+          height: clickedElement.height,
+          isTextBox: clickedElement.isTextBox,
+        });
+        setTextValue(clickedElement.text ?? '');
+        // Delete the existing element so we can recreate it when done
+        onDeleteElement(clickedElement.id);
+        setTimeout(() => textInputRef.current?.focus(), 10);
+        return;
+      }
+
       // Start tracking if user drags to create a text box
       setStartPoint(point);
       setIsDrawing(true);
