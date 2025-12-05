@@ -1431,6 +1431,18 @@ export function Canvas({
 
     return (
       <g>
+        {/* Dashed line connecting the endpoints */}
+        <line
+          x1={p1.x}
+          y1={p1.y}
+          x2={p2.x}
+          y2={p2.y}
+          stroke="var(--accent)"
+          strokeWidth={2}
+          strokeDasharray="5,5"
+          pointerEvents="none"
+        />
+
         {/* Endpoint dots */}
         <circle
           cx={p1.x}
