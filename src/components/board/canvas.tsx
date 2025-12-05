@@ -228,11 +228,16 @@ export function Canvas({
   const [dragStart, setDragStart] = useState<Point | null>(null);
   const [originalElements, setOriginalElements] = useState<BoardElement[]>([]);
   const [originalBounds, setOriginalBounds] = useState<BoundingBox | null>(null);
-  
+
+  // Line endpoint dragging state
+  const [isDraggingLineEndpoint, setIsDraggingLineEndpoint] = useState(false);
+  const [lineEndpointIndex, setLineEndpointIndex] = useState<number | null>(null);
+  const [isDraggingLineStroke, setIsDraggingLineStroke] = useState(false);
+
   // Box selection state
   const [isBoxSelecting, setIsBoxSelecting] = useState(false);
   const [selectionBox, setSelectionBox] = useState<BoundingBox | null>(null);
-  
+
   // Shift key tracking
   const [shiftPressed, setShiftPressed] = useState(false);
 
@@ -396,11 +401,34 @@ export function Canvas({
       return;
     }
 
+    // Handle line endpoint dragging
+    if (isDraggingLineEndpoint && lineEndpointIndex !== null && originalElements.length === 1) {
+      const originalElement = originalElements[0];
+      if (originalElement.type === 'line' && originalElement.points.length === 2) {
+        const newPoints = [...originalElement.points];
+        newPoints[lineEndpointIndex] = point;
+        onUpdateElement(originalElement.id, { points: newPoints });
+      }
+      return;
+    }
+
+    // Handle line stroke width adjustment
+    if (isDraggingLineStroke && dragStart && originalElements.length === 1) {
+      const originalElement = originalElements[0];
+      if (originalElement.type === 'line') {
+        const dy = point.y - dragStart.y;
+        const originalStrokeWidth = originalElement.strokeWidth || 2;
+        const newStrokeWidth = Math.max(1, Math.min(50, originalStrokeWidth + dy / 5));
+        onUpdateElement(originalElement.id, { strokeWidth: newStrokeWidth });
+      }
+      return;
+    }
+
     // Handle dragging (moving elements)
     if (isDragging && dragStart && originalElements.length > 0) {
       const dx = point.x - dragStart.x;
       const dy = point.y - dragStart.y;
-      
+
       originalElements.forEach(origEl => {
         if (origEl.type === 'pen' || origEl.type === 'line') {
           const newPoints = origEl.points.map(p => ({
@@ -672,7 +700,7 @@ export function Canvas({
         break;
       }
     }
-  }, [isDrawing, currentElement, startPoint, tool, collaboration, getMousePosition, isPanning, panStart, elements, onDeleteElement, strokeWidth, isDragging, isResizing, selectedIds, dragStart, originalElements, originalBounds, resizeHandle, onUpdateElement, shiftPressed, isBoxSelecting, lassoPoints, lastMousePos, setLastMousePos]);
+  }, [isDrawing, currentElement, startPoint, tool, collaboration, getMousePosition, isPanning, panStart, elements, onDeleteElement, strokeWidth, isDragging, isResizing, selectedIds, dragStart, originalElements, originalBounds, resizeHandle, onUpdateElement, shiftPressed, isBoxSelecting, lassoPoints, lastMousePos, setLastMousePos, isDraggingLineEndpoint, lineEndpointIndex, isDraggingLineStroke]);
 
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
     // Middle mouse button for panning
@@ -876,6 +904,20 @@ export function Canvas({
       return;
     }
 
+    if (isDraggingLineEndpoint) {
+      setIsDraggingLineEndpoint(false);
+      setLineEndpointIndex(null);
+      setOriginalElements([]);
+      return;
+    }
+
+    if (isDraggingLineStroke) {
+      setIsDraggingLineStroke(false);
+      setDragStart(null);
+      setOriginalElements([]);
+      return;
+    }
+
     if (isDragging) {
       setIsDragging(false);
       setDragStart(null);
@@ -986,7 +1028,7 @@ export function Canvas({
     setCurrentElement(null);
     setStartPoint(null);
     setLassoPoints([]);
-  }, [currentElement, isDrawing, onAddElement, isPanning, isDragging, isResizing, isBoxSelecting, selectionBox, elements, tool, lassoPoints, onDeleteElement, onToolChange, lastMousePos, startPoint, textInputRef, setTextInput, setTextValue, setIsDrawing, setStartPoint, setSelectedIds]);
+  }, [currentElement, isDrawing, onAddElement, isPanning, isDragging, isResizing, isBoxSelecting, selectionBox, elements, tool, lassoPoints, onDeleteElement, onToolChange, lastMousePos, startPoint, textInputRef, setTextInput, setTextValue, setIsDrawing, setStartPoint, setSelectedIds, isDraggingLineEndpoint, isDraggingLineStroke]);
 
   const handleTextSubmit = useCallback(() => {
     if (textInput && textValue.trim()) {
@@ -1359,10 +1401,87 @@ export function Canvas({
     }
   };
 
+  // Render line-specific control points
+  const renderLineControls = useCallback((element: BoardElement) => {
+    if (element.points.length < 2) return null;
+
+    const p1 = element.points[0];
+    const p2 = element.points[1];
+    const midX = (p1.x + p2.x) / 2;
+    const midY = (p1.y + p2.y) / 2;
+
+    const dotSize = 8;
+
+    const handleEndpointMouseDown = (e: React.MouseEvent, endpointIndex: number) => {
+      e.stopPropagation();
+      onStartTransform?.();
+      setIsDraggingLineEndpoint(true);
+      setLineEndpointIndex(endpointIndex);
+      setOriginalElements([{ ...element }]);
+    };
+
+    const handleStrokeMouseDown = (e: React.MouseEvent) => {
+      e.stopPropagation();
+      const point = getMousePosition(e);
+      onStartTransform?.();
+      setIsDraggingLineStroke(true);
+      setDragStart(point);
+      setOriginalElements([{ ...element }]);
+    };
+
+    return (
+      <g>
+        {/* Endpoint dots */}
+        <circle
+          cx={p1.x}
+          cy={p1.y}
+          r={dotSize / 2}
+          fill="var(--accent)"
+          stroke="var(--background)"
+          strokeWidth={2}
+          style={{ cursor: 'move' }}
+          onMouseDown={(e) => handleEndpointMouseDown(e, 0)}
+        />
+        <circle
+          cx={p2.x}
+          cy={p2.y}
+          r={dotSize / 2}
+          fill="var(--accent)"
+          stroke="var(--background)"
+          strokeWidth={2}
+          style={{ cursor: 'move' }}
+          onMouseDown={(e) => handleEndpointMouseDown(e, 1)}
+        />
+
+        {/* Middle control for stroke width */}
+        <rect
+          x={midX - dotSize / 2}
+          y={midY - dotSize / 2}
+          width={dotSize}
+          height={dotSize}
+          fill="var(--accent)"
+          stroke="var(--background)"
+          strokeWidth={2}
+          rx={2}
+          style={{ cursor: 'ns-resize' }}
+          onMouseDown={handleStrokeMouseDown}
+        />
+      </g>
+    );
+  }, [onStartTransform, getMousePosition]);
+
   // Render selection box with handles
   const renderSelectionBox = () => {
     if (!selectedBounds || selectedIds.length === 0) return null;
-    
+
+    // For single line selection, use line-specific controls instead
+    if (selectedIds.length === 1) {
+      const selectedElement = elements.find(el => el.id === selectedIds[0]);
+      if (selectedElement?.type === 'line') {
+        return renderLineControls(selectedElement);
+      }
+    }
+
     const handleSize = 8;
     const handles: { pos: ResizeHandle; x: number; y: number; cursor: string }[] = selectedIds.length === 1 ? [
       { pos: 'nw', x: selectedBounds.x, y: selectedBounds.y, cursor: 'nwse-resize' },
@@ -1374,7 +1493,7 @@ export function Canvas({
       { pos: 'sw', x: selectedBounds.x, y: selectedBounds.y + selectedBounds.height, cursor: 'nesw-resize' },
       { pos: 'w', x: selectedBounds.x, y: selectedBounds.y + selectedBounds.height / 2, cursor: 'ew-resize' },
     ] : [];
-    
+
     return (
       <g>
         {/* Selection border */}
@@ -1389,7 +1508,7 @@ export function Canvas({
           strokeDasharray="5,5"
           pointerEvents="none"
         />
-        
+
         {/* Resize handles (only for single selection) */}
         {handles.map((handle) => (
           <rect
