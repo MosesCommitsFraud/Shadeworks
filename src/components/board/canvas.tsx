@@ -370,6 +370,90 @@ export function Canvas({
     };
   }, [pan, zoom]);
 
+  // Helper function to check if a point is near a line segment
+  const pointToLineDistance = (point: Point, lineStart: Point, lineEnd: Point): number => {
+    const dx = lineEnd.x - lineStart.x;
+    const dy = lineEnd.y - lineStart.y;
+    const lengthSquared = dx * dx + dy * dy;
+
+    if (lengthSquared === 0) {
+      // Line segment is actually a point
+      return Math.hypot(point.x - lineStart.x, point.y - lineStart.y);
+    }
+
+    // Calculate projection of point onto line segment
+    let t = ((point.x - lineStart.x) * dx + (point.y - lineStart.y) * dy) / lengthSquared;
+    t = Math.max(0, Math.min(1, t));
+
+    const projX = lineStart.x + t * dx;
+    const projY = lineStart.y + t * dy;
+
+    return Math.hypot(point.x - projX, point.y - projY);
+  };
+
+  // Helper function to erase elements at a point
+  const eraseAtPoint = useCallback((point: Point) => {
+    const eraseRadius = strokeWidth * 2;
+    const toDelete: string[] = [];
+
+    elements.forEach((el) => {
+      if (el.type === 'pen' || el.type === 'line') {
+        // Check if eraser intersects with any segment of the path
+        let isNear = false;
+        for (let i = 0; i < el.points.length - 1; i++) {
+          const distance = pointToLineDistance(point, el.points[i], el.points[i + 1]);
+          if (distance < eraseRadius + (el.strokeWidth || 2)) {
+            isNear = true;
+            break;
+          }
+        }
+        // Also check if eraser is near any single point (for pen strokes with single points)
+        if (!isNear && el.points.length === 1) {
+          isNear = Math.hypot(point.x - el.points[0].x, point.y - el.points[0].y) < eraseRadius;
+        }
+        if (isNear) toDelete.push(el.id);
+      } else if (el.type === 'rectangle' || el.type === 'ellipse') {
+        if (
+          el.x !== undefined &&
+          el.y !== undefined &&
+          el.width !== undefined &&
+          el.height !== undefined
+        ) {
+          // Check if eraser circle intersects with the shape bounds
+          const closestX = Math.max(el.x, Math.min(point.x, el.x + el.width));
+          const closestY = Math.max(el.y, Math.min(point.y, el.y + el.height));
+          const distance = Math.hypot(point.x - closestX, point.y - closestY);
+          if (distance < eraseRadius) toDelete.push(el.id);
+        }
+      } else if (el.type === 'text') {
+        const bounds = getBoundingBox(el);
+        if (bounds) {
+          // Check if eraser circle intersects with text bounds
+          const closestX = Math.max(bounds.x, Math.min(point.x, bounds.x + bounds.width));
+          const closestY = Math.max(bounds.y, Math.min(point.y, bounds.y + bounds.height));
+          const distance = Math.hypot(point.x - closestX, point.y - closestY);
+          if (distance < eraseRadius) toDelete.push(el.id);
+        }
+      } else if (el.type === 'frame' || el.type === 'web-embed') {
+        if (
+          el.x !== undefined &&
+          el.y !== undefined &&
+          el.width !== undefined &&
+          el.height !== undefined
+        ) {
+          // Check if eraser circle intersects with the frame bounds
+          const closestX = Math.max(el.x, Math.min(point.x, el.x + el.width));
+          const closestY = Math.max(el.y, Math.min(point.y, el.y + el.height));
+          const distance = Math.hypot(point.x - closestX, point.y - closestY);
+          if (distance < eraseRadius) toDelete.push(el.id);
+        }
+      }
+    });
+
+    // Delete all marked elements
+    toDelete.forEach(id => onDeleteElement(id));
+  }, [elements, strokeWidth, onDeleteElement]);
+
   // Get selected elements and their combined bounds
   const selectedElements = selectedIds.map(id => elements.find(el => el.id === id)).filter(Boolean) as BoardElement[];
   const selectedBounds = getCombinedBounds(selectedIds, elements);
@@ -579,6 +663,12 @@ export function Canvas({
       return;
     }
 
+    // Handle eraser tool
+    if (tool === 'eraser' && isDrawing) {
+      eraseAtPoint(point);
+      return;
+    }
+
     if (!isDrawing || !currentElement || !startPoint) return;
 
     switch (tool) {
@@ -601,13 +691,13 @@ export function Canvas({
         const height = point.y - startPoint.y;
         let finalWidth = Math.abs(width);
         let finalHeight = Math.abs(height);
-        
+
         if (shiftPressed) {
           const size = Math.max(finalWidth, finalHeight);
           finalWidth = size;
           finalHeight = size;
         }
-        
+
         setCurrentElement({
           ...currentElement,
           x: width < 0 ? startPoint.x - finalWidth : startPoint.x,
@@ -622,47 +712,19 @@ export function Canvas({
         const height = point.y - startPoint.y;
         let finalWidth = Math.abs(width);
         let finalHeight = Math.abs(height);
-        
+
         if (shiftPressed) {
           const size = Math.max(finalWidth, finalHeight);
           finalWidth = size;
           finalHeight = size;
         }
-        
+
         setCurrentElement({
           ...currentElement,
           x: width < 0 ? startPoint.x - finalWidth : startPoint.x,
           y: height < 0 ? startPoint.y - finalHeight : startPoint.y,
           width: finalWidth,
           height: finalHeight,
-        });
-        break;
-      }
-      case 'eraser': {
-        const eraseRadius = strokeWidth * 2;
-        elements.forEach((el) => {
-          if (el.type === 'pen' || el.type === 'line') {
-            const isNear = el.points.some(
-              (p) => Math.hypot(p.x - point.x, p.y - point.y) < eraseRadius
-            );
-            if (isNear) onDeleteElement(el.id);
-          } else if (el.type === 'rectangle' || el.type === 'ellipse') {
-            if (
-              el.x !== undefined &&
-              el.y !== undefined &&
-              el.width !== undefined &&
-              el.height !== undefined
-            ) {
-              if (
-                point.x >= el.x &&
-                point.x <= el.x + el.width &&
-                point.y >= el.y &&
-                point.y <= el.y + el.height
-              ) {
-                onDeleteElement(el.id);
-              }
-            }
-          }
         });
         break;
       }
@@ -700,7 +762,7 @@ export function Canvas({
         break;
       }
     }
-  }, [isDrawing, currentElement, startPoint, tool, collaboration, getMousePosition, isPanning, panStart, elements, onDeleteElement, strokeWidth, isDragging, isResizing, selectedIds, dragStart, originalElements, originalBounds, resizeHandle, onUpdateElement, shiftPressed, isBoxSelecting, lassoPoints, lastMousePos, setLastMousePos, isDraggingLineEndpoint, lineEndpointIndex, isDraggingLineStroke]);
+  }, [isDrawing, currentElement, startPoint, tool, collaboration, getMousePosition, isPanning, panStart, elements, onDeleteElement, strokeWidth, isDragging, isResizing, selectedIds, dragStart, originalElements, originalBounds, resizeHandle, onUpdateElement, shiftPressed, isBoxSelecting, lassoPoints, lastMousePos, setLastMousePos, isDraggingLineEndpoint, lineEndpointIndex, isDraggingLineStroke, eraseAtPoint]);
 
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
     // Middle mouse button for panning
@@ -833,6 +895,7 @@ export function Canvas({
 
     if (tool === 'eraser') {
       setIsDrawing(true);
+      eraseAtPoint(point);
       return;
     }
 
@@ -873,7 +936,7 @@ export function Canvas({
 
     setCurrentElement(newElement);
     setIsDrawing(true);
-  }, [tool, strokeColor, strokeWidth, getMousePosition, elements, pan, selectedBounds, selectedElements, selectedIds, shiftPressed, onStartTransform]);
+  }, [tool, strokeColor, strokeWidth, getMousePosition, elements, pan, selectedBounds, selectedElements, selectedIds, shiftPressed, onStartTransform, eraseAtPoint, onDeleteElement]);
 
   const handleMouseUp = useCallback(() => {
     if (isPanning) {
