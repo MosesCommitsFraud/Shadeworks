@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { Canvas } from './canvas';
 import { Toolbar } from './toolbar';
+import { ToolSidebar } from './tool-sidebar';
 import { CollaborationManager, type ConnectionStatus } from '@/lib/collaboration';
 import { generateFunnyName } from '@/lib/funny-names';
 import type { Tool, BoardElement } from '@/lib/board-types';
@@ -14,9 +15,13 @@ interface WhiteboardProps {
 const MAX_UNDO_STACK = 100;
 
 export function Whiteboard({ roomId }: WhiteboardProps) {
-  const [tool, setTool] = useState<Tool>('pen');
+  const [tool, setTool] = useState<Tool>('select');
   const [strokeColor, setStrokeColor] = useState('#ffffff');
   const [strokeWidth, setStrokeWidth] = useState(4);
+  const [fillColor, setFillColor] = useState('transparent');
+  const [opacity, setOpacity] = useState(100);
+  const [strokeStyle, setStrokeStyle] = useState<'solid' | 'dashed' | 'dotted'>('solid');
+  const [cornerRadius, setCornerRadius] = useState(0);
   const [elements, setElements] = useState<BoardElement[]>([]);
   const [collaboration, setCollaboration] = useState<CollaborationManager | null>(null);
   const [connectedUsers, setConnectedUsers] = useState(1);
@@ -26,6 +31,7 @@ export function Whiteboard({ roomId }: WhiteboardProps) {
   const [collaboratorUsers, setCollaboratorUsers] = useState<Array<{ id: string; name: string; color: string; viewport?: { pan: { x: number; y: number }; zoom: number } }>>([]);
   const [isReady, setIsReady] = useState(false);
   const [followedUserId, setFollowedUserId] = useState<string | null>(null);
+  const [selectedElements, setSelectedElements] = useState<BoardElement[]>([]);
 
   // Undo/Redo stacks - store snapshots
   const undoStackRef = useRef<BoardElement[][]>([]);
@@ -229,6 +235,113 @@ export function Whiteboard({ roomId }: WhiteboardProps) {
     setFollowedUserId(prev => prev === userId ? null : userId);
   }, []);
 
+  const handleBringToFront = useCallback(() => {
+    if (selectedElements.length === 0) return;
+    saveToUndoStack();
+
+    const maxZIndex = Math.max(...elements.map(el => el.zIndex || 0), 0);
+    selectedElements.forEach((selectedEl) => {
+      handleUpdateElement(selectedEl.id, { zIndex: maxZIndex + 1 });
+    });
+  }, [selectedElements, elements, saveToUndoStack, handleUpdateElement]);
+
+  const handleSendToBack = useCallback(() => {
+    if (selectedElements.length === 0) return;
+    saveToUndoStack();
+
+    const minZIndex = Math.min(...elements.map(el => el.zIndex || 0), 0);
+    selectedElements.forEach((selectedEl) => {
+      handleUpdateElement(selectedEl.id, { zIndex: minZIndex - 1 });
+    });
+  }, [selectedElements, elements, saveToUndoStack, handleUpdateElement]);
+
+  // Handle property changes - apply to selected elements if any, otherwise update defaults
+  const handleStrokeColorChange = useCallback((color: string) => {
+    if (selectedElements.length > 0) {
+      saveToUndoStack();
+      selectedElements.forEach((el) => {
+        handleUpdateElement(el.id, { strokeColor: color });
+      });
+    }
+    setStrokeColor(color);
+  }, [selectedElements, saveToUndoStack, handleUpdateElement]);
+
+  const handleStrokeWidthChange = useCallback((width: number) => {
+    if (selectedElements.length > 0) {
+      saveToUndoStack();
+      selectedElements.forEach((el) => {
+        handleUpdateElement(el.id, { strokeWidth: width });
+      });
+    }
+    setStrokeWidth(width);
+  }, [selectedElements, saveToUndoStack, handleUpdateElement]);
+
+  const handleFillColorChange = useCallback((color: string) => {
+    if (selectedElements.length > 0) {
+      saveToUndoStack();
+      selectedElements.forEach((el) => {
+        if (el.type === 'rectangle' || el.type === 'ellipse' || el.type === 'frame') {
+          handleUpdateElement(el.id, { fillColor: color });
+        }
+      });
+    }
+    setFillColor(color);
+  }, [selectedElements, saveToUndoStack, handleUpdateElement]);
+
+  const handleOpacityChange = useCallback((newOpacity: number) => {
+    if (selectedElements.length > 0) {
+      saveToUndoStack();
+      selectedElements.forEach((el) => {
+        handleUpdateElement(el.id, { opacity: newOpacity });
+      });
+    }
+    setOpacity(newOpacity);
+  }, [selectedElements, saveToUndoStack, handleUpdateElement]);
+
+  const handleStrokeStyleChange = useCallback((style: 'solid' | 'dashed' | 'dotted') => {
+    if (selectedElements.length > 0) {
+      saveToUndoStack();
+      selectedElements.forEach((el) => {
+        handleUpdateElement(el.id, { strokeStyle: style });
+      });
+    }
+    setStrokeStyle(style);
+  }, [selectedElements, saveToUndoStack, handleUpdateElement]);
+
+  const handleCornerRadiusChange = useCallback((radius: number) => {
+    if (selectedElements.length > 0) {
+      saveToUndoStack();
+      selectedElements.forEach((el) => {
+        if (el.type === 'rectangle' || el.type === 'frame') {
+          handleUpdateElement(el.id, { cornerRadius: radius });
+        }
+      });
+    }
+    setCornerRadius(radius);
+  }, [selectedElements, saveToUndoStack, handleUpdateElement]);
+
+  // Sync sidebar properties with selected elements
+  useEffect(() => {
+    if (selectedElements.length > 0) {
+      // Use the first selected element's properties to populate the sidebar
+      const firstElement = selectedElements[0];
+      setStrokeColor(firstElement.strokeColor);
+      setStrokeWidth(firstElement.strokeWidth);
+      if (firstElement.fillColor !== undefined) {
+        setFillColor(firstElement.fillColor);
+      }
+      if (firstElement.opacity !== undefined) {
+        setOpacity(firstElement.opacity);
+      }
+      if (firstElement.strokeStyle !== undefined) {
+        setStrokeStyle(firstElement.strokeStyle);
+      }
+      if (firstElement.cornerRadius !== undefined) {
+        setCornerRadius(firstElement.cornerRadius);
+      }
+    }
+  }, [selectedElements]);
+
   // Continuously track followed user's viewport
   useEffect(() => {
     if (!followedUserId || !setViewportRef.current) return;
@@ -295,11 +408,35 @@ export function Whiteboard({ roomId }: WhiteboardProps) {
         onFollowUser={handleFollowUser}
         followedUserId={followedUserId}
       />
-      
+
+      <ToolSidebar
+        selectedTool={tool}
+        strokeColor={strokeColor}
+        onStrokeColorChange={handleStrokeColorChange}
+        strokeWidth={strokeWidth}
+        onStrokeWidthChange={handleStrokeWidthChange}
+        fillColor={fillColor}
+        onFillColorChange={handleFillColorChange}
+        opacity={opacity}
+        onOpacityChange={handleOpacityChange}
+        strokeStyle={strokeStyle}
+        onStrokeStyleChange={handleStrokeStyleChange}
+        cornerRadius={cornerRadius}
+        onCornerRadiusChange={handleCornerRadiusChange}
+        selectedElements={selectedElements}
+        onBringToFront={handleBringToFront}
+        onSendToBack={handleSendToBack}
+        onToolChange={setTool}
+      />
+
       <Canvas
         tool={tool}
         strokeColor={strokeColor}
         strokeWidth={strokeWidth}
+        fillColor={fillColor}
+        opacity={opacity}
+        strokeStyle={strokeStyle}
+        cornerRadius={cornerRadius}
         collaboration={collaboration}
         elements={elements}
         onAddElement={handleAddElement}
@@ -312,6 +449,9 @@ export function Whiteboard({ roomId }: WhiteboardProps) {
         onSetViewport={(setter) => {
           setViewportRef.current = setter;
         }}
+        onSelectionChange={setSelectedElements}
+        onStrokeColorChange={handleStrokeColorChange}
+        onFillColorChange={handleFillColorChange}
       />
     </div>
   );

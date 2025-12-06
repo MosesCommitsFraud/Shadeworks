@@ -15,7 +15,8 @@ import {
   LayoutTemplate,
   Globe,
   Pointer,
-  Lasso
+  Lasso,
+  Pipette
 } from 'lucide-react';
 import { Tool, COLORS, STROKE_WIDTHS } from '@/lib/board-types';
 import type { ConnectionStatus } from '@/lib/collaboration';
@@ -191,9 +192,9 @@ export function Toolbar({
       {/* Collaboration Panel */}
       <div className="flex items-center gap-2 bg-card/95 backdrop-blur-md border border-border rounded-xl p-1.5 shadow-2xl">
         {/* Your Name */}
-        <div className="flex items-center gap-2 px-3 py-1.5">
+        <div className="flex items-center gap-2 px-3 py-1.5 h-10">
           {/* Status indicator */}
-          <div 
+          <div
             className={cn(
               "w-2 h-2 rounded-full shrink-0",
               connectionStatus === 'connected' && peerCount > 0 ? "bg-green-500" :
@@ -202,12 +203,12 @@ export function Toolbar({
               "bg-red-500"
             )}
             title={
-              connectionStatus === 'connected' && peerCount > 0 
-                ? `Connected to ${peerCount} peer(s)` 
-                : connectionStatus === 'connected' 
-                  ? 'Waiting for collaborators...' 
-                  : connectionStatus === 'connecting' 
-                    ? 'Connecting...' 
+              connectionStatus === 'connected' && peerCount > 0
+                ? `Connected to ${peerCount} peer(s)`
+                : connectionStatus === 'connected'
+                  ? 'Waiting for collaborators...'
+                  : connectionStatus === 'connecting'
+                    ? 'Connecting...'
                     : 'Disconnected'
             }
           />

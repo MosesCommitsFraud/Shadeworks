@@ -11,6 +11,10 @@ interface CanvasProps {
   tool: Tool;
   strokeColor: string;
   strokeWidth: number;
+  fillColor?: string;
+  opacity?: number;
+  strokeStyle?: 'solid' | 'dashed' | 'dotted';
+  cornerRadius?: number;
   collaboration: CollaborationManager | null;
   elements: BoardElement[];
   onAddElement: (element: BoardElement) => void;
@@ -21,6 +25,9 @@ interface CanvasProps {
   onRedo?: () => void;
   onToolChange?: (tool: Tool) => void;
   onSetViewport?: (setter: (pan: { x: number; y: number }, zoom: number) => void) => void;
+  onSelectionChange?: (elements: BoardElement[]) => void;
+  onStrokeColorChange?: (color: string) => void;
+  onFillColorChange?: (color: string) => void;
 }
 
 interface RemoteCursor {
@@ -55,6 +62,38 @@ function getSvgPathFromStroke(stroke: number[][]) {
 
   d.push('Z');
   return d.join(' ');
+}
+
+// Wrap text to fit within a given width
+function wrapText(text: string, maxWidth: number, fontSize: number): string[] {
+  if (!text) return [''];
+
+  const words = text.split(' ');
+  const lines: string[] = [];
+  let currentLine = '';
+  // More accurate character width estimation for typical fonts
+  const avgCharWidth = fontSize * 0.6;
+
+  for (let i = 0; i < words.length; i++) {
+    const word = words[i];
+    const testLine = currentLine ? currentLine + ' ' + word : word;
+    const estimatedWidth = testLine.length * avgCharWidth;
+
+    if (estimatedWidth > maxWidth && currentLine) {
+      // Current line is too long, push it and start new line
+      lines.push(currentLine);
+      currentLine = word;
+    } else {
+      currentLine = testLine;
+    }
+  }
+
+  // Add the last line
+  if (currentLine) {
+    lines.push(currentLine);
+  }
+
+  return lines.length > 0 ? lines : [''];
 }
 
 // Get bounding box for any element
@@ -95,6 +134,15 @@ function getBoundingBox(element: BoardElement): BoundingBox | null {
       };
     }
     const fontSize = element.strokeWidth * 4 + 12;
+    if (element.isTextBox) {
+      // For text boxes, use the defined dimensions
+      return {
+        x: element.x ?? 0,
+        y: element.y ?? 0,
+        width: element.width ?? 200,
+        height: element.height ?? 100,
+      };
+    }
     const textWidth = (element.text?.length ?? 0) * fontSize * 0.55;
     const textHeight = fontSize * 1.2;
     return {
@@ -152,6 +200,10 @@ export function Canvas({
   tool,
   strokeColor,
   strokeWidth,
+  fillColor = 'transparent',
+  opacity = 100,
+  strokeStyle = 'solid',
+  cornerRadius = 0,
   collaboration,
   elements,
   onAddElement,
@@ -162,6 +214,9 @@ export function Canvas({
   onRedo,
   onToolChange,
   onSetViewport,
+  onSelectionChange,
+  onStrokeColorChange,
+  onFillColorChange,
 }: CanvasProps) {
   const svgRef = useRef<SVGSVGElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -174,11 +229,16 @@ export function Canvas({
   const [isPanning, setIsPanning] = useState(false);
   const [panStart, setPanStart] = useState({ x: 0, y: 0 });
   const [zoom, setZoom] = useState(1);
-  const [textInput, setTextInput] = useState<{ x: number; y: number } | null>(null);
+  const [textInput, setTextInput] = useState<{ x: number; y: number; width?: number; height?: number; isTextBox?: boolean } | null>(null);
   const [textValue, setTextValue] = useState('');
-  const textInputRef = useRef<HTMLInputElement>(null);
+  const textInputRef = useRef<HTMLTextAreaElement>(null);
   const [lassoPoints, setLassoPoints] = useState<Point[]>([]);
-  
+  const [lastMousePos, setLastMousePos] = useState<Point>({ x: 0, y: 0 });
+
+  // Eyedropper state
+  const [eyedropperHoverColor, setEyedropperHoverColor] = useState<string | null>(null);
+  const [eyedropperCursorPos, setEyedropperCursorPos] = useState<Point | null>(null);
+
   // Move and resize state
   const [isDragging, setIsDragging] = useState(false);
   const [isResizing, setIsResizing] = useState(false);
@@ -186,11 +246,16 @@ export function Canvas({
   const [dragStart, setDragStart] = useState<Point | null>(null);
   const [originalElements, setOriginalElements] = useState<BoardElement[]>([]);
   const [originalBounds, setOriginalBounds] = useState<BoundingBox | null>(null);
-  
+
+  // Line endpoint dragging state
+  const [isDraggingLineEndpoint, setIsDraggingLineEndpoint] = useState(false);
+  const [lineEndpointIndex, setLineEndpointIndex] = useState<number | null>(null);
+  const [isDraggingLineStroke, setIsDraggingLineStroke] = useState(false);
+
   // Box selection state
   const [isBoxSelecting, setIsBoxSelecting] = useState(false);
   const [selectionBox, setSelectionBox] = useState<BoundingBox | null>(null);
-  
+
   // Shift key tracking
   const [shiftPressed, setShiftPressed] = useState(false);
 
@@ -226,7 +291,13 @@ export function Canvas({
     if (!container) return;
 
     const handleWheel = (e: WheelEvent) => {
+      // Prevent browser back/forward navigation on horizontal scroll
+      if (Math.abs(e.deltaX) > 0) {
+        e.preventDefault();
+      }
+
       if (e.ctrlKey || e.metaKey) {
+        // Zoom with Ctrl/Cmd + Scroll
         e.preventDefault();
 
         const rect = container.getBoundingClientRect();
@@ -250,6 +321,13 @@ export function Canvas({
 
           return newZoom;
         });
+      } else if (!e.ctrlKey && !e.metaKey && (Math.abs(e.deltaX) > 0 || Math.abs(e.deltaY) > 0)) {
+        // Two-finger trackpad pan (no modifier keys)
+        e.preventDefault();
+        setPan(prev => ({
+          x: prev.x - e.deltaX,
+          y: prev.y - e.deltaY,
+        }));
       }
     };
 
@@ -289,6 +367,14 @@ export function Canvas({
     collaboration.updateViewport(pan, zoom);
   }, [collaboration, pan, zoom]);
 
+  // Clear eyedropper state when tool changes
+  useEffect(() => {
+    if (tool !== 'eyedropper') {
+      setEyedropperHoverColor(null);
+      setEyedropperCursorPos(null);
+    }
+  }, [tool]);
+
   // Expose viewport setter to parent component
   useEffect(() => {
     if (onSetViewport) {
@@ -310,15 +396,207 @@ export function Canvas({
     };
   }, [pan, zoom]);
 
+  // Helper function to check if a point is near a line segment
+  const pointToLineDistance = (point: Point, lineStart: Point, lineEnd: Point): number => {
+    const dx = lineEnd.x - lineStart.x;
+    const dy = lineEnd.y - lineStart.y;
+    const lengthSquared = dx * dx + dy * dy;
+
+    if (lengthSquared === 0) {
+      // Line segment is actually a point
+      return Math.hypot(point.x - lineStart.x, point.y - lineStart.y);
+    }
+
+    // Calculate projection of point onto line segment
+    let t = ((point.x - lineStart.x) * dx + (point.y - lineStart.y) * dy) / lengthSquared;
+    t = Math.max(0, Math.min(1, t));
+
+    const projX = lineStart.x + t * dx;
+    const projY = lineStart.y + t * dy;
+
+    return Math.hypot(point.x - projX, point.y - projY);
+  };
+
+  // Helper function to erase elements at a point
+  const eraseAtPoint = useCallback((point: Point) => {
+    const eraseRadius = strokeWidth * 2;
+    const toDelete: string[] = [];
+
+    elements.forEach((el) => {
+      if (el.type === 'pen' || el.type === 'line') {
+        // Check if eraser intersects with any segment of the path
+        let isNear = false;
+        for (let i = 0; i < el.points.length - 1; i++) {
+          const distance = pointToLineDistance(point, el.points[i], el.points[i + 1]);
+          if (distance < eraseRadius + (el.strokeWidth || 2)) {
+            isNear = true;
+            break;
+          }
+        }
+        // Also check if eraser is near any single point (for pen strokes with single points)
+        if (!isNear && el.points.length === 1) {
+          isNear = Math.hypot(point.x - el.points[0].x, point.y - el.points[0].y) < eraseRadius;
+        }
+        if (isNear) toDelete.push(el.id);
+      } else if (el.type === 'rectangle' || el.type === 'ellipse') {
+        if (
+          el.x !== undefined &&
+          el.y !== undefined &&
+          el.width !== undefined &&
+          el.height !== undefined
+        ) {
+          // Check if eraser circle intersects with the shape bounds
+          const closestX = Math.max(el.x, Math.min(point.x, el.x + el.width));
+          const closestY = Math.max(el.y, Math.min(point.y, el.y + el.height));
+          const distance = Math.hypot(point.x - closestX, point.y - closestY);
+          if (distance < eraseRadius) toDelete.push(el.id);
+        }
+      } else if (el.type === 'text') {
+        const bounds = getBoundingBox(el);
+        if (bounds) {
+          // Check if eraser circle intersects with text bounds
+          const closestX = Math.max(bounds.x, Math.min(point.x, bounds.x + bounds.width));
+          const closestY = Math.max(bounds.y, Math.min(point.y, bounds.y + bounds.height));
+          const distance = Math.hypot(point.x - closestX, point.y - closestY);
+          if (distance < eraseRadius) toDelete.push(el.id);
+        }
+      } else if (el.type === 'frame' || el.type === 'web-embed') {
+        if (
+          el.x !== undefined &&
+          el.y !== undefined &&
+          el.width !== undefined &&
+          el.height !== undefined
+        ) {
+          // Check if eraser circle intersects with the frame bounds
+          const closestX = Math.max(el.x, Math.min(point.x, el.x + el.width));
+          const closestY = Math.max(el.y, Math.min(point.y, el.y + el.height));
+          const distance = Math.hypot(point.x - closestX, point.y - closestY);
+          if (distance < eraseRadius) toDelete.push(el.id);
+        }
+      }
+    });
+
+    // Delete all marked elements
+    toDelete.forEach(id => onDeleteElement(id));
+  }, [elements, strokeWidth, onDeleteElement]);
+
   // Get selected elements and their combined bounds
   const selectedElements = selectedIds.map(id => elements.find(el => el.id === id)).filter(Boolean) as BoardElement[];
   const selectedBounds = getCombinedBounds(selectedIds, elements);
 
   const handleMouseMove = useCallback((e: React.MouseEvent) => {
     const point = getMousePosition(e);
-    
+    setLastMousePos(point);
+
     if (collaboration) {
       collaboration.updateCursor(point.x, point.y);
+    }
+
+    // Handle eyedropper hover
+    if (tool === 'eyedropper') {
+      setEyedropperCursorPos({ x: e.clientX, y: e.clientY });
+
+      // Find element under cursor - check if actually over stroke or fill
+      const hoveredElement = [...elements].reverse().find(el => {
+        if (el.type === 'pen') {
+          // For pen strokes, check if near any point
+          const threshold = el.strokeWidth + 2;
+          return el.points.some(p => {
+            const dx = point.x - p.x;
+            const dy = point.y - p.y;
+            return Math.sqrt(dx * dx + dy * dy) <= threshold;
+          });
+        }
+
+        if (el.type === 'line') {
+          // For lines, check distance to line segment
+          if (el.points.length < 2) return false;
+          const p1 = el.points[0];
+          const p2 = el.points[1];
+          const threshold = el.strokeWidth + 2;
+
+          // Calculate distance from point to line segment
+          const dx = p2.x - p1.x;
+          const dy = p2.y - p1.y;
+          const length = Math.sqrt(dx * dx + dy * dy);
+          if (length === 0) return false;
+
+          const t = Math.max(0, Math.min(1, ((point.x - p1.x) * dx + (point.y - p1.y) * dy) / (length * length)));
+          const projX = p1.x + t * dx;
+          const projY = p1.y + t * dy;
+          const dist = Math.sqrt((point.x - projX) ** 2 + (point.y - projY) ** 2);
+
+          return dist <= threshold;
+        }
+
+        if (el.type === 'rectangle' || el.type === 'frame' || el.type === 'web-embed') {
+          const x = el.x ?? 0;
+          const y = el.y ?? 0;
+          const width = el.width ?? 0;
+          const height = el.height ?? 0;
+          const hasFill = el.fillColor && el.fillColor !== 'transparent';
+
+          // Check if inside bounds
+          if (point.x < x || point.x > x + width || point.y < y || point.y > y + height) {
+            return false;
+          }
+
+          // If has fill, hovering anywhere inside counts
+          if (hasFill) {
+            return true;
+          }
+
+          // Otherwise, check if near stroke (edge)
+          const threshold = el.strokeWidth + 2;
+          const nearLeft = Math.abs(point.x - x) <= threshold;
+          const nearRight = Math.abs(point.x - (x + width)) <= threshold;
+          const nearTop = Math.abs(point.y - y) <= threshold;
+          const nearBottom = Math.abs(point.y - (y + height)) <= threshold;
+
+          return (nearLeft || nearRight) && point.y >= y - threshold && point.y <= y + height + threshold ||
+                 (nearTop || nearBottom) && point.x >= x - threshold && point.x <= x + width + threshold;
+        }
+
+        if (el.type === 'ellipse') {
+          const cx = (el.x ?? 0) + (el.width ?? 0) / 2;
+          const cy = (el.y ?? 0) + (el.height ?? 0) / 2;
+          const rx = (el.width ?? 0) / 2;
+          const ry = (el.height ?? 0) / 2;
+          const hasFill = el.fillColor && el.fillColor !== 'transparent';
+
+          // Check if point is on ellipse using ellipse equation
+          const normalizedX = (point.x - cx) / rx;
+          const normalizedY = (point.y - cy) / ry;
+          const distance = normalizedX * normalizedX + normalizedY * normalizedY;
+
+          // If has fill, anywhere inside the ellipse counts
+          if (hasFill && distance <= 1) {
+            return true;
+          }
+
+          // Otherwise check if near the stroke (perimeter)
+          const threshold = (el.strokeWidth + 2) / Math.max(rx, ry);
+          return Math.abs(distance - 1) <= threshold && distance <= 1 + threshold;
+        }
+
+        if (el.type === 'text') {
+          // For text, just use bounding box
+          const x = el.x ?? 0;
+          const y = el.y ?? 0;
+          const width = el.width ?? 100;
+          const height = el.height ?? 30;
+          return point.x >= x && point.x <= x + width && point.y >= y && point.y <= y + height;
+        }
+
+        return false;
+      });
+
+      if (hoveredElement) {
+        setEyedropperHoverColor(hoveredElement.strokeColor);
+      } else {
+        setEyedropperHoverColor(null);
+      }
+      return;
     }
 
     // Handle panning
@@ -340,11 +618,34 @@ export function Canvas({
       return;
     }
 
+    // Handle line endpoint dragging
+    if (isDraggingLineEndpoint && lineEndpointIndex !== null && originalElements.length === 1) {
+      const originalElement = originalElements[0];
+      if (originalElement.type === 'line' && originalElement.points.length === 2) {
+        const newPoints = [...originalElement.points];
+        newPoints[lineEndpointIndex] = point;
+        onUpdateElement(originalElement.id, { points: newPoints });
+      }
+      return;
+    }
+
+    // Handle line stroke width adjustment
+    if (isDraggingLineStroke && dragStart && originalElements.length === 1) {
+      const originalElement = originalElements[0];
+      if (originalElement.type === 'line') {
+        const dy = point.y - dragStart.y;
+        const originalStrokeWidth = originalElement.strokeWidth || 2;
+        const newStrokeWidth = Math.max(1, Math.min(50, originalStrokeWidth + dy / 5));
+        onUpdateElement(originalElement.id, { strokeWidth: newStrokeWidth });
+      }
+      return;
+    }
+
     // Handle dragging (moving elements)
     if (isDragging && dragStart && originalElements.length > 0) {
       const dx = point.x - dragStart.x;
       const dy = point.y - dragStart.y;
-      
+
       originalElements.forEach(origEl => {
         if (origEl.type === 'pen' || origEl.type === 'line') {
           const newPoints = origEl.points.map(p => ({
@@ -495,6 +796,12 @@ export function Canvas({
       return;
     }
 
+    // Handle eraser tool
+    if (tool === 'eraser' && isDrawing) {
+      eraseAtPoint(point);
+      return;
+    }
+
     if (!isDrawing || !currentElement || !startPoint) return;
 
     switch (tool) {
@@ -517,13 +824,13 @@ export function Canvas({
         const height = point.y - startPoint.y;
         let finalWidth = Math.abs(width);
         let finalHeight = Math.abs(height);
-        
+
         if (shiftPressed) {
           const size = Math.max(finalWidth, finalHeight);
           finalWidth = size;
           finalHeight = size;
         }
-        
+
         setCurrentElement({
           ...currentElement,
           x: width < 0 ? startPoint.x - finalWidth : startPoint.x,
@@ -538,47 +845,19 @@ export function Canvas({
         const height = point.y - startPoint.y;
         let finalWidth = Math.abs(width);
         let finalHeight = Math.abs(height);
-        
+
         if (shiftPressed) {
           const size = Math.max(finalWidth, finalHeight);
           finalWidth = size;
           finalHeight = size;
         }
-        
+
         setCurrentElement({
           ...currentElement,
           x: width < 0 ? startPoint.x - finalWidth : startPoint.x,
           y: height < 0 ? startPoint.y - finalHeight : startPoint.y,
           width: finalWidth,
           height: finalHeight,
-        });
-        break;
-      }
-      case 'eraser': {
-        const eraseRadius = strokeWidth * 2;
-        elements.forEach((el) => {
-          if (el.type === 'pen' || el.type === 'line') {
-            const isNear = el.points.some(
-              (p) => Math.hypot(p.x - point.x, p.y - point.y) < eraseRadius
-            );
-            if (isNear) onDeleteElement(el.id);
-          } else if (el.type === 'rectangle' || el.type === 'ellipse') {
-            if (
-              el.x !== undefined &&
-              el.y !== undefined &&
-              el.width !== undefined &&
-              el.height !== undefined
-            ) {
-              if (
-                point.x >= el.x &&
-                point.x <= el.x + el.width &&
-                point.y >= el.y &&
-                point.y <= el.y + el.height
-              ) {
-                onDeleteElement(el.id);
-              }
-            }
-          }
         });
         break;
       }
@@ -616,7 +895,7 @@ export function Canvas({
         break;
       }
     }
-  }, [isDrawing, currentElement, startPoint, tool, collaboration, getMousePosition, isPanning, panStart, elements, onDeleteElement, strokeWidth, isDragging, isResizing, selectedIds, dragStart, originalElements, originalBounds, resizeHandle, onUpdateElement, shiftPressed, isBoxSelecting, lassoPoints]);
+  }, [isDrawing, currentElement, startPoint, tool, collaboration, getMousePosition, isPanning, panStart, elements, onDeleteElement, strokeWidth, isDragging, isResizing, selectedIds, dragStart, originalElements, originalBounds, resizeHandle, onUpdateElement, shiftPressed, isBoxSelecting, lassoPoints, lastMousePos, setLastMousePos, isDraggingLineEndpoint, lineEndpointIndex, isDraggingLineStroke, eraseAtPoint]);
 
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
     // Middle mouse button for panning
@@ -724,20 +1003,53 @@ export function Canvas({
     }
 
     if (tool === 'text') {
-      setTextInput(point);
-      setTextValue('');
-      setTimeout(() => textInputRef.current?.focus(), 10);
+      // Check if we clicked on an existing text element to edit it
+      if (clickedElement && clickedElement.type === 'text') {
+        // Enter edit mode for the existing text element
+        setTextInput({
+          x: clickedElement.x ?? 0,
+          y: clickedElement.y ?? 0,
+          width: clickedElement.width,
+          height: clickedElement.height,
+          isTextBox: clickedElement.isTextBox,
+        });
+        setTextValue(clickedElement.text ?? '');
+        // Delete the existing element so we can recreate it when done
+        onDeleteElement(clickedElement.id);
+        setTimeout(() => textInputRef.current?.focus(), 10);
+        return;
+      }
+
+      // Start tracking if user drags to create a text box
+      setStartPoint(point);
+      setIsDrawing(true);
       return;
     }
 
     if (tool === 'eraser') {
       setIsDrawing(true);
+      eraseAtPoint(point);
       return;
     }
 
     if (tool === 'lasso') {
       setLassoPoints([point]);
       setIsDrawing(true);
+      return;
+    }
+
+    if (tool === 'eyedropper') {
+      // Pick color from clicked element
+      if (clickedElement) {
+        onStrokeColorChange?.(clickedElement.strokeColor);
+        if (clickedElement.fillColor && clickedElement.fillColor !== 'transparent') {
+          onFillColorChange?.(clickedElement.fillColor);
+        }
+        // Switch back to select tool
+        if (onToolChange) {
+          onToolChange('select');
+        }
+      }
       return;
     }
 
@@ -749,6 +1061,8 @@ export function Canvas({
         strokeColor,
         strokeWidth,
         timestamp: Date.now(),
+        opacity,
+        strokeStyle,
       };
       setCurrentElement(newElement);
       setIsDrawing(true);
@@ -761,6 +1075,9 @@ export function Canvas({
       points: [point],
       strokeColor,
       strokeWidth,
+      opacity,
+      strokeStyle,
+      cornerRadius,
     };
 
     if (tool === 'rectangle' || tool === 'ellipse' || tool === 'frame' || tool === 'web-embed') {
@@ -768,11 +1085,12 @@ export function Canvas({
       newElement.y = point.y;
       newElement.width = 0;
       newElement.height = 0;
+      newElement.fillColor = fillColor;
     }
 
     setCurrentElement(newElement);
     setIsDrawing(true);
-  }, [tool, strokeColor, strokeWidth, getMousePosition, elements, pan, selectedBounds, selectedElements, selectedIds, shiftPressed, onStartTransform]);
+  }, [tool, strokeColor, strokeWidth, fillColor, opacity, strokeStyle, cornerRadius, getMousePosition, elements, pan, selectedBounds, selectedElements, selectedIds, shiftPressed, onStartTransform, eraseAtPoint, onDeleteElement]);
 
   const handleMouseUp = useCallback(() => {
     if (isPanning) {
@@ -786,13 +1104,14 @@ export function Canvas({
       elements.forEach(el => {
         const bounds = getBoundingBox(el);
         if (bounds) {
-          // Check if element is within selection box
-          if (
-            bounds.x >= selectionBox.x &&
-            bounds.y >= selectionBox.y &&
-            bounds.x + bounds.width <= selectionBox.x + selectionBox.width &&
-            bounds.y + bounds.height <= selectionBox.y + selectionBox.height
-          ) {
+          // Check if element intersects with selection box (any overlap)
+          const intersects = !(
+            bounds.x + bounds.width < selectionBox.x ||
+            bounds.x > selectionBox.x + selectionBox.width ||
+            bounds.y + bounds.height < selectionBox.y ||
+            bounds.y > selectionBox.y + selectionBox.height
+          );
+          if (intersects) {
             selected.push(el.id);
           }
         }
@@ -800,6 +1119,20 @@ export function Canvas({
       setSelectedIds(selected);
       setIsBoxSelecting(false);
       setSelectionBox(null);
+      return;
+    }
+
+    if (isDraggingLineEndpoint) {
+      setIsDraggingLineEndpoint(false);
+      setLineEndpointIndex(null);
+      setOriginalElements([]);
+      return;
+    }
+
+    if (isDraggingLineStroke) {
+      setIsDraggingLineStroke(false);
+      setDragStart(null);
+      setOriginalElements([]);
       return;
     }
 
@@ -816,6 +1149,34 @@ export function Canvas({
       setDragStart(null);
       setOriginalElements([]);
       setOriginalBounds(null);
+      return;
+    }
+
+    // Handle text tool - determine if it was a click or drag
+    if (tool === 'text' && isDrawing && startPoint) {
+      const currentPoint = lastMousePos;
+      const dragDistance = Math.hypot(currentPoint.x - startPoint.x, currentPoint.y - startPoint.y);
+
+      if (dragDistance < 5) {
+        // It was a click - create simple text
+        setTextInput({ x: startPoint.x, y: startPoint.y, isTextBox: false });
+        setTextValue('');
+        setTimeout(() => textInputRef.current?.focus(), 10);
+      } else {
+        // It was a drag - create text box
+        const width = Math.abs(currentPoint.x - startPoint.x);
+        const height = Math.abs(currentPoint.y - startPoint.y);
+        const x = Math.min(startPoint.x, currentPoint.x);
+        const y = Math.min(startPoint.y, currentPoint.y);
+
+        if (width > 10 && height > 10) {
+          setTextInput({ x, y, width, height, isTextBox: true });
+          setTextValue('');
+          setTimeout(() => textInputRef.current?.focus(), 10);
+        }
+      }
+      setIsDrawing(false);
+      setStartPoint(null);
       return;
     }
 
@@ -848,7 +1209,7 @@ export function Canvas({
     if (currentElement && isDrawing) {
       let elementAdded = false;
 
-      if (currentElement.type === 'pen' && currentElement.points.length > 1) {
+      if (currentElement.type === 'pen' && currentElement.points.length >= 1) {
         onAddElement(currentElement);
         elementAdded = true;
       } else if (currentElement.type === 'line' && currentElement.points.length === 2) {
@@ -872,8 +1233,8 @@ export function Canvas({
         elementAdded = true;
       }
 
-      // Switch back to select tool and select the new element
-      if (elementAdded) {
+      // Switch back to select tool and select the new element (except for pen tool)
+      if (elementAdded && currentElement.type !== 'pen') {
         setSelectedIds([currentElement.id]);
         if (onToolChange) {
           onToolChange('select');
@@ -885,54 +1246,115 @@ export function Canvas({
     setCurrentElement(null);
     setStartPoint(null);
     setLassoPoints([]);
-  }, [currentElement, isDrawing, onAddElement, isPanning, isDragging, isResizing, isBoxSelecting, selectionBox, elements, tool, lassoPoints, onDeleteElement, onToolChange]);
+  }, [currentElement, isDrawing, onAddElement, isPanning, isDragging, isResizing, isBoxSelecting, selectionBox, elements, tool, lassoPoints, onDeleteElement, onToolChange, lastMousePos, startPoint, textInputRef, setTextInput, setTextValue, setIsDrawing, setStartPoint, setSelectedIds, isDraggingLineEndpoint, isDraggingLineStroke]);
 
   const handleTextSubmit = useCallback(() => {
     if (textInput && textValue.trim()) {
       const fontSize = strokeWidth * 4 + 12;
-      const textWidth = textValue.length * fontSize * 0.55;
-      const textHeight = fontSize * 1.2;
 
-      // x,y is top-left of bounding box
-      // The text input is positioned at textInput.y - 10 (see input style below)
-      // So the actual top of the text should be around that position
-      const newElement: BoardElement = {
-        id: uuid(),
-        type: 'text',
-        points: [],
-        strokeColor,
-        strokeWidth,
-        text: textValue,
-        x: textInput.x,
-        y: textInput.y - fontSize * 0.82, // Adjust for baseline
-        width: Math.max(textWidth, 60),
-        height: textHeight,
-        scaleX: 1,
-        scaleY: 1,
-      };
-      onAddElement(newElement);
+      if (textInput.isTextBox) {
+        // Get actual height from textarea
+        let contentHeight = textInput.height ?? 100;
+        const padding = 8;
+        const fontSize = strokeWidth * 4 + 12;
 
-      // Select the new text element and switch back to select tool
-      setSelectedIds([newElement.id]);
-      if (onToolChange) {
-        onToolChange('select');
+        if (textInputRef.current) {
+          // The textarea's scrollHeight includes its asymmetric padding and border (2px top + 2px bottom)
+          const textareaScrollHeight = textInputRef.current.scrollHeight;
+          const paddingTop = (8 - fontSize * 0.18) * zoom;
+          const paddingBottom = 8 * zoom;
+          const borderWidth = 4 * zoom; // 2px top + 2px bottom
+          const textareaPadding = paddingTop + paddingBottom + borderWidth;
+          const contentOnlyHeight = (textareaScrollHeight - textareaPadding) / zoom;
+
+          contentHeight = Math.max(
+            textInput.height ?? 100,
+            contentOnlyHeight + padding * 2 // Add back unscaled padding
+          );
+        } else {
+          // Fallback: Calculate height based on content
+          const lineHeight = fontSize * 1.4;
+          const lines = textValue.split('\n');
+          const totalLines = lines.reduce((acc, line) => {
+            if (!line) return acc + 1; // Empty line
+            const wrappedLines = wrapText(line, (textInput.width ?? 200) - padding * 2, fontSize);
+            return acc + wrappedLines.length;
+          }, 0);
+
+          contentHeight = Math.max(
+            textInput.height ?? 100,
+            totalLines * lineHeight + padding * 2 + fontSize * 0.82
+          );
+        }
+
+        // Create a text box with defined dimensions
+        const newElement: BoardElement = {
+          id: uuid(),
+          type: 'text',
+          points: [],
+          strokeColor,
+          strokeWidth,
+          text: textValue,
+          x: textInput.x,
+          y: textInput.y,
+          width: textInput.width,
+          height: contentHeight,
+          isTextBox: true,
+          scaleX: 1,
+          scaleY: 1,
+          opacity,
+        };
+        onAddElement(newElement);
+
+        // Select the new text element and switch back to select tool
+        setSelectedIds([newElement.id]);
+        if (onToolChange) {
+          onToolChange('select');
+        }
+      } else {
+        // Create simple single-line text
+        const textWidth = textValue.length * fontSize * 0.55;
+        const textHeight = fontSize * 1.2;
+
+        const newElement: BoardElement = {
+          id: uuid(),
+          type: 'text',
+          points: [],
+          strokeColor,
+          strokeWidth,
+          text: textValue,
+          x: textInput.x,
+          y: textInput.y - fontSize * 0.82, // Adjust for baseline
+          width: Math.max(textWidth, 60),
+          height: textHeight,
+          scaleX: 1,
+          scaleY: 1,
+          opacity,
+        };
+        onAddElement(newElement);
+
+        // Select the new text element and switch back to select tool
+        setSelectedIds([newElement.id]);
+        if (onToolChange) {
+          onToolChange('select');
+        }
       }
     }
     setTextInput(null);
     setTextValue('');
-  }, [textInput, textValue, strokeColor, strokeWidth, onAddElement, onToolChange]);
+  }, [textInput, textValue, strokeColor, strokeWidth, opacity, onAddElement, onToolChange, setSelectedIds, textInputRef, zoom]);
 
   // Auto-save text on blur or after typing stops
   const textSaveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  
+
   const handleTextChange = useCallback((value: string) => {
     setTextValue(value);
-    
+
     // Clear existing timeout
     if (textSaveTimeoutRef.current) {
       clearTimeout(textSaveTimeoutRef.current);
     }
-    
+
     // Auto-save after 2 seconds of no typing (optional, can be removed if unwanted)
     // textSaveTimeoutRef.current = setTimeout(() => {
     //   if (textInput && value.trim()) {
@@ -940,6 +1362,18 @@ export function Canvas({
     //   }
     // }, 2000);
   }, []);
+
+  // Auto-resize textarea to fit content
+  useEffect(() => {
+    if (textInputRef.current && textInput?.isTextBox) {
+      const textarea = textInputRef.current;
+      // Reset height to auto to get the correct scrollHeight
+      textarea.style.height = 'auto';
+      // Set height to scrollHeight to fit content
+      const newHeight = Math.max(textarea.scrollHeight, (textInput.height ?? 100) * zoom);
+      textarea.style.height = `${newHeight}px`;
+    }
+  }, [textValue, textInput, zoom]);
 
   const renderElement = (element: BoardElement, isPreview = false) => {
     const opacity = isPreview ? 0.7 : 1;
@@ -953,19 +1387,23 @@ export function Canvas({
           streamline: 0.5,
         });
         const pathData = getSvgPathFromStroke(stroke);
+        const elOpacity = (element.opacity ?? 100) / 100;
         return (
           <path
             key={element.id}
             data-element-id={element.id}
             d={pathData}
             fill={element.strokeColor}
-            opacity={opacity}
+            opacity={elOpacity}
             pointerEvents="auto"
           />
         );
       }
       case 'line': {
         if (element.points.length < 2) return null;
+        const elOpacity = (element.opacity ?? 100) / 100;
+        const elStrokeStyle = element.strokeStyle || 'solid';
+        const strokeDasharray = elStrokeStyle === 'dashed' ? '10,10' : elStrokeStyle === 'dotted' ? '2,6' : 'none';
         return (
           <line
             key={element.id}
@@ -977,12 +1415,18 @@ export function Canvas({
             stroke={element.strokeColor}
             strokeWidth={element.strokeWidth}
             strokeLinecap="round"
-            opacity={opacity}
+            strokeDasharray={strokeDasharray}
+            opacity={elOpacity}
             pointerEvents="stroke"
           />
         );
       }
       case 'rectangle': {
+        const elOpacity = (element.opacity ?? 100) / 100;
+        const elStrokeStyle = element.strokeStyle || 'solid';
+        const strokeDasharray = elStrokeStyle === 'dashed' ? '10,10' : elStrokeStyle === 'dotted' ? '2,6' : 'none';
+        const elCornerRadius = element.cornerRadius ?? 4;
+        const elFillColor = element.fillColor || 'none';
         return (
           <rect
             key={element.id}
@@ -993,14 +1437,19 @@ export function Canvas({
             height={element.height}
             stroke={element.strokeColor}
             strokeWidth={element.strokeWidth}
-            fill="none"
-            rx={4}
-            opacity={opacity}
+            strokeDasharray={strokeDasharray}
+            fill={elFillColor}
+            rx={elCornerRadius}
+            opacity={elOpacity}
             pointerEvents="stroke"
           />
         );
       }
       case 'ellipse': {
+        const elOpacity = (element.opacity ?? 100) / 100;
+        const elStrokeStyle = element.strokeStyle || 'solid';
+        const strokeDasharray = elStrokeStyle === 'dashed' ? '10,10' : elStrokeStyle === 'dotted' ? '2,6' : 'none';
+        const elFillColor = element.fillColor || 'none';
         const cx = (element.x || 0) + (element.width || 0) / 2;
         const cy = (element.y || 0) + (element.height || 0) / 2;
         return (
@@ -1013,13 +1462,15 @@ export function Canvas({
             ry={(element.height || 0) / 2}
             stroke={element.strokeColor}
             strokeWidth={element.strokeWidth}
-            fill="none"
-            opacity={opacity}
+            strokeDasharray={strokeDasharray}
+            fill={elFillColor}
+            opacity={elOpacity}
             pointerEvents="stroke"
           />
         );
       }
       case 'text': {
+        const elOpacity = (element.opacity ?? 100) / 100;
         const fontSize = element.strokeWidth * 4 + 12;
         const scaleX = element.scaleX ?? 1;
         const scaleY = element.scaleY ?? 1;
@@ -1027,11 +1478,62 @@ export function Canvas({
         const y = element.y ?? 0;
         const baselineOffset = fontSize * 0.82;
 
+        if (element.isTextBox && element.width && element.height) {
+          // Render text box with wrapping
+          const padding = 8;
+          const lineHeight = fontSize * 1.4;
+
+          // Split by newlines first, then wrap each line
+          const paragraphs = (element.text || '').split('\n');
+          const allLines: string[] = [];
+
+          paragraphs.forEach((paragraph) => {
+            if (!paragraph) {
+              allLines.push(''); // Preserve empty lines
+            } else {
+              const wrappedLines = wrapText(paragraph, (element.width ?? 200) - padding * 2, fontSize);
+              allLines.push(...wrappedLines);
+            }
+          });
+
+          return (
+            <g key={element.id} data-element-id={element.id}>
+              {/* Clickable area for the entire text box */}
+              <rect
+                x={x}
+                y={y}
+                width={element.width}
+                height={element.height}
+                fill="transparent"
+                stroke="transparent"
+                strokeWidth={1}
+                pointerEvents="fill"
+              />
+              {/* Wrapped text */}
+              {allLines.map((line, i) => (
+                <text
+                  key={i}
+                  fill={element.strokeColor}
+                  fontSize={fontSize}
+                  fontFamily="inherit"
+                  x={x + padding}
+                  y={y + padding + baselineOffset + i * lineHeight}
+                  opacity={elOpacity}
+                  pointerEvents="none"
+                >
+                  {line}
+                </text>
+              ))}
+            </g>
+          );
+        }
+
+        // Render simple single-line text
         return (
           <text
             key={element.id}
             data-element-id={element.id}
-            opacity={opacity}
+            opacity={elOpacity}
             fill={element.strokeColor}
             fontSize={fontSize}
             fontFamily="inherit"
@@ -1045,6 +1547,11 @@ export function Canvas({
         );
       }
       case 'frame': {
+        const elOpacity = (element.opacity ?? 100) / 100;
+        const elStrokeStyle = element.strokeStyle || 'solid';
+        const strokeDasharray = elStrokeStyle === 'dashed' ? '8,4' : elStrokeStyle === 'dotted' ? '2,6' : '8,4'; // Frame defaults to dashed
+        const elCornerRadius = element.cornerRadius ?? 8;
+        const elFillColor = element.fillColor || 'none';
         return (
           <g key={element.id}>
             <rect
@@ -1055,10 +1562,10 @@ export function Canvas({
               height={element.height}
               stroke={element.strokeColor}
               strokeWidth={element.strokeWidth}
-              fill="none"
-              rx={8}
-              opacity={opacity}
-              strokeDasharray="8,4"
+              fill={elFillColor}
+              rx={elCornerRadius}
+              opacity={elOpacity}
+              strokeDasharray={strokeDasharray}
               pointerEvents="stroke"
             />
             {element.label && (
@@ -1069,6 +1576,7 @@ export function Canvas({
                 fontSize={14}
                 fontFamily="inherit"
                 fontWeight="600"
+                opacity={elOpacity}
                 pointerEvents="none"
               >
                 {element.label}
@@ -1078,6 +1586,11 @@ export function Canvas({
         );
       }
       case 'web-embed': {
+        const elOpacity = (element.opacity ?? 100) / 100;
+        const elStrokeStyle = element.strokeStyle || 'solid';
+        const strokeDasharray = elStrokeStyle === 'dashed' ? '10,10' : elStrokeStyle === 'dotted' ? '2,6' : 'none';
+        const elCornerRadius = element.cornerRadius ?? 4;
+        const elFillColor = element.fillColor || 'rgba(100, 100, 255, 0.05)';
         return (
           <g key={element.id}>
             <rect
@@ -1088,9 +1601,10 @@ export function Canvas({
               height={element.height}
               stroke={element.strokeColor}
               strokeWidth={element.strokeWidth}
-              fill="rgba(100, 100, 255, 0.05)"
-              rx={4}
-              opacity={opacity}
+              fill={elFillColor}
+              rx={elCornerRadius}
+              opacity={elOpacity}
+              strokeDasharray={strokeDasharray}
               pointerEvents="auto"
             />
             {element.url && (
@@ -1101,7 +1615,7 @@ export function Canvas({
                 fontSize={12}
                 fontFamily="inherit"
                 textAnchor="middle"
-                opacity={0.7}
+                opacity={elOpacity * 0.7}
                 pointerEvents="none"
               >
                 {element.url}
@@ -1112,6 +1626,7 @@ export function Canvas({
       }
       case 'laser': {
         if (element.points.length < 2) return null;
+        const elOpacity = (element.opacity ?? 100) / 100;
         const stroke = getStroke(element.points.map((p) => [p.x, p.y]), {
           size: 8,
           thinning: 0.3,
@@ -1125,7 +1640,7 @@ export function Canvas({
             data-element-id={element.id}
             d={pathData}
             fill={element.strokeColor}
-            opacity={Math.max(0.3, opacity * 0.7)}
+            opacity={Math.max(0.3, elOpacity * 0.7)}
             filter="url(#laser-glow)"
             pointerEvents="auto"
           />
@@ -1136,10 +1651,99 @@ export function Canvas({
     }
   };
 
+  // Render line-specific control points
+  const renderLineControls = useCallback((element: BoardElement) => {
+    if (element.points.length < 2) return null;
+
+    const p1 = element.points[0];
+    const p2 = element.points[1];
+    const midX = (p1.x + p2.x) / 2;
+    const midY = (p1.y + p2.y) / 2;
+
+    const dotSize = 8;
+
+    const handleEndpointMouseDown = (e: React.MouseEvent, endpointIndex: number) => {
+      e.stopPropagation();
+      onStartTransform?.();
+      setIsDraggingLineEndpoint(true);
+      setLineEndpointIndex(endpointIndex);
+      setOriginalElements([{ ...element }]);
+    };
+
+    const handleStrokeMouseDown = (e: React.MouseEvent) => {
+      e.stopPropagation();
+      const point = getMousePosition(e);
+      onStartTransform?.();
+      setIsDraggingLineStroke(true);
+      setDragStart(point);
+      setOriginalElements([{ ...element }]);
+    };
+
+    return (
+      <g>
+        {/* Dashed line connecting the endpoints */}
+        <line
+          x1={p1.x}
+          y1={p1.y}
+          x2={p2.x}
+          y2={p2.y}
+          stroke="var(--accent)"
+          strokeWidth={2}
+          strokeDasharray="5,5"
+          pointerEvents="none"
+        />
+
+        {/* Endpoint dots */}
+        <circle
+          cx={p1.x}
+          cy={p1.y}
+          r={dotSize / 2}
+          fill="var(--accent)"
+          stroke="var(--background)"
+          strokeWidth={2}
+          style={{ cursor: 'move' }}
+          onMouseDown={(e) => handleEndpointMouseDown(e, 0)}
+        />
+        <circle
+          cx={p2.x}
+          cy={p2.y}
+          r={dotSize / 2}
+          fill="var(--accent)"
+          stroke="var(--background)"
+          strokeWidth={2}
+          style={{ cursor: 'move' }}
+          onMouseDown={(e) => handleEndpointMouseDown(e, 1)}
+        />
+
+        {/* Middle control for stroke width */}
+        <rect
+          x={midX - dotSize / 2}
+          y={midY - dotSize / 2}
+          width={dotSize}
+          height={dotSize}
+          fill="var(--accent)"
+          stroke="var(--background)"
+          strokeWidth={2}
+          rx={2}
+          style={{ cursor: 'ns-resize' }}
+          onMouseDown={handleStrokeMouseDown}
+        />
+      </g>
+    );
+  }, [onStartTransform, getMousePosition]);
+
   // Render selection box with handles
   const renderSelectionBox = () => {
     if (!selectedBounds || selectedIds.length === 0) return null;
-    
+
+    // For single line selection, use line-specific controls instead
+    if (selectedIds.length === 1) {
+      const selectedElement = elements.find(el => el.id === selectedIds[0]);
+      if (selectedElement?.type === 'line') {
+        return renderLineControls(selectedElement);
+      }
+    }
+
     const handleSize = 8;
     const handles: { pos: ResizeHandle; x: number; y: number; cursor: string }[] = selectedIds.length === 1 ? [
       { pos: 'nw', x: selectedBounds.x, y: selectedBounds.y, cursor: 'nwse-resize' },
@@ -1151,7 +1755,7 @@ export function Canvas({
       { pos: 'sw', x: selectedBounds.x, y: selectedBounds.y + selectedBounds.height, cursor: 'nesw-resize' },
       { pos: 'w', x: selectedBounds.x, y: selectedBounds.y + selectedBounds.height / 2, cursor: 'ew-resize' },
     ] : [];
-    
+
     return (
       <g>
         {/* Selection border */}
@@ -1166,7 +1770,7 @@ export function Canvas({
           strokeDasharray="5,5"
           pointerEvents="none"
         />
-        
+
         {/* Resize handles (only for single selection) */}
         {handles.map((handle) => (
           <rect
@@ -1228,6 +1832,14 @@ export function Canvas({
     }
   };
 
+  // Update parent component when selection changes
+  useEffect(() => {
+    if (onSelectionChange) {
+      const selected = elements.filter(el => selectedIds.includes(el.id));
+      onSelectionChange(selected);
+    }
+  }, [selectedIds, elements, onSelectionChange]);
+
   return (
     <div ref={containerRef} className="relative w-full h-full overflow-hidden bg-[#0a0a0a]">
       {/* Grid Background */}
@@ -1263,8 +1875,8 @@ export function Canvas({
           </filter>
         </defs>
         <g transform={`translate(${pan.x}, ${pan.y}) scale(${zoom})`}>
-          {/* Render all elements */}
-          {elements.map((el) => renderElement(el))}
+          {/* Render all elements sorted by zIndex */}
+          {[...elements].sort((a, b) => (a.zIndex || 0) - (b.zIndex || 0)).map((el) => renderElement(el))}
 
           {/* Render current element being drawn */}
           {currentElement && renderElement(currentElement, true)}
@@ -1297,6 +1909,22 @@ export function Canvas({
               opacity={0.7}
             />
           )}
+
+          {/* Render text box preview while dragging */}
+          {tool === 'text' && isDrawing && startPoint && (
+            <rect
+              x={Math.min(startPoint.x, lastMousePos.x)}
+              y={Math.min(startPoint.y, lastMousePos.y)}
+              width={Math.abs(lastMousePos.x - startPoint.x)}
+              height={Math.abs(lastMousePos.y - startPoint.y)}
+              fill="none"
+              stroke={strokeColor}
+              strokeWidth={strokeWidth * 0.5}
+              strokeDasharray="4,4"
+              opacity={0.5}
+              rx={4}
+            />
+          )}
         </g>
 
       </svg>
@@ -1311,40 +1939,85 @@ export function Canvas({
 
       {/* Text Input */}
       {textInput && (
-        <input
-          ref={textInputRef}
-          type="text"
-          value={textValue}
-          onChange={(e) => handleTextChange(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter') {
-              e.preventDefault();
-              handleTextSubmit();
-            }
-            if (e.key === 'Escape') {
-              setTextInput(null);
-              setTextValue('');
-            }
-          }}
-          onBlur={() => {
-            // Save text on blur if there's content
-            if (textValue.trim()) {
-              handleTextSubmit();
-            } else {
-              setTextInput(null);
-              setTextValue('');
-            }
-          }}
-          className="absolute bg-transparent border-none outline-none text-foreground"
-          style={{
-            left: textInput.x * zoom + pan.x,
-            top: textInput.y * zoom + pan.y - (strokeWidth * 4 + 12) * 0.82 * zoom,
-            fontSize: (strokeWidth * 4 + 12) * zoom,
-            color: strokeColor,
-            minWidth: '100px',
-          }}
-          placeholder="Type..."
-        />
+        textInput.isTextBox ? (
+          <textarea
+            ref={textInputRef}
+            value={textValue}
+            onChange={(e) => handleTextChange(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                handleTextSubmit();
+              }
+              if (e.key === 'Escape') {
+                setTextInput(null);
+                setTextValue('');
+              }
+            }}
+            onBlur={() => {
+              // Save text on blur if there's content
+              if (textValue.trim()) {
+                handleTextSubmit();
+              } else {
+                setTextInput(null);
+                setTextValue('');
+              }
+            }}
+            className="absolute bg-transparent border-2 border-dashed border-accent/50 outline-none text-foreground resize-none overflow-hidden"
+            style={{
+              left: textInput.x * zoom + pan.x,
+              top: textInput.y * zoom + pan.y - 2 * zoom, // Account for 2px border
+              width: (textInput.width ?? 200) * zoom,
+              fontSize: (strokeWidth * 4 + 12) * zoom,
+              color: strokeColor,
+              lineHeight: '1.4',
+              // Match SVG padding: horizontal is 8, vertical is 8 but adjusted for baseline
+              paddingLeft: `${8 * zoom}px`,
+              paddingRight: `${8 * zoom}px`,
+              paddingTop: `${(8 - (strokeWidth * 4 + 12) * 0.18) * zoom}px`,
+              paddingBottom: `${8 * zoom}px`,
+              wordWrap: 'break-word',
+              whiteSpace: 'pre-wrap',
+              boxSizing: 'border-box',
+            }}
+            placeholder="Type..."
+          />
+        ) : (
+          <input
+            ref={textInputRef as any}
+            type="text"
+            value={textValue}
+            onChange={(e) => handleTextChange(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                e.preventDefault();
+                handleTextSubmit();
+              }
+              if (e.key === 'Escape') {
+                setTextInput(null);
+                setTextValue('');
+              }
+            }}
+            onBlur={() => {
+              // Save text on blur if there's content
+              if (textValue.trim()) {
+                handleTextSubmit();
+              } else {
+                setTextInput(null);
+                setTextValue('');
+              }
+            }}
+            className="absolute bg-transparent border-none outline-none text-foreground"
+            style={{
+              left: textInput.x * zoom + pan.x,
+              top: textInput.y * zoom + pan.y - (strokeWidth * 4 + 12) * 0.82 * zoom,
+              fontSize: (strokeWidth * 4 + 12) * zoom,
+              color: strokeColor,
+              minWidth: '100px',
+            }}
+            placeholder="Type..."
+          />
+        )
       )}
 
       {/* Zoom and Undo/Redo Controls */}
@@ -1404,8 +2077,29 @@ export function Canvas({
 
       {/* Tooltip */}
       <div className="absolute bottom-4 right-4 text-xs text-muted-foreground bg-card/80 backdrop-blur-sm px-3 py-1.5 rounded-lg border border-border">
-        Ctrl+Scroll to zoom • Middle-click to pan
+        Ctrl+Scroll to zoom • Two-finger/Middle-click to pan
       </div>
+
+      {/* Eyedropper color preview box */}
+      {tool === 'eyedropper' && eyedropperCursorPos && eyedropperHoverColor && (
+        <div
+          className="fixed pointer-events-none z-[10000]"
+          style={{
+            left: eyedropperCursorPos.x + 20,
+            top: eyedropperCursorPos.y + 20,
+          }}
+        >
+          <div className="bg-card border-2 border-border rounded-lg shadow-2xl p-2 flex flex-col gap-1">
+            <div
+              className="w-16 h-16 rounded border-2 border-border/50"
+              style={{ backgroundColor: eyedropperHoverColor }}
+            />
+            <div className="text-xs font-mono text-center text-foreground px-1">
+              {eyedropperHoverColor}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

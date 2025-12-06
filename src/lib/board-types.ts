@@ -1,4 +1,4 @@
-export type Tool = 'select' | 'pen' | 'line' | 'rectangle' | 'ellipse' | 'eraser' | 'text' | 'frame' | 'web-embed' | 'laser' | 'lasso';
+export type Tool = 'select' | 'pen' | 'line' | 'rectangle' | 'ellipse' | 'eraser' | 'text' | 'frame' | 'web-embed' | 'laser' | 'lasso' | 'eyedropper';
 
 export interface Point {
   x: number;
@@ -20,12 +20,20 @@ export interface BoardElement {
   // For text scaling/squishing
   scaleX?: number;
   scaleY?: number;
+  // For text wrapping in textbox mode
+  isTextBox?: boolean;
   // For frame tool
   label?: string;
   // For web embed
   url?: string;
   // For laser pointer
   timestamp?: number;
+  // Style properties
+  opacity?: number;
+  strokeStyle?: 'solid' | 'dashed' | 'dotted';
+  cornerRadius?: number;
+  // Layer order
+  zIndex?: number;
 }
 
 export interface Cursor {
