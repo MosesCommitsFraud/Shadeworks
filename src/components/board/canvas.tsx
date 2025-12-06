@@ -1104,13 +1104,14 @@ export function Canvas({
       elements.forEach(el => {
         const bounds = getBoundingBox(el);
         if (bounds) {
-          // Check if element is within selection box
-          if (
-            bounds.x >= selectionBox.x &&
-            bounds.y >= selectionBox.y &&
-            bounds.x + bounds.width <= selectionBox.x + selectionBox.width &&
-            bounds.y + bounds.height <= selectionBox.y + selectionBox.height
-          ) {
+          // Check if element intersects with selection box (any overlap)
+          const intersects = !(
+            bounds.x + bounds.width < selectionBox.x ||
+            bounds.x > selectionBox.x + selectionBox.width ||
+            bounds.y + bounds.height < selectionBox.y ||
+            bounds.y > selectionBox.y + selectionBox.height
+          );
+          if (intersects) {
             selected.push(el.id);
           }
         }
