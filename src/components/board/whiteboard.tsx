@@ -255,6 +255,93 @@ export function Whiteboard({ roomId }: WhiteboardProps) {
     });
   }, [selectedElements, elements, saveToUndoStack, handleUpdateElement]);
 
+  // Handle property changes - apply to selected elements if any, otherwise update defaults
+  const handleStrokeColorChange = useCallback((color: string) => {
+    if (selectedElements.length > 0) {
+      saveToUndoStack();
+      selectedElements.forEach((el) => {
+        handleUpdateElement(el.id, { strokeColor: color });
+      });
+    }
+    setStrokeColor(color);
+  }, [selectedElements, saveToUndoStack, handleUpdateElement]);
+
+  const handleStrokeWidthChange = useCallback((width: number) => {
+    if (selectedElements.length > 0) {
+      saveToUndoStack();
+      selectedElements.forEach((el) => {
+        handleUpdateElement(el.id, { strokeWidth: width });
+      });
+    }
+    setStrokeWidth(width);
+  }, [selectedElements, saveToUndoStack, handleUpdateElement]);
+
+  const handleFillColorChange = useCallback((color: string) => {
+    if (selectedElements.length > 0) {
+      saveToUndoStack();
+      selectedElements.forEach((el) => {
+        if (el.type === 'rectangle' || el.type === 'ellipse' || el.type === 'frame') {
+          handleUpdateElement(el.id, { fillColor: color });
+        }
+      });
+    }
+    setFillColor(color);
+  }, [selectedElements, saveToUndoStack, handleUpdateElement]);
+
+  const handleOpacityChange = useCallback((newOpacity: number) => {
+    if (selectedElements.length > 0) {
+      saveToUndoStack();
+      selectedElements.forEach((el) => {
+        handleUpdateElement(el.id, { opacity: newOpacity });
+      });
+    }
+    setOpacity(newOpacity);
+  }, [selectedElements, saveToUndoStack, handleUpdateElement]);
+
+  const handleStrokeStyleChange = useCallback((style: 'solid' | 'dashed' | 'dotted') => {
+    if (selectedElements.length > 0) {
+      saveToUndoStack();
+      selectedElements.forEach((el) => {
+        handleUpdateElement(el.id, { strokeStyle: style });
+      });
+    }
+    setStrokeStyle(style);
+  }, [selectedElements, saveToUndoStack, handleUpdateElement]);
+
+  const handleCornerRadiusChange = useCallback((radius: number) => {
+    if (selectedElements.length > 0) {
+      saveToUndoStack();
+      selectedElements.forEach((el) => {
+        if (el.type === 'rectangle' || el.type === 'frame') {
+          handleUpdateElement(el.id, { cornerRadius: radius });
+        }
+      });
+    }
+    setCornerRadius(radius);
+  }, [selectedElements, saveToUndoStack, handleUpdateElement]);
+
+  // Sync sidebar properties with selected elements
+  useEffect(() => {
+    if (selectedElements.length > 0) {
+      // Use the first selected element's properties to populate the sidebar
+      const firstElement = selectedElements[0];
+      setStrokeColor(firstElement.strokeColor);
+      setStrokeWidth(firstElement.strokeWidth);
+      if (firstElement.fillColor !== undefined) {
+        setFillColor(firstElement.fillColor);
+      }
+      if (firstElement.opacity !== undefined) {
+        setOpacity(firstElement.opacity);
+      }
+      if (firstElement.strokeStyle !== undefined) {
+        setStrokeStyle(firstElement.strokeStyle);
+      }
+      if (firstElement.cornerRadius !== undefined) {
+        setCornerRadius(firstElement.cornerRadius);
+      }
+    }
+  }, [selectedElements]);
+
   // Continuously track followed user's viewport
   useEffect(() => {
     if (!followedUserId || !setViewportRef.current) return;
@@ -325,17 +412,17 @@ export function Whiteboard({ roomId }: WhiteboardProps) {
       <ToolSidebar
         selectedTool={tool}
         strokeColor={strokeColor}
-        onStrokeColorChange={setStrokeColor}
+        onStrokeColorChange={handleStrokeColorChange}
         strokeWidth={strokeWidth}
-        onStrokeWidthChange={setStrokeWidth}
+        onStrokeWidthChange={handleStrokeWidthChange}
         fillColor={fillColor}
-        onFillColorChange={setFillColor}
+        onFillColorChange={handleFillColorChange}
         opacity={opacity}
-        onOpacityChange={setOpacity}
+        onOpacityChange={handleOpacityChange}
         strokeStyle={strokeStyle}
-        onStrokeStyleChange={setStrokeStyle}
+        onStrokeStyleChange={handleStrokeStyleChange}
         cornerRadius={cornerRadius}
-        onCornerRadiusChange={setCornerRadius}
+        onCornerRadiusChange={handleCornerRadiusChange}
         selectedElements={selectedElements}
         onBringToFront={handleBringToFront}
         onSendToBack={handleSendToBack}

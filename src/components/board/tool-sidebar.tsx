@@ -52,9 +52,16 @@ export function ToolSidebar({
     return null;
   }
 
-  const showFill = selectedTool === 'rectangle' || selectedTool === 'ellipse' || selectedTool === 'frame';
-  const showCornerRadius = selectedTool === 'rectangle' || selectedTool === 'frame';
   const hasSelectedElements = selectedElements.length > 0;
+
+  // Determine what controls to show based on selected elements or current tool
+  const showFill = hasSelectedElements
+    ? selectedElements.some(el => el.type === 'rectangle' || el.type === 'ellipse' || el.type === 'frame')
+    : selectedTool === 'rectangle' || selectedTool === 'ellipse' || selectedTool === 'frame';
+
+  const showCornerRadius = hasSelectedElements
+    ? selectedElements.some(el => el.type === 'rectangle' || el.type === 'frame')
+    : selectedTool === 'rectangle' || selectedTool === 'frame';
 
   return (
     <div
