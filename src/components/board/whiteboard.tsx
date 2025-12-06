@@ -449,6 +449,8 @@ export function Whiteboard({ roomId }: WhiteboardProps) {
           setViewportRef.current = setter;
         }}
         onSelectionChange={setSelectedElements}
+        onStrokeColorChange={handleStrokeColorChange}
+        onFillColorChange={handleFillColorChange}
       />
     </div>
   );

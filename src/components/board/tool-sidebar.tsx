@@ -124,19 +124,27 @@ export function ToolSidebar({
               {/* Custom color picker */}
               <button
                 onClick={() => setShowStrokeColorPicker(true)}
-                className="w-7 h-7 rounded-lg border-2 border-border/50 cursor-pointer transition-all duration-200 hover:scale-110 hover:shadow-lg"
-                style={{
-                  background: 'linear-gradient(135deg, #ff0000 0%, #ff7f00 14%, #ffff00 28%, #00ff00 42%, #0000ff 57%, #4b0082 71%, #9400d3 85%, #ff0000 100%)'
-                }}
+                className="w-7 h-7 rounded-lg border-2 border-border/50 cursor-pointer transition-all duration-200 hover:scale-110 hover:shadow-lg overflow-hidden"
                 title="Custom color"
-              />
+              >
+                <div
+                  className="w-full h-full"
+                  style={{
+                    background: 'linear-gradient(135deg, #ff0000 0%, #ff7f00 14%, #ffff00 28%, #00ff00 42%, #0000ff 57%, #4b0082 71%, #9400d3 85%, #ff0000 100%)'
+                  }}
+                />
+              </button>
             </div>
           </div>
 
           {/* Stroke Color Picker Modal */}
           {showStrokeColorPicker && (
-            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm" onClick={() => setShowStrokeColorPicker(false)}>
-              <div className="bg-card/95 backdrop-blur-md border border-border rounded-xl p-6 shadow-2xl w-80" onClick={(e) => e.stopPropagation()}>
+            <>
+              <div className="fixed inset-0 z-[60] bg-black/50" onClick={() => setShowStrokeColorPicker(false)} />
+              <div
+                className="fixed right-[280px] top-1/2 -translate-y-1/2 z-[70] bg-card border border-border rounded-xl p-6 shadow-2xl w-80"
+                onClick={(e) => e.stopPropagation()}
+              >
                 <div className="flex items-center justify-between mb-4">
                   <h3 className="text-sm font-semibold text-foreground">Custom Stroke Color</h3>
                   <button onClick={() => setShowStrokeColorPicker(false)} className="text-muted-foreground hover:text-foreground transition-colors">
@@ -144,17 +152,6 @@ export function ToolSidebar({
                   </button>
                 </div>
                 <div className="space-y-4">
-                  <div>
-                    <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2 block">
-                      Color Picker
-                    </label>
-                    <input
-                      type="color"
-                      value={customStrokeColor}
-                      onChange={(e) => setCustomStrokeColor(e.target.value)}
-                      className="w-full h-24 rounded-lg border-2 border-border/50 cursor-pointer"
-                    />
-                  </div>
                   <div>
                     <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2 block">
                       Hex Code
@@ -172,6 +169,15 @@ export function ToolSidebar({
                       placeholder="#FFFFFF"
                     />
                   </div>
+                  <div>
+                    <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2 block">
+                      Preview
+                    </label>
+                    <div
+                      className="w-full h-16 rounded-lg border-2 border-border/50"
+                      style={{ backgroundColor: customStrokeColor }}
+                    />
+                  </div>
                   <button
                     onClick={() => {
                       onStrokeColorChange(customStrokeColor);
@@ -183,7 +189,7 @@ export function ToolSidebar({
                   </button>
                 </div>
               </div>
-            </div>
+            </>
           )}
 
           {/* Fill Color (for shapes) */}
@@ -231,19 +237,27 @@ export function ToolSidebar({
                   {/* Custom color picker */}
                   <button
                     onClick={() => setShowFillColorPicker(true)}
-                    className="w-7 h-7 rounded-lg border-2 border-border/50 cursor-pointer transition-all duration-200 hover:scale-110 hover:shadow-lg"
-                    style={{
-                      background: 'linear-gradient(135deg, #ff0000 0%, #ff7f00 14%, #ffff00 28%, #00ff00 42%, #0000ff 57%, #4b0082 71%, #9400d3 85%, #ff0000 100%)'
-                    }}
+                    className="w-7 h-7 rounded-lg border-2 border-border/50 cursor-pointer transition-all duration-200 hover:scale-110 hover:shadow-lg overflow-hidden"
                     title="Custom fill color"
-                  />
+                  >
+                    <div
+                      className="w-full h-full"
+                      style={{
+                        background: 'linear-gradient(135deg, #ff0000 0%, #ff7f00 14%, #ffff00 28%, #00ff00 42%, #0000ff 57%, #4b0082 71%, #9400d3 85%, #ff0000 100%)'
+                      }}
+                    />
+                  </button>
                 </div>
               </div>
 
               {/* Fill Color Picker Modal */}
               {showFillColorPicker && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm" onClick={() => setShowFillColorPicker(false)}>
-                  <div className="bg-card/95 backdrop-blur-md border border-border rounded-xl p-6 shadow-2xl w-80" onClick={(e) => e.stopPropagation()}>
+                <>
+                  <div className="fixed inset-0 z-50 bg-black/50" onClick={() => setShowFillColorPicker(false)} />
+                  <div
+                    className="fixed right-[280px] top-1/2 -translate-y-1/2 z-50 bg-card border border-border rounded-xl p-6 shadow-2xl w-80"
+                    onClick={(e) => e.stopPropagation()}
+                  >
                     <div className="flex items-center justify-between mb-4">
                       <h3 className="text-sm font-semibold text-foreground">Custom Fill Color</h3>
                       <button onClick={() => setShowFillColorPicker(false)} className="text-muted-foreground hover:text-foreground transition-colors">
@@ -251,17 +265,6 @@ export function ToolSidebar({
                       </button>
                     </div>
                     <div className="space-y-4">
-                      <div>
-                        <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2 block">
-                          Color Picker
-                        </label>
-                        <input
-                          type="color"
-                          value={customFillColor === 'transparent' ? '#ffffff' : customFillColor}
-                          onChange={(e) => setCustomFillColor(e.target.value)}
-                          className="w-full h-24 rounded-lg border-2 border-border/50 cursor-pointer"
-                        />
-                      </div>
                       <div>
                         <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2 block">
                           Hex Code
@@ -279,6 +282,15 @@ export function ToolSidebar({
                           placeholder="#FFFFFF"
                         />
                       </div>
+                      <div>
+                        <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2 block">
+                          Preview
+                        </label>
+                        <div
+                          className="w-full h-16 rounded-lg border-2 border-border/50"
+                          style={{ backgroundColor: customFillColor === 'transparent' ? '#ffffff' : customFillColor }}
+                        />
+                      </div>
                       <button
                         onClick={() => {
                           onFillColorChange(customFillColor);
@@ -290,7 +302,7 @@ export function ToolSidebar({
                       </button>
                     </div>
                   </div>
-                </div>
+                </>
               )}
             </>
           )}

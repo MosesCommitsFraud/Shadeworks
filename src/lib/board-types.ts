@@ -1,4 +1,4 @@
-export type Tool = 'select' | 'pen' | 'line' | 'rectangle' | 'ellipse' | 'eraser' | 'text' | 'frame' | 'web-embed' | 'laser' | 'lasso';
+export type Tool = 'select' | 'pen' | 'line' | 'rectangle' | 'ellipse' | 'eraser' | 'text' | 'frame' | 'web-embed' | 'laser' | 'lasso' | 'eyedropper';
 
 export interface Point {
   x: number;

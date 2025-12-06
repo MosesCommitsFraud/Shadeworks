@@ -26,6 +26,8 @@ interface CanvasProps {
   onToolChange?: (tool: Tool) => void;
   onSetViewport?: (setter: (pan: { x: number; y: number }, zoom: number) => void) => void;
   onSelectionChange?: (elements: BoardElement[]) => void;
+  onStrokeColorChange?: (color: string) => void;
+  onFillColorChange?: (color: string) => void;
 }
 
 interface RemoteCursor {
@@ -213,6 +215,8 @@ export function Canvas({
   onToolChange,
   onSetViewport,
   onSelectionChange,
+  onStrokeColorChange,
+  onFillColorChange,
 }: CanvasProps) {
   const svgRef = useRef<SVGSVGElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -912,6 +916,21 @@ export function Canvas({
     if (tool === 'lasso') {
       setLassoPoints([point]);
       setIsDrawing(true);
+      return;
+    }
+
+    if (tool === 'eyedropper') {
+      // Pick color from clicked element
+      if (clickedElement) {
+        onStrokeColorChange?.(clickedElement.strokeColor);
+        if (clickedElement.fillColor && clickedElement.fillColor !== 'transparent') {
+          onFillColorChange?.(clickedElement.fillColor);
+        }
+        // Switch back to select tool
+        if (onToolChange) {
+          onToolChange('select');
+        }
+      }
       return;
     }
 
