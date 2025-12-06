@@ -28,6 +28,7 @@ interface CanvasProps {
   onSelectionChange?: (elements: BoardElement[]) => void;
   onStrokeColorChange?: (color: string) => void;
   onFillColorChange?: (color: string) => void;
+  canvasBackground?: 'none' | 'dots' | 'lines' | 'grid';
 }
 
 interface RemoteCursor {
@@ -217,6 +218,7 @@ export function Canvas({
   onSelectionChange,
   onStrokeColorChange,
   onFillColorChange,
+  canvasBackground = 'grid',
 }: CanvasProps) {
   const svgRef = useRef<SVGSVGElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -1809,20 +1811,50 @@ export function Canvas({
     }
   }, [selectedIds, elements, onSelectionChange]);
 
-  return (
-    <div ref={containerRef} className="relative w-full h-full overflow-hidden bg-[#0a0a0a]">
-      {/* Grid Background */}
-      <div
-        className="absolute inset-0 pointer-events-none opacity-[0.03]"
-        style={{
+  // Helper function to get background style
+  const getBackgroundStyle = () => {
+    const spacing = 40 * zoom;
+    const position = `${pan.x}px ${pan.y}px`;
+
+    switch (canvasBackground) {
+      case 'grid':
+        return {
           backgroundImage: `
             linear-gradient(to right, #fff 1px, transparent 1px),
             linear-gradient(to bottom, #fff 1px, transparent 1px)
           `,
-          backgroundSize: `${40 * zoom}px ${40 * zoom}px`,
-          backgroundPosition: `${pan.x}px ${pan.y}px`,
-        }}
-      />
+          backgroundSize: `${spacing}px ${spacing}px`,
+          backgroundPosition: position,
+        };
+      case 'dots':
+        return {
+          backgroundImage: `radial-gradient(circle, #fff 1.5px, transparent 1.5px)`,
+          backgroundSize: `${spacing}px ${spacing}px`,
+          backgroundPosition: position,
+        };
+      case 'lines':
+        return {
+          backgroundImage: `linear-gradient(to bottom, #fff 1px, transparent 1px)`,
+          backgroundSize: `${spacing}px ${spacing}px`,
+          backgroundPosition: position,
+        };
+      case 'none':
+      default:
+        return {
+          backgroundImage: 'none',
+        };
+    }
+  };
+
+  return (
+    <div ref={containerRef} className="relative w-full h-full overflow-hidden bg-[#0a0a0a]">
+      {/* Canvas Background */}
+      {canvasBackground !== 'none' && (
+        <div
+          className="absolute inset-0 pointer-events-none opacity-[0.03]"
+          style={getBackgroundStyle()}
+        />
+      )}
       
       {/* Main SVG Canvas */}
       <svg

@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { Canvas } from './canvas';
 import { Toolbar } from './toolbar';
 import { ToolSidebar } from './tool-sidebar';
+import { BurgerMenu } from './burger-menu';
 import { CollaborationManager, type ConnectionStatus } from '@/lib/collaboration';
 import { generateFunnyName } from '@/lib/funny-names';
 import type { Tool, BoardElement } from '@/lib/board-types';
@@ -32,6 +33,7 @@ export function Whiteboard({ roomId }: WhiteboardProps) {
   const [isReady, setIsReady] = useState(false);
   const [followedUserId, setFollowedUserId] = useState<string | null>(null);
   const [selectedElements, setSelectedElements] = useState<BoardElement[]>([]);
+  const [canvasBackground, setCanvasBackground] = useState<'none' | 'dots' | 'lines' | 'grid'>('grid');
 
   // Undo/Redo stacks - store snapshots
   const undoStackRef = useRef<BoardElement[][]>([]);
@@ -368,6 +370,16 @@ export function Whiteboard({ roomId }: WhiteboardProps) {
 
   return (
     <div className="relative w-screen h-screen overflow-hidden">
+      {/* Burger Menu - Top Left */}
+      <div className="absolute top-4 left-4 z-50">
+        <BurgerMenu
+          onClear={handleClear}
+          canvasBackground={canvasBackground}
+          onCanvasBackgroundChange={setCanvasBackground}
+          roomId={roomId}
+        />
+      </div>
+
       {/* Colored frame when following a user */}
       {followedUser && (
         <div
@@ -376,7 +388,7 @@ export function Whiteboard({ roomId }: WhiteboardProps) {
             boxShadow: `inset 0 0 0 4px ${followedUser.color}`,
           }}
         >
-          <div className="absolute top-4 left-4 px-3 py-1.5 rounded-lg bg-card/95 backdrop-blur-md border-2 shadow-lg flex items-center gap-2"
+          <div className="absolute top-4 left-20 px-3 py-1.5 rounded-lg bg-card/95 backdrop-blur-md border-2 shadow-lg flex items-center gap-2"
             style={{ borderColor: followedUser.color }}
           >
             <div className="w-2 h-2 rounded-full" style={{ backgroundColor: followedUser.color }} />
@@ -451,6 +463,7 @@ export function Whiteboard({ roomId }: WhiteboardProps) {
         onSelectionChange={setSelectedElements}
         onStrokeColorChange={handleStrokeColorChange}
         onFillColorChange={handleFillColorChange}
+        canvasBackground={canvasBackground}
       />
     </div>
   );
