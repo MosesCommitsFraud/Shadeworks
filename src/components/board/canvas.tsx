@@ -239,6 +239,9 @@ export function Canvas({
   const [eyedropperHoverColor, setEyedropperHoverColor] = useState<string | null>(null);
   const [eyedropperCursorPos, setEyedropperCursorPos] = useState<Point | null>(null);
 
+  // Eraser preview state
+  const [eraserMarkedIds, setEraserMarkedIds] = useState<Set<string>>(new Set());
+
   // Move and resize state
   const [isDragging, setIsDragging] = useState(false);
   const [isResizing, setIsResizing] = useState(false);
@@ -375,6 +378,13 @@ export function Canvas({
     }
   }, [tool]);
 
+  // Clear eraser marked IDs when tool changes
+  useEffect(() => {
+    if (tool !== 'eraser') {
+      setEraserMarkedIds(new Set());
+    }
+  }, [tool]);
+
   // Expose viewport setter to parent component
   useEffect(() => {
     if (onSetViewport) {
@@ -417,10 +427,10 @@ export function Canvas({
     return Math.hypot(point.x - projX, point.y - projY);
   };
 
-  // Helper function to erase elements at a point
-  const eraseAtPoint = useCallback((point: Point) => {
+  // Helper function to find elements at a point that should be erased
+  const getElementsToErase = useCallback((point: Point): string[] => {
     const eraseRadius = strokeWidth * 2;
-    const toDelete: string[] = [];
+    const toErase: string[] = [];
 
     elements.forEach((el) => {
       if (el.type === 'pen' || el.type === 'line') {
@@ -437,7 +447,7 @@ export function Canvas({
         if (!isNear && el.points.length === 1) {
           isNear = Math.hypot(point.x - el.points[0].x, point.y - el.points[0].y) < eraseRadius;
         }
-        if (isNear) toDelete.push(el.id);
+        if (isNear) toErase.push(el.id);
       } else if (el.type === 'rectangle' || el.type === 'ellipse') {
         if (
           el.x !== undefined &&
@@ -449,7 +459,7 @@ export function Canvas({
           const closestX = Math.max(el.x, Math.min(point.x, el.x + el.width));
           const closestY = Math.max(el.y, Math.min(point.y, el.y + el.height));
           const distance = Math.hypot(point.x - closestX, point.y - closestY);
-          if (distance < eraseRadius) toDelete.push(el.id);
+          if (distance < eraseRadius) toErase.push(el.id);
         }
       } else if (el.type === 'text') {
         const bounds = getBoundingBox(el);
@@ -458,7 +468,7 @@ export function Canvas({
           const closestX = Math.max(bounds.x, Math.min(point.x, bounds.x + bounds.width));
           const closestY = Math.max(bounds.y, Math.min(point.y, bounds.y + bounds.height));
           const distance = Math.hypot(point.x - closestX, point.y - closestY);
-          if (distance < eraseRadius) toDelete.push(el.id);
+          if (distance < eraseRadius) toErase.push(el.id);
         }
       } else if (el.type === 'frame' || el.type === 'web-embed') {
         if (
@@ -471,14 +481,13 @@ export function Canvas({
           const closestX = Math.max(el.x, Math.min(point.x, el.x + el.width));
           const closestY = Math.max(el.y, Math.min(point.y, el.y + el.height));
           const distance = Math.hypot(point.x - closestX, point.y - closestY);
-          if (distance < eraseRadius) toDelete.push(el.id);
+          if (distance < eraseRadius) toErase.push(el.id);
         }
       }
     });
 
-    // Delete all marked elements
-    toDelete.forEach(id => onDeleteElement(id));
-  }, [elements, strokeWidth, onDeleteElement]);
+    return toErase;
+  }, [elements, strokeWidth]);
 
   // Get selected elements and their combined bounds
   const selectedElements = selectedIds.map(id => elements.find(el => el.id === id)).filter(Boolean) as BoardElement[];
@@ -796,9 +805,16 @@ export function Canvas({
       return;
     }
 
-    // Handle eraser tool
+    // Handle eraser tool - mark elements for deletion preview
     if (tool === 'eraser' && isDrawing) {
-      eraseAtPoint(point);
+      const elementsToMark = getElementsToErase(point);
+      if (elementsToMark.length > 0) {
+        setEraserMarkedIds(prev => {
+          const newSet = new Set(prev);
+          elementsToMark.forEach(id => newSet.add(id));
+          return newSet;
+        });
+      }
       return;
     }
 
@@ -895,7 +911,7 @@ export function Canvas({
         break;
       }
     }
-  }, [isDrawing, currentElement, startPoint, tool, collaboration, getMousePosition, isPanning, panStart, elements, onDeleteElement, strokeWidth, isDragging, isResizing, selectedIds, dragStart, originalElements, originalBounds, resizeHandle, onUpdateElement, shiftPressed, isBoxSelecting, lassoPoints, lastMousePos, setLastMousePos, isDraggingLineEndpoint, lineEndpointIndex, isDraggingLineStroke, eraseAtPoint]);
+  }, [isDrawing, currentElement, startPoint, tool, collaboration, getMousePosition, isPanning, panStart, elements, onDeleteElement, strokeWidth, isDragging, isResizing, selectedIds, dragStart, originalElements, originalBounds, resizeHandle, onUpdateElement, shiftPressed, isBoxSelecting, lassoPoints, lastMousePos, setLastMousePos, isDraggingLineEndpoint, lineEndpointIndex, isDraggingLineStroke, getElementsToErase]);
 
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
     // Middle mouse button for panning
@@ -1028,7 +1044,11 @@ export function Canvas({
 
     if (tool === 'eraser') {
       setIsDrawing(true);
-      eraseAtPoint(point);
+      // Mark elements at initial point for deletion preview
+      const elementsToMark = getElementsToErase(point);
+      if (elementsToMark.length > 0) {
+        setEraserMarkedIds(new Set(elementsToMark));
+      }
       return;
     }
 
@@ -1090,11 +1110,21 @@ export function Canvas({
 
     setCurrentElement(newElement);
     setIsDrawing(true);
-  }, [tool, strokeColor, strokeWidth, fillColor, opacity, strokeStyle, cornerRadius, getMousePosition, elements, pan, selectedBounds, selectedElements, selectedIds, shiftPressed, onStartTransform, eraseAtPoint, onDeleteElement]);
+  }, [tool, strokeColor, strokeWidth, fillColor, opacity, strokeStyle, cornerRadius, getMousePosition, elements, pan, selectedBounds, selectedElements, selectedIds, shiftPressed, onStartTransform, getElementsToErase, onDeleteElement]);
 
   const handleMouseUp = useCallback(() => {
     if (isPanning) {
       setIsPanning(false);
+      return;
+    }
+
+    // Handle eraser - delete marked elements on mouse release
+    if (tool === 'eraser' && isDrawing) {
+      if (eraserMarkedIds.size > 0) {
+        eraserMarkedIds.forEach(id => onDeleteElement(id));
+      }
+      setEraserMarkedIds(new Set());
+      setIsDrawing(false);
       return;
     }
 
@@ -1246,7 +1276,7 @@ export function Canvas({
     setCurrentElement(null);
     setStartPoint(null);
     setLassoPoints([]);
-  }, [currentElement, isDrawing, onAddElement, isPanning, isDragging, isResizing, isBoxSelecting, selectionBox, elements, tool, lassoPoints, onDeleteElement, onToolChange, lastMousePos, startPoint, textInputRef, setTextInput, setTextValue, setIsDrawing, setStartPoint, setSelectedIds, isDraggingLineEndpoint, isDraggingLineStroke]);
+  }, [currentElement, isDrawing, onAddElement, isPanning, isDragging, isResizing, isBoxSelecting, selectionBox, elements, tool, lassoPoints, onDeleteElement, onToolChange, lastMousePos, startPoint, textInputRef, setTextInput, setTextValue, setIsDrawing, setStartPoint, setSelectedIds, isDraggingLineEndpoint, isDraggingLineStroke, eraserMarkedIds]);
 
   const handleTextSubmit = useCallback(() => {
     if (textInput && textValue.trim()) {
@@ -1377,6 +1407,7 @@ export function Canvas({
 
   const renderElement = (element: BoardElement, isPreview = false) => {
     const opacity = isPreview ? 0.7 : 1;
+    const isMarkedForDeletion = eraserMarkedIds.has(element.id);
 
     switch (element.type) {
       case 'pen': {
@@ -1389,14 +1420,22 @@ export function Canvas({
         const pathData = getSvgPathFromStroke(stroke);
         const elOpacity = (element.opacity ?? 100) / 100;
         return (
-          <path
-            key={element.id}
-            data-element-id={element.id}
-            d={pathData}
-            fill={element.strokeColor}
-            opacity={elOpacity}
-            pointerEvents="auto"
-          />
+          <g key={element.id}>
+            <path
+              data-element-id={element.id}
+              d={pathData}
+              fill={element.strokeColor}
+              opacity={isMarkedForDeletion ? elOpacity * 0.3 : elOpacity}
+              pointerEvents="auto"
+            />
+            {isMarkedForDeletion && (
+              <path
+                d={pathData}
+                fill="rgba(0, 0, 0, 0.6)"
+                pointerEvents="none"
+              />
+            )}
+          </g>
         );
       }
       case 'line': {
@@ -1405,20 +1444,33 @@ export function Canvas({
         const elStrokeStyle = element.strokeStyle || 'solid';
         const strokeDasharray = elStrokeStyle === 'dashed' ? '10,10' : elStrokeStyle === 'dotted' ? '2,6' : 'none';
         return (
-          <line
-            key={element.id}
-            data-element-id={element.id}
-            x1={element.points[0].x}
-            y1={element.points[0].y}
-            x2={element.points[1].x}
-            y2={element.points[1].y}
-            stroke={element.strokeColor}
-            strokeWidth={element.strokeWidth}
-            strokeLinecap="round"
-            strokeDasharray={strokeDasharray}
-            opacity={elOpacity}
-            pointerEvents="stroke"
-          />
+          <g key={element.id}>
+            <line
+              data-element-id={element.id}
+              x1={element.points[0].x}
+              y1={element.points[0].y}
+              x2={element.points[1].x}
+              y2={element.points[1].y}
+              stroke={element.strokeColor}
+              strokeWidth={element.strokeWidth}
+              strokeLinecap="round"
+              strokeDasharray={strokeDasharray}
+              opacity={isMarkedForDeletion ? elOpacity * 0.3 : elOpacity}
+              pointerEvents="stroke"
+            />
+            {isMarkedForDeletion && (
+              <line
+                x1={element.points[0].x}
+                y1={element.points[0].y}
+                x2={element.points[1].x}
+                y2={element.points[1].y}
+                stroke="rgba(0, 0, 0, 0.7)"
+                strokeWidth={element.strokeWidth}
+                strokeLinecap="round"
+                pointerEvents="none"
+              />
+            )}
+          </g>
         );
       }
       case 'rectangle': {
@@ -1428,21 +1480,33 @@ export function Canvas({
         const elCornerRadius = element.cornerRadius ?? 4;
         const elFillColor = element.fillColor || 'none';
         return (
-          <rect
-            key={element.id}
-            data-element-id={element.id}
-            x={element.x}
-            y={element.y}
-            width={element.width}
-            height={element.height}
-            stroke={element.strokeColor}
-            strokeWidth={element.strokeWidth}
-            strokeDasharray={strokeDasharray}
-            fill={elFillColor}
-            rx={elCornerRadius}
-            opacity={elOpacity}
-            pointerEvents="stroke"
-          />
+          <g key={element.id}>
+            <rect
+              data-element-id={element.id}
+              x={element.x}
+              y={element.y}
+              width={element.width}
+              height={element.height}
+              stroke={element.strokeColor}
+              strokeWidth={element.strokeWidth}
+              strokeDasharray={strokeDasharray}
+              fill={elFillColor}
+              rx={elCornerRadius}
+              opacity={isMarkedForDeletion ? elOpacity * 0.3 : elOpacity}
+              pointerEvents="stroke"
+            />
+            {isMarkedForDeletion && (
+              <rect
+                x={element.x}
+                y={element.y}
+                width={element.width}
+                height={element.height}
+                fill="rgba(0, 0, 0, 0.7)"
+                rx={elCornerRadius}
+                pointerEvents="none"
+              />
+            )}
+          </g>
         );
       }
       case 'ellipse': {
@@ -1453,20 +1517,31 @@ export function Canvas({
         const cx = (element.x || 0) + (element.width || 0) / 2;
         const cy = (element.y || 0) + (element.height || 0) / 2;
         return (
-          <ellipse
-            key={element.id}
-            data-element-id={element.id}
-            cx={cx}
-            cy={cy}
-            rx={(element.width || 0) / 2}
-            ry={(element.height || 0) / 2}
-            stroke={element.strokeColor}
-            strokeWidth={element.strokeWidth}
-            strokeDasharray={strokeDasharray}
-            fill={elFillColor}
-            opacity={elOpacity}
-            pointerEvents="stroke"
-          />
+          <g key={element.id}>
+            <ellipse
+              data-element-id={element.id}
+              cx={cx}
+              cy={cy}
+              rx={(element.width || 0) / 2}
+              ry={(element.height || 0) / 2}
+              stroke={element.strokeColor}
+              strokeWidth={element.strokeWidth}
+              strokeDasharray={strokeDasharray}
+              fill={elFillColor}
+              opacity={isMarkedForDeletion ? elOpacity * 0.3 : elOpacity}
+              pointerEvents="stroke"
+            />
+            {isMarkedForDeletion && (
+              <ellipse
+                cx={cx}
+                cy={cy}
+                rx={(element.width || 0) / 2}
+                ry={(element.height || 0) / 2}
+                fill="rgba(0, 0, 0, 0.7)"
+                pointerEvents="none"
+              />
+            )}
+          </g>
         );
       }
       case 'text': {
@@ -1518,32 +1593,54 @@ export function Canvas({
                   fontFamily="inherit"
                   x={x + padding}
                   y={y + padding + baselineOffset + i * lineHeight}
-                  opacity={elOpacity}
+                  opacity={isMarkedForDeletion ? elOpacity * 0.3 : elOpacity}
                   pointerEvents="none"
                 >
                   {line}
                 </text>
               ))}
+              {isMarkedForDeletion && (
+                <rect
+                  x={x}
+                  y={y}
+                  width={element.width}
+                  height={element.height}
+                  fill="rgba(0, 0, 0, 0.7)"
+                  pointerEvents="none"
+                />
+              )}
             </g>
           );
         }
 
         // Render simple single-line text
         return (
-          <text
-            key={element.id}
-            data-element-id={element.id}
-            opacity={elOpacity}
-            fill={element.strokeColor}
-            fontSize={fontSize}
-            fontFamily="inherit"
-            x={0}
-            y={baselineOffset}
-            transform={`translate(${x}, ${y}) scale(${scaleX}, ${scaleY})`}
-            pointerEvents="auto"
-          >
-            {element.text}
-          </text>
+          <g key={element.id}>
+            <text
+              data-element-id={element.id}
+              opacity={isMarkedForDeletion ? elOpacity * 0.3 : elOpacity}
+              fill={element.strokeColor}
+              fontSize={fontSize}
+              fontFamily="inherit"
+              x={0}
+              y={baselineOffset}
+              transform={`translate(${x}, ${y}) scale(${scaleX}, ${scaleY})`}
+              pointerEvents="auto"
+            >
+              {element.text}
+            </text>
+            {isMarkedForDeletion && (
+              <rect
+                x={x}
+                y={y}
+                width={element.width ?? 100}
+                height={element.height ?? 30}
+                fill="rgba(0, 0, 0, 0.7)"
+                transform={`scale(${scaleX}, ${scaleY})`}
+                pointerEvents="none"
+              />
+            )}
+          </g>
         );
       }
       case 'frame': {
@@ -1564,7 +1661,7 @@ export function Canvas({
               strokeWidth={element.strokeWidth}
               fill={elFillColor}
               rx={elCornerRadius}
-              opacity={elOpacity}
+              opacity={isMarkedForDeletion ? elOpacity * 0.3 : elOpacity}
               strokeDasharray={strokeDasharray}
               pointerEvents="stroke"
             />
@@ -1576,11 +1673,22 @@ export function Canvas({
                 fontSize={14}
                 fontFamily="inherit"
                 fontWeight="600"
-                opacity={elOpacity}
+                opacity={isMarkedForDeletion ? elOpacity * 0.3 : elOpacity}
                 pointerEvents="none"
               >
                 {element.label}
               </text>
+            )}
+            {isMarkedForDeletion && (
+              <rect
+                x={element.x}
+                y={element.y}
+                width={element.width}
+                height={element.height}
+                fill="rgba(0, 0, 0, 0.7)"
+                rx={elCornerRadius}
+                pointerEvents="none"
+              />
             )}
           </g>
         );
@@ -1603,7 +1711,7 @@ export function Canvas({
               strokeWidth={element.strokeWidth}
               fill={elFillColor}
               rx={elCornerRadius}
-              opacity={elOpacity}
+              opacity={isMarkedForDeletion ? elOpacity * 0.3 : elOpacity}
               strokeDasharray={strokeDasharray}
               pointerEvents="auto"
             />
@@ -1615,11 +1723,22 @@ export function Canvas({
                 fontSize={12}
                 fontFamily="inherit"
                 textAnchor="middle"
-                opacity={elOpacity * 0.7}
+                opacity={isMarkedForDeletion ? elOpacity * 0.3 * 0.7 : elOpacity * 0.7}
                 pointerEvents="none"
               >
                 {element.url}
               </text>
+            )}
+            {isMarkedForDeletion && (
+              <rect
+                x={element.x}
+                y={element.y}
+                width={element.width}
+                height={element.height}
+                fill="rgba(0, 0, 0, 0.7)"
+                rx={elCornerRadius}
+                pointerEvents="none"
+              />
             )}
           </g>
         );
@@ -1635,15 +1754,23 @@ export function Canvas({
         });
         const pathData = getSvgPathFromStroke(stroke);
         return (
-          <path
-            key={element.id}
-            data-element-id={element.id}
-            d={pathData}
-            fill={element.strokeColor}
-            opacity={Math.max(0.3, elOpacity * 0.7)}
-            filter="url(#laser-glow)"
-            pointerEvents="auto"
-          />
+          <g key={element.id}>
+            <path
+              data-element-id={element.id}
+              d={pathData}
+              fill={element.strokeColor}
+              opacity={isMarkedForDeletion ? Math.max(0.3, elOpacity * 0.7) * 0.3 : Math.max(0.3, elOpacity * 0.7)}
+              filter="url(#laser-glow)"
+              pointerEvents="auto"
+            />
+            {isMarkedForDeletion && (
+              <path
+                d={pathData}
+                fill="rgba(0, 0, 0, 0.7)"
+                pointerEvents="none"
+              />
+            )}
+          </g>
         );
       }
       default:
