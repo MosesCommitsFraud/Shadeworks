@@ -28,6 +28,12 @@ export interface BoardElement {
   url?: string;
   // For laser pointer
   timestamp?: number;
+  // Style properties
+  opacity?: number;
+  strokeStyle?: 'solid' | 'dashed' | 'dotted';
+  cornerRadius?: number;
+  // Layer order
+  zIndex?: number;
 }
 
 export interface Cursor {

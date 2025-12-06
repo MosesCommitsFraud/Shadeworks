@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { Canvas } from './canvas';
 import { Toolbar } from './toolbar';
+import { ToolSidebar } from './tool-sidebar';
 import { CollaborationManager, type ConnectionStatus } from '@/lib/collaboration';
 import { generateFunnyName } from '@/lib/funny-names';
 import type { Tool, BoardElement } from '@/lib/board-types';
@@ -17,6 +18,10 @@ export function Whiteboard({ roomId }: WhiteboardProps) {
   const [tool, setTool] = useState<Tool>('select');
   const [strokeColor, setStrokeColor] = useState('#ffffff');
   const [strokeWidth, setStrokeWidth] = useState(4);
+  const [fillColor, setFillColor] = useState('transparent');
+  const [opacity, setOpacity] = useState(100);
+  const [strokeStyle, setStrokeStyle] = useState<'solid' | 'dashed' | 'dotted'>('solid');
+  const [cornerRadius, setCornerRadius] = useState(0);
   const [elements, setElements] = useState<BoardElement[]>([]);
   const [collaboration, setCollaboration] = useState<CollaborationManager | null>(null);
   const [connectedUsers, setConnectedUsers] = useState(1);
@@ -26,6 +31,7 @@ export function Whiteboard({ roomId }: WhiteboardProps) {
   const [collaboratorUsers, setCollaboratorUsers] = useState<Array<{ id: string; name: string; color: string; viewport?: { pan: { x: number; y: number }; zoom: number } }>>([]);
   const [isReady, setIsReady] = useState(false);
   const [followedUserId, setFollowedUserId] = useState<string | null>(null);
+  const [selectedElements, setSelectedElements] = useState<BoardElement[]>([]);
 
   // Undo/Redo stacks - store snapshots
   const undoStackRef = useRef<BoardElement[][]>([]);
@@ -229,6 +235,26 @@ export function Whiteboard({ roomId }: WhiteboardProps) {
     setFollowedUserId(prev => prev === userId ? null : userId);
   }, []);
 
+  const handleBringToFront = useCallback(() => {
+    if (selectedElements.length === 0) return;
+    saveToUndoStack();
+
+    const maxZIndex = Math.max(...elements.map(el => el.zIndex || 0), 0);
+    selectedElements.forEach((selectedEl) => {
+      handleUpdateElement(selectedEl.id, { zIndex: maxZIndex + 1 });
+    });
+  }, [selectedElements, elements, saveToUndoStack, handleUpdateElement]);
+
+  const handleSendToBack = useCallback(() => {
+    if (selectedElements.length === 0) return;
+    saveToUndoStack();
+
+    const minZIndex = Math.min(...elements.map(el => el.zIndex || 0), 0);
+    selectedElements.forEach((selectedEl) => {
+      handleUpdateElement(selectedEl.id, { zIndex: minZIndex - 1 });
+    });
+  }, [selectedElements, elements, saveToUndoStack, handleUpdateElement]);
+
   // Continuously track followed user's viewport
   useEffect(() => {
     if (!followedUserId || !setViewportRef.current) return;
@@ -295,11 +321,34 @@ export function Whiteboard({ roomId }: WhiteboardProps) {
         onFollowUser={handleFollowUser}
         followedUserId={followedUserId}
       />
-      
+
+      <ToolSidebar
+        selectedTool={tool}
+        strokeColor={strokeColor}
+        onStrokeColorChange={setStrokeColor}
+        strokeWidth={strokeWidth}
+        onStrokeWidthChange={setStrokeWidth}
+        fillColor={fillColor}
+        onFillColorChange={setFillColor}
+        opacity={opacity}
+        onOpacityChange={setOpacity}
+        strokeStyle={strokeStyle}
+        onStrokeStyleChange={setStrokeStyle}
+        cornerRadius={cornerRadius}
+        onCornerRadiusChange={setCornerRadius}
+        selectedElements={selectedElements}
+        onBringToFront={handleBringToFront}
+        onSendToBack={handleSendToBack}
+      />
+
       <Canvas
         tool={tool}
         strokeColor={strokeColor}
         strokeWidth={strokeWidth}
+        fillColor={fillColor}
+        opacity={opacity}
+        strokeStyle={strokeStyle}
+        cornerRadius={cornerRadius}
         collaboration={collaboration}
         elements={elements}
         onAddElement={handleAddElement}
@@ -312,6 +361,7 @@ export function Whiteboard({ roomId }: WhiteboardProps) {
         onSetViewport={(setter) => {
           setViewportRef.current = setter;
         }}
+        onSelectionChange={setSelectedElements}
       />
     </div>
   );

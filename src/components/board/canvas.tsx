@@ -11,6 +11,10 @@ interface CanvasProps {
   tool: Tool;
   strokeColor: string;
   strokeWidth: number;
+  fillColor?: string;
+  opacity?: number;
+  strokeStyle?: 'solid' | 'dashed' | 'dotted';
+  cornerRadius?: number;
   collaboration: CollaborationManager | null;
   elements: BoardElement[];
   onAddElement: (element: BoardElement) => void;
@@ -21,6 +25,7 @@ interface CanvasProps {
   onRedo?: () => void;
   onToolChange?: (tool: Tool) => void;
   onSetViewport?: (setter: (pan: { x: number; y: number }, zoom: number) => void) => void;
+  onSelectionChange?: (elements: BoardElement[]) => void;
 }
 
 interface RemoteCursor {
@@ -193,6 +198,10 @@ export function Canvas({
   tool,
   strokeColor,
   strokeWidth,
+  fillColor = 'transparent',
+  opacity = 100,
+  strokeStyle = 'solid',
+  cornerRadius = 0,
   collaboration,
   elements,
   onAddElement,
@@ -203,6 +212,7 @@ export function Canvas({
   onRedo,
   onToolChange,
   onSetViewport,
+  onSelectionChange,
 }: CanvasProps) {
   const svgRef = useRef<SVGSVGElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -913,6 +923,8 @@ export function Canvas({
         strokeColor,
         strokeWidth,
         timestamp: Date.now(),
+        opacity,
+        strokeStyle,
       };
       setCurrentElement(newElement);
       setIsDrawing(true);
@@ -925,6 +937,9 @@ export function Canvas({
       points: [point],
       strokeColor,
       strokeWidth,
+      opacity,
+      strokeStyle,
+      cornerRadius,
     };
 
     if (tool === 'rectangle' || tool === 'ellipse' || tool === 'frame' || tool === 'web-embed') {
@@ -932,11 +947,12 @@ export function Canvas({
       newElement.y = point.y;
       newElement.width = 0;
       newElement.height = 0;
+      newElement.fillColor = fillColor;
     }
 
     setCurrentElement(newElement);
     setIsDrawing(true);
-  }, [tool, strokeColor, strokeWidth, getMousePosition, elements, pan, selectedBounds, selectedElements, selectedIds, shiftPressed, onStartTransform, eraseAtPoint, onDeleteElement]);
+  }, [tool, strokeColor, strokeWidth, fillColor, opacity, strokeStyle, cornerRadius, getMousePosition, elements, pan, selectedBounds, selectedElements, selectedIds, shiftPressed, onStartTransform, eraseAtPoint, onDeleteElement]);
 
   const handleMouseUp = useCallback(() => {
     if (isPanning) {
@@ -1147,6 +1163,7 @@ export function Canvas({
           isTextBox: true,
           scaleX: 1,
           scaleY: 1,
+          opacity,
         };
         onAddElement(newElement);
 
@@ -1173,6 +1190,7 @@ export function Canvas({
           height: textHeight,
           scaleX: 1,
           scaleY: 1,
+          opacity,
         };
         onAddElement(newElement);
 
@@ -1185,7 +1203,7 @@ export function Canvas({
     }
     setTextInput(null);
     setTextValue('');
-  }, [textInput, textValue, strokeColor, strokeWidth, onAddElement, onToolChange, setSelectedIds, textInputRef, zoom]);
+  }, [textInput, textValue, strokeColor, strokeWidth, opacity, onAddElement, onToolChange, setSelectedIds, textInputRef, zoom]);
 
   // Auto-save text on blur or after typing stops
   const textSaveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -1230,19 +1248,23 @@ export function Canvas({
           streamline: 0.5,
         });
         const pathData = getSvgPathFromStroke(stroke);
+        const elOpacity = (element.opacity ?? 100) / 100;
         return (
           <path
             key={element.id}
             data-element-id={element.id}
             d={pathData}
             fill={element.strokeColor}
-            opacity={opacity}
+            opacity={elOpacity}
             pointerEvents="auto"
           />
         );
       }
       case 'line': {
         if (element.points.length < 2) return null;
+        const elOpacity = (element.opacity ?? 100) / 100;
+        const elStrokeStyle = element.strokeStyle || 'solid';
+        const strokeDasharray = elStrokeStyle === 'dashed' ? '10,10' : elStrokeStyle === 'dotted' ? '2,6' : 'none';
         return (
           <line
             key={element.id}
@@ -1254,12 +1276,18 @@ export function Canvas({
             stroke={element.strokeColor}
             strokeWidth={element.strokeWidth}
             strokeLinecap="round"
-            opacity={opacity}
+            strokeDasharray={strokeDasharray}
+            opacity={elOpacity}
             pointerEvents="stroke"
           />
         );
       }
       case 'rectangle': {
+        const elOpacity = (element.opacity ?? 100) / 100;
+        const elStrokeStyle = element.strokeStyle || 'solid';
+        const strokeDasharray = elStrokeStyle === 'dashed' ? '10,10' : elStrokeStyle === 'dotted' ? '2,6' : 'none';
+        const elCornerRadius = element.cornerRadius ?? 4;
+        const elFillColor = element.fillColor || 'none';
         return (
           <rect
             key={element.id}
@@ -1270,14 +1298,19 @@ export function Canvas({
             height={element.height}
             stroke={element.strokeColor}
             strokeWidth={element.strokeWidth}
-            fill="none"
-            rx={4}
-            opacity={opacity}
+            strokeDasharray={strokeDasharray}
+            fill={elFillColor}
+            rx={elCornerRadius}
+            opacity={elOpacity}
             pointerEvents="stroke"
           />
         );
       }
       case 'ellipse': {
+        const elOpacity = (element.opacity ?? 100) / 100;
+        const elStrokeStyle = element.strokeStyle || 'solid';
+        const strokeDasharray = elStrokeStyle === 'dashed' ? '10,10' : elStrokeStyle === 'dotted' ? '2,6' : 'none';
+        const elFillColor = element.fillColor || 'none';
         const cx = (element.x || 0) + (element.width || 0) / 2;
         const cy = (element.y || 0) + (element.height || 0) / 2;
         return (
@@ -1290,13 +1323,15 @@ export function Canvas({
             ry={(element.height || 0) / 2}
             stroke={element.strokeColor}
             strokeWidth={element.strokeWidth}
-            fill="none"
-            opacity={opacity}
+            strokeDasharray={strokeDasharray}
+            fill={elFillColor}
+            opacity={elOpacity}
             pointerEvents="stroke"
           />
         );
       }
       case 'text': {
+        const elOpacity = (element.opacity ?? 100) / 100;
         const fontSize = element.strokeWidth * 4 + 12;
         const scaleX = element.scaleX ?? 1;
         const scaleY = element.scaleY ?? 1;
@@ -1344,7 +1379,7 @@ export function Canvas({
                   fontFamily="inherit"
                   x={x + padding}
                   y={y + padding + baselineOffset + i * lineHeight}
-                  opacity={opacity}
+                  opacity={elOpacity}
                   pointerEvents="none"
                 >
                   {line}
@@ -1359,7 +1394,7 @@ export function Canvas({
           <text
             key={element.id}
             data-element-id={element.id}
-            opacity={opacity}
+            opacity={elOpacity}
             fill={element.strokeColor}
             fontSize={fontSize}
             fontFamily="inherit"
@@ -1373,6 +1408,11 @@ export function Canvas({
         );
       }
       case 'frame': {
+        const elOpacity = (element.opacity ?? 100) / 100;
+        const elStrokeStyle = element.strokeStyle || 'solid';
+        const strokeDasharray = elStrokeStyle === 'dashed' ? '8,4' : elStrokeStyle === 'dotted' ? '2,6' : '8,4'; // Frame defaults to dashed
+        const elCornerRadius = element.cornerRadius ?? 8;
+        const elFillColor = element.fillColor || 'none';
         return (
           <g key={element.id}>
             <rect
@@ -1383,10 +1423,10 @@ export function Canvas({
               height={element.height}
               stroke={element.strokeColor}
               strokeWidth={element.strokeWidth}
-              fill="none"
-              rx={8}
-              opacity={opacity}
-              strokeDasharray="8,4"
+              fill={elFillColor}
+              rx={elCornerRadius}
+              opacity={elOpacity}
+              strokeDasharray={strokeDasharray}
               pointerEvents="stroke"
             />
             {element.label && (
@@ -1397,6 +1437,7 @@ export function Canvas({
                 fontSize={14}
                 fontFamily="inherit"
                 fontWeight="600"
+                opacity={elOpacity}
                 pointerEvents="none"
               >
                 {element.label}
@@ -1406,6 +1447,11 @@ export function Canvas({
         );
       }
       case 'web-embed': {
+        const elOpacity = (element.opacity ?? 100) / 100;
+        const elStrokeStyle = element.strokeStyle || 'solid';
+        const strokeDasharray = elStrokeStyle === 'dashed' ? '10,10' : elStrokeStyle === 'dotted' ? '2,6' : 'none';
+        const elCornerRadius = element.cornerRadius ?? 4;
+        const elFillColor = element.fillColor || 'rgba(100, 100, 255, 0.05)';
         return (
           <g key={element.id}>
             <rect
@@ -1416,9 +1462,10 @@ export function Canvas({
               height={element.height}
               stroke={element.strokeColor}
               strokeWidth={element.strokeWidth}
-              fill="rgba(100, 100, 255, 0.05)"
-              rx={4}
-              opacity={opacity}
+              fill={elFillColor}
+              rx={elCornerRadius}
+              opacity={elOpacity}
+              strokeDasharray={strokeDasharray}
               pointerEvents="auto"
             />
             {element.url && (
@@ -1429,7 +1476,7 @@ export function Canvas({
                 fontSize={12}
                 fontFamily="inherit"
                 textAnchor="middle"
-                opacity={0.7}
+                opacity={elOpacity * 0.7}
                 pointerEvents="none"
               >
                 {element.url}
@@ -1440,6 +1487,7 @@ export function Canvas({
       }
       case 'laser': {
         if (element.points.length < 2) return null;
+        const elOpacity = (element.opacity ?? 100) / 100;
         const stroke = getStroke(element.points.map((p) => [p.x, p.y]), {
           size: 8,
           thinning: 0.3,
@@ -1453,7 +1501,7 @@ export function Canvas({
             data-element-id={element.id}
             d={pathData}
             fill={element.strokeColor}
-            opacity={Math.max(0.3, opacity * 0.7)}
+            opacity={Math.max(0.3, elOpacity * 0.7)}
             filter="url(#laser-glow)"
             pointerEvents="auto"
           />
@@ -1645,6 +1693,14 @@ export function Canvas({
     }
   };
 
+  // Update parent component when selection changes
+  useEffect(() => {
+    if (onSelectionChange) {
+      const selected = elements.filter(el => selectedIds.includes(el.id));
+      onSelectionChange(selected);
+    }
+  }, [selectedIds, elements, onSelectionChange]);
+
   return (
     <div ref={containerRef} className="relative w-full h-full overflow-hidden bg-[#0a0a0a]">
       {/* Grid Background */}
@@ -1680,8 +1736,8 @@ export function Canvas({
           </filter>
         </defs>
         <g transform={`translate(${pan.x}, ${pan.y}) scale(${zoom})`}>
-          {/* Render all elements */}
-          {elements.map((el) => renderElement(el))}
+          {/* Render all elements sorted by zIndex */}
+          {[...elements].sort((a, b) => (a.zIndex || 0) - (b.zIndex || 0)).map((el) => renderElement(el))}
 
           {/* Render current element being drawn */}
           {currentElement && renderElement(currentElement, true)}
