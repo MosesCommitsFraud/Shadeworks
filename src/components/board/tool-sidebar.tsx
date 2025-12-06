@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { ChevronLeft, ChevronRight, Circle, Minus, Square, Type, Pencil, ArrowUpToLine, ArrowDownToLine } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Circle, Minus, Square, Type, Pencil, ArrowUpToLine, ArrowDownToLine, X } from 'lucide-react';
 import { Tool, COLORS, STROKE_WIDTHS, BoardElement } from '@/lib/board-types';
 import { cn } from '@/lib/utils';
 
@@ -46,6 +46,10 @@ export function ToolSidebar({
   onSendToBack,
 }: ToolSidebarProps) {
   const [isCollapsed, setIsCollapsed] = useState(false);
+  const [showStrokeColorPicker, setShowStrokeColorPicker] = useState(false);
+  const [showFillColorPicker, setShowFillColorPicker] = useState(false);
+  const [customStrokeColor, setCustomStrokeColor] = useState(strokeColor);
+  const [customFillColor, setCustomFillColor] = useState(fillColor);
 
   // Don't show sidebar for non-adjustable tools
   if (!ADJUSTABLE_TOOLS.includes(selectedTool) && selectedElements.length === 0) {
@@ -102,13 +106,13 @@ export function ToolSidebar({
             <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
               Stroke Color
             </label>
-            <div className="grid grid-cols-5 gap-1.5">
+            <div className="flex flex-wrap gap-1">
               {COLORS.map((color) => (
                 <button
                   key={color}
                   onClick={() => onStrokeColorChange(color)}
                   className={cn(
-                    'w-10 h-10 rounded-lg border-2 transition-all duration-200 hover:scale-110 hover:shadow-lg',
+                    'w-7 h-7 rounded-lg border-2 transition-all duration-200 hover:scale-110 hover:shadow-lg',
                     strokeColor === color
                       ? 'border-accent shadow-lg scale-105'
                       : 'border-border/50'
@@ -117,52 +121,178 @@ export function ToolSidebar({
                   title={color}
                 />
               ))}
+              {/* Custom color picker */}
+              <button
+                onClick={() => setShowStrokeColorPicker(true)}
+                className="w-7 h-7 rounded-lg border-2 border-border/50 cursor-pointer transition-all duration-200 hover:scale-110 hover:shadow-lg"
+                style={{
+                  background: 'linear-gradient(135deg, #ff0000 0%, #ff7f00 14%, #ffff00 28%, #00ff00 42%, #0000ff 57%, #4b0082 71%, #9400d3 85%, #ff0000 100%)'
+                }}
+                title="Custom color"
+              />
             </div>
           </div>
 
+          {/* Stroke Color Picker Modal */}
+          {showStrokeColorPicker && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm" onClick={() => setShowStrokeColorPicker(false)}>
+              <div className="bg-card/95 backdrop-blur-md border border-border rounded-xl p-6 shadow-2xl w-80" onClick={(e) => e.stopPropagation()}>
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-sm font-semibold text-foreground">Custom Stroke Color</h3>
+                  <button onClick={() => setShowStrokeColorPicker(false)} className="text-muted-foreground hover:text-foreground transition-colors">
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+                <div className="space-y-4">
+                  <div>
+                    <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2 block">
+                      Color Picker
+                    </label>
+                    <input
+                      type="color"
+                      value={customStrokeColor}
+                      onChange={(e) => setCustomStrokeColor(e.target.value)}
+                      className="w-full h-24 rounded-lg border-2 border-border/50 cursor-pointer"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2 block">
+                      Hex Code
+                    </label>
+                    <input
+                      type="text"
+                      value={customStrokeColor}
+                      onChange={(e) => {
+                        const value = e.target.value;
+                        if (/^#[0-9A-F]{0,6}$/i.test(value)) {
+                          setCustomStrokeColor(value);
+                        }
+                      }}
+                      className="w-full px-3 py-2 bg-secondary/50 border-2 border-border/50 rounded-lg text-foreground font-mono text-sm focus:border-accent focus:outline-none transition-colors"
+                      placeholder="#FFFFFF"
+                    />
+                  </div>
+                  <button
+                    onClick={() => {
+                      onStrokeColorChange(customStrokeColor);
+                      setShowStrokeColorPicker(false);
+                    }}
+                    className="w-full px-4 py-2.5 bg-accent text-accent-foreground rounded-lg font-medium hover:bg-accent/90 transition-colors"
+                  >
+                    Apply Color
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Fill Color (for shapes) */}
           {showFill && onFillColorChange && (
-            <div className="space-y-2">
-              <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                Fill Color
-              </label>
-              <div className="grid grid-cols-5 gap-1.5">
-                {/* Transparent option */}
-                <button
-                  onClick={() => onFillColorChange('transparent')}
-                  className={cn(
-                    'w-10 h-10 rounded-lg border-2 transition-all duration-200 hover:scale-110 hover:shadow-lg relative',
-                    fillColor === 'transparent'
-                      ? 'border-accent shadow-lg scale-105'
-                      : 'border-border/50'
-                  )}
-                  style={{
-                    background: 'linear-gradient(45deg, #e5e5e5 25%, transparent 25%, transparent 75%, #e5e5e5 75%, #e5e5e5), linear-gradient(45deg, #e5e5e5 25%, transparent 25%, transparent 75%, #e5e5e5 75%, #e5e5e5)',
-                    backgroundSize: '8px 8px',
-                    backgroundPosition: '0 0, 4px 4px'
-                  }}
-                  title="Transparent"
-                >
-                  <div className="absolute inset-0 flex items-center justify-center">
-                    <div className="w-6 h-0.5 bg-red-500 rotate-45" />
-                  </div>
-                </button>
-                {COLORS.map((color) => (
+            <>
+              <div className="space-y-2">
+                <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                  Fill Color
+                </label>
+                <div className="flex flex-wrap gap-1">
+                  {/* Transparent option */}
                   <button
-                    key={`fill-${color}`}
-                    onClick={() => onFillColorChange(color)}
+                    onClick={() => onFillColorChange('transparent')}
                     className={cn(
-                      'w-10 h-10 rounded-lg border-2 transition-all duration-200 hover:scale-110 hover:shadow-lg',
-                      fillColor === color
+                      'w-7 h-7 rounded-lg border-2 transition-all duration-200 hover:scale-110 hover:shadow-lg relative',
+                      fillColor === 'transparent'
                         ? 'border-accent shadow-lg scale-105'
                         : 'border-border/50'
                     )}
-                    style={{ backgroundColor: color }}
-                    title={color}
+                    style={{
+                      background: 'linear-gradient(45deg, #e5e5e5 25%, transparent 25%, transparent 75%, #e5e5e5 75%, #e5e5e5), linear-gradient(45deg, #e5e5e5 25%, transparent 25%, transparent 75%, #e5e5e5 75%, #e5e5e5)',
+                      backgroundSize: '6px 6px',
+                      backgroundPosition: '0 0, 3px 3px'
+                    }}
+                    title="Transparent"
+                  >
+                    <div className="absolute inset-0 flex items-center justify-center">
+                      <div className="w-5 h-0.5 bg-red-500 rotate-45" />
+                    </div>
+                  </button>
+                  {COLORS.map((color) => (
+                    <button
+                      key={`fill-${color}`}
+                      onClick={() => onFillColorChange(color)}
+                      className={cn(
+                        'w-7 h-7 rounded-lg border-2 transition-all duration-200 hover:scale-110 hover:shadow-lg',
+                        fillColor === color
+                          ? 'border-accent shadow-lg scale-105'
+                          : 'border-border/50'
+                      )}
+                      style={{ backgroundColor: color }}
+                      title={color}
+                    />
+                  ))}
+                  {/* Custom color picker */}
+                  <button
+                    onClick={() => setShowFillColorPicker(true)}
+                    className="w-7 h-7 rounded-lg border-2 border-border/50 cursor-pointer transition-all duration-200 hover:scale-110 hover:shadow-lg"
+                    style={{
+                      background: 'linear-gradient(135deg, #ff0000 0%, #ff7f00 14%, #ffff00 28%, #00ff00 42%, #0000ff 57%, #4b0082 71%, #9400d3 85%, #ff0000 100%)'
+                    }}
+                    title="Custom fill color"
                   />
-                ))}
+                </div>
               </div>
-            </div>
+
+              {/* Fill Color Picker Modal */}
+              {showFillColorPicker && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm" onClick={() => setShowFillColorPicker(false)}>
+                  <div className="bg-card/95 backdrop-blur-md border border-border rounded-xl p-6 shadow-2xl w-80" onClick={(e) => e.stopPropagation()}>
+                    <div className="flex items-center justify-between mb-4">
+                      <h3 className="text-sm font-semibold text-foreground">Custom Fill Color</h3>
+                      <button onClick={() => setShowFillColorPicker(false)} className="text-muted-foreground hover:text-foreground transition-colors">
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
+                    <div className="space-y-4">
+                      <div>
+                        <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2 block">
+                          Color Picker
+                        </label>
+                        <input
+                          type="color"
+                          value={customFillColor === 'transparent' ? '#ffffff' : customFillColor}
+                          onChange={(e) => setCustomFillColor(e.target.value)}
+                          className="w-full h-24 rounded-lg border-2 border-border/50 cursor-pointer"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2 block">
+                          Hex Code
+                        </label>
+                        <input
+                          type="text"
+                          value={customFillColor === 'transparent' ? '' : customFillColor}
+                          onChange={(e) => {
+                            const value = e.target.value;
+                            if (/^#[0-9A-F]{0,6}$/i.test(value)) {
+                              setCustomFillColor(value);
+                            }
+                          }}
+                          className="w-full px-3 py-2 bg-secondary/50 border-2 border-border/50 rounded-lg text-foreground font-mono text-sm focus:border-accent focus:outline-none transition-colors"
+                          placeholder="#FFFFFF"
+                        />
+                      </div>
+                      <button
+                        onClick={() => {
+                          onFillColorChange(customFillColor);
+                          setShowFillColorPicker(false);
+                        }}
+                        className="w-full px-4 py-2.5 bg-accent text-accent-foreground rounded-lg font-medium hover:bg-accent/90 transition-colors"
+                      >
+                        Apply Color
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </>
           )}
 
           {/* Stroke Width */}
@@ -176,15 +306,15 @@ export function ToolSidebar({
                   key={width}
                   onClick={() => onStrokeWidthChange(width)}
                   className={cn(
-                    'flex-1 h-12 rounded-lg border-2 transition-all duration-200 flex items-center justify-center hover:bg-secondary/50',
+                    'flex-1 h-10 rounded-lg border-2 transition-all duration-200 flex items-center justify-center hover:bg-secondary/50',
                     strokeWidth === width
                       ? 'border-accent bg-secondary/50'
                       : 'border-border/50'
                   )}
                 >
                   <div
-                    className="rounded-full bg-foreground"
-                    style={{ width: width + 2, height: width + 2 }}
+                    className="w-full bg-foreground rounded-full mx-2"
+                    style={{ height: width }}
                   />
                 </button>
               ))}
