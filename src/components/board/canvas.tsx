@@ -496,12 +496,99 @@ export function Canvas({
     if (tool === 'eyedropper') {
       setEyedropperCursorPos({ x: e.clientX, y: e.clientY });
 
-      // Find element under cursor
+      // Find element under cursor - check if actually over stroke or fill
       const hoveredElement = [...elements].reverse().find(el => {
-        const bbox = getBoundingBox(el);
-        if (!bbox) return false;
-        return point.x >= bbox.x && point.x <= bbox.x + bbox.width &&
-               point.y >= bbox.y && point.y <= bbox.y + bbox.height;
+        if (el.type === 'pen') {
+          // For pen strokes, check if near any point
+          const threshold = el.strokeWidth + 2;
+          return el.points.some(p => {
+            const dx = point.x - p.x;
+            const dy = point.y - p.y;
+            return Math.sqrt(dx * dx + dy * dy) <= threshold;
+          });
+        }
+
+        if (el.type === 'line') {
+          // For lines, check distance to line segment
+          if (el.points.length < 2) return false;
+          const p1 = el.points[0];
+          const p2 = el.points[1];
+          const threshold = el.strokeWidth + 2;
+
+          // Calculate distance from point to line segment
+          const dx = p2.x - p1.x;
+          const dy = p2.y - p1.y;
+          const length = Math.sqrt(dx * dx + dy * dy);
+          if (length === 0) return false;
+
+          const t = Math.max(0, Math.min(1, ((point.x - p1.x) * dx + (point.y - p1.y) * dy) / (length * length)));
+          const projX = p1.x + t * dx;
+          const projY = p1.y + t * dy;
+          const dist = Math.sqrt((point.x - projX) ** 2 + (point.y - projY) ** 2);
+
+          return dist <= threshold;
+        }
+
+        if (el.type === 'rectangle' || el.type === 'frame' || el.type === 'web-embed') {
+          const x = el.x ?? 0;
+          const y = el.y ?? 0;
+          const width = el.width ?? 0;
+          const height = el.height ?? 0;
+          const hasFill = el.fillColor && el.fillColor !== 'transparent';
+
+          // Check if inside bounds
+          if (point.x < x || point.x > x + width || point.y < y || point.y > y + height) {
+            return false;
+          }
+
+          // If has fill, hovering anywhere inside counts
+          if (hasFill) {
+            return true;
+          }
+
+          // Otherwise, check if near stroke (edge)
+          const threshold = el.strokeWidth + 2;
+          const nearLeft = Math.abs(point.x - x) <= threshold;
+          const nearRight = Math.abs(point.x - (x + width)) <= threshold;
+          const nearTop = Math.abs(point.y - y) <= threshold;
+          const nearBottom = Math.abs(point.y - (y + height)) <= threshold;
+
+          return (nearLeft || nearRight) && point.y >= y - threshold && point.y <= y + height + threshold ||
+                 (nearTop || nearBottom) && point.x >= x - threshold && point.x <= x + width + threshold;
+        }
+
+        if (el.type === 'ellipse') {
+          const cx = (el.x ?? 0) + (el.width ?? 0) / 2;
+          const cy = (el.y ?? 0) + (el.height ?? 0) / 2;
+          const rx = (el.width ?? 0) / 2;
+          const ry = (el.height ?? 0) / 2;
+          const hasFill = el.fillColor && el.fillColor !== 'transparent';
+
+          // Check if point is on ellipse using ellipse equation
+          const normalizedX = (point.x - cx) / rx;
+          const normalizedY = (point.y - cy) / ry;
+          const distance = normalizedX * normalizedX + normalizedY * normalizedY;
+
+          // If has fill, anywhere inside the ellipse counts
+          if (hasFill && distance <= 1) {
+            return true;
+          }
+
+          // Otherwise check if near the stroke (perimeter)
+          const threshold = (el.strokeWidth + 2) / Math.max(rx, ry);
+          return Math.abs(distance - 1) <= threshold && distance <= 1 + threshold;
+        }
+
+        if (el.type === 'text') {
+          // For text, just use bounding box
+          const x = el.x ?? 0;
+          const y = el.y ?? 0;
+          const width = el.width ?? 100;
+          const height = el.height ?? 30;
+          return point.x >= x && point.x <= x + width && point.y >= y && point.y <= y + height;
+        }
+
+        return false;
       });
 
       if (hoveredElement) {
