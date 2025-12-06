@@ -15,7 +15,6 @@ import {
   Monitor,
   X,
   ExternalLink,
-  Terminal,
 } from 'lucide-react';
 import { useTheme } from 'next-themes';
 import {
@@ -96,12 +95,6 @@ export function BurgerMenu({
         handleExportImage();
       }
 
-      // Ctrl+/ - Toggle menu (Command Palette)
-      if (ctrlKey && e.key === '/') {
-        e.preventDefault();
-        setIsOpen(prev => !prev);
-      }
-
       // Ctrl+F - Find on canvas
       if (ctrlKey && e.key === 'f') {
         e.preventDefault();
@@ -128,7 +121,7 @@ export function BurgerMenu({
           className={cn(
             'p-2.5 rounded-lg transition-all duration-200',
             'bg-card/95 backdrop-blur-md border border-border',
-            'hover:bg-secondary/80 text-muted-foreground hover:text-foreground',
+            'hover:bg-muted/60 text-muted-foreground hover:text-foreground',
             'shadow-2xl'
           )}
           aria-label="Menu"
@@ -167,19 +160,7 @@ export function BurgerMenu({
         {/* Collaboration */}
         <DropdownMenuItem onClick={copyInviteLink}>
           <Share2 className="w-4 h-4" />
-          <span>{copied ? 'Link Copied!' : 'Live collaboration...'}</span>
-        </DropdownMenuItem>
-
-        <DropdownMenuSeparator />
-
-        {/* Command Palette */}
-        <DropdownMenuItem className="text-accent">
-          <Terminal className="w-4 h-4" />
-          <span>Command palette</span>
-          <div className="ml-auto flex gap-0.5">
-            <Kbd>{modKey}</Kbd>
-            <Kbd>/</Kbd>
-          </div>
+          <span>{copied ? 'Link Copied!' : 'Invite'}</span>
         </DropdownMenuItem>
 
         <DropdownMenuSeparator />
@@ -200,8 +181,8 @@ export function BurgerMenu({
           <Kbd className="ml-auto">?</Kbd>
         </DropdownMenuItem>
 
-        <DropdownMenuItem onClick={onClear} variant="destructive">
-          <RotateCcw className="w-4 h-4" />
+        <DropdownMenuItem onClick={onClear} className="text-red-400 dark:text-red-400">
+          <RotateCcw className="w-4 h-4 !text-red-400 dark:!text-red-400" />
           <span>Reset the canvas</span>
         </DropdownMenuItem>
 
@@ -224,113 +205,126 @@ export function BurgerMenu({
         <DropdownMenuSeparator />
 
         {/* Theme Selection */}
-        <DropdownMenuLabel>Theme</DropdownMenuLabel>
-        <div className="px-2 py-2 flex gap-2">
-          <button
-            onClick={() => setTheme('light')}
-            className={cn(
-              'flex-1 p-2 rounded-md transition-colors',
-              'hover:bg-secondary/80',
-              theme === 'light' ? 'bg-accent text-accent-foreground' : 'bg-secondary/40'
-            )}
-            aria-label="Light theme"
-          >
-            <Sun className="w-4 h-4 mx-auto" />
-          </button>
-          <button
-            onClick={() => setTheme('dark')}
-            className={cn(
-              'flex-1 p-2 rounded-md transition-colors',
-              'hover:bg-secondary/80',
-              theme === 'dark' ? 'bg-accent text-accent-foreground' : 'bg-secondary/40'
-            )}
-            aria-label="Dark theme"
-          >
-            <Moon className="w-4 h-4 mx-auto" />
-          </button>
-          <button
-            onClick={() => setTheme('system')}
-            className={cn(
-              'flex-1 p-2 rounded-md transition-colors',
-              'hover:bg-secondary/80',
-              theme === 'system' ? 'bg-accent text-accent-foreground' : 'bg-secondary/40'
-            )}
-            aria-label="System theme"
-          >
-            <Monitor className="w-4 h-4 mx-auto" />
-          </button>
+        <div className="px-2 py-1.5 flex items-center justify-between gap-2">
+          <DropdownMenuLabel className="p-0 m-0">Theme</DropdownMenuLabel>
+          <div className="flex items-center bg-secondary/40 rounded-md p-0.5 gap-0.5">
+            <button
+              onClick={() => setTheme('light')}
+              className={cn(
+                'w-7 h-7 rounded-sm transition-all flex items-center justify-center',
+                theme === 'light' ? 'bg-accent text-accent-foreground shadow-sm' : 'hover:bg-muted/60'
+              )}
+              aria-label="Light theme"
+            >
+              <Sun className="w-3.5 h-3.5" />
+            </button>
+            <button
+              onClick={() => setTheme('dark')}
+              className={cn(
+                'w-7 h-7 rounded-sm transition-all flex items-center justify-center',
+                theme === 'dark' ? 'bg-accent text-accent-foreground shadow-sm' : 'hover:bg-muted/60'
+              )}
+              aria-label="Dark theme"
+            >
+              <Moon className="w-3.5 h-3.5" />
+            </button>
+            <button
+              onClick={() => setTheme('system')}
+              className={cn(
+                'w-7 h-7 rounded-sm transition-all flex items-center justify-center',
+                theme === 'system' ? 'bg-accent text-accent-foreground shadow-sm' : 'hover:bg-muted/60'
+              )}
+              aria-label="System theme"
+            >
+              <Monitor className="w-3.5 h-3.5" />
+            </button>
+          </div>
         </div>
 
         <DropdownMenuSeparator />
 
         {/* Canvas Background */}
-        <DropdownMenuLabel>Canvas background</DropdownMenuLabel>
-        <div className="px-2 py-2 flex gap-2">
-          <button
-            onClick={() => onCanvasBackgroundChange('none')}
-            className={cn(
-              'flex-1 h-8 rounded-md transition-all border-2',
-              'bg-background',
-              canvasBackground === 'none'
-                ? 'border-accent ring-2 ring-accent/20'
-                : 'border-border hover:border-accent/50'
-            )}
-            aria-label="No background"
-            title="None"
-          >
-            <X className="w-3 h-3 mx-auto text-muted-foreground" />
-          </button>
-          <button
-            onClick={() => onCanvasBackgroundChange('dots')}
-            className={cn(
-              'flex-1 h-8 rounded-md transition-all border-2',
-              'bg-background',
-              canvasBackground === 'dots'
-                ? 'border-accent ring-2 ring-accent/20'
-                : 'border-border hover:border-accent/50'
-            )}
-            style={{
-              backgroundImage: 'radial-gradient(circle, currentColor 1px, transparent 1px)',
-              backgroundSize: '8px 8px',
-            }}
-            aria-label="Dots background"
-            title="Dots"
-          />
-          <button
-            onClick={() => onCanvasBackgroundChange('lines')}
-            className={cn(
-              'flex-1 h-8 rounded-md transition-all border-2',
-              'bg-background',
-              canvasBackground === 'lines'
-                ? 'border-accent ring-2 ring-accent/20'
-                : 'border-border hover:border-accent/50'
-            )}
-            style={{
-              backgroundImage: 'linear-gradient(to bottom, currentColor 1px, transparent 1px)',
-              backgroundSize: '8px 8px',
-            }}
-            aria-label="Lines background"
-            title="Lines"
-          />
-          <button
-            onClick={() => onCanvasBackgroundChange('grid')}
-            className={cn(
-              'flex-1 h-8 rounded-md transition-all border-2',
-              'bg-background',
-              canvasBackground === 'grid'
-                ? 'border-accent ring-2 ring-accent/20'
-                : 'border-border hover:border-accent/50'
-            )}
-            style={{
-              backgroundImage: `
-                linear-gradient(to right, currentColor 1px, transparent 1px),
-                linear-gradient(to bottom, currentColor 1px, transparent 1px)
-              `,
-              backgroundSize: '8px 8px',
-            }}
-            aria-label="Grid background"
-            title="Grid"
-          />
+        <div className="px-2 py-1.5 flex items-center justify-between gap-2">
+          <DropdownMenuLabel className="p-0 m-0">Canvas</DropdownMenuLabel>
+          <div className="flex gap-0.5">
+            <button
+              onClick={() => onCanvasBackgroundChange('none')}
+              className={cn(
+                'w-7 h-7 rounded-sm transition-all border-2 overflow-hidden flex items-center justify-center',
+                'bg-background',
+                canvasBackground === 'none'
+                  ? 'border-accent ring-2 ring-accent/20'
+                  : 'border-border hover:bg-muted/60'
+              )}
+              aria-label="No background"
+              title="None"
+            >
+              <X className="w-3 h-3 text-muted-foreground" />
+            </button>
+            <button
+              onClick={() => onCanvasBackgroundChange('dots')}
+              className={cn(
+                'w-7 h-7 rounded-sm transition-all border-2 overflow-hidden',
+                'bg-background',
+                canvasBackground === 'dots'
+                  ? 'border-accent ring-2 ring-accent/20'
+                  : 'border-border hover:bg-muted/60'
+              )}
+              aria-label="Dots background"
+              title="Dots"
+            >
+              <div
+                className="w-full h-full"
+                style={{
+                  backgroundImage: 'radial-gradient(circle, currentColor 1px, transparent 1px)',
+                  backgroundSize: '6px 6px',
+                }}
+              />
+            </button>
+            <button
+              onClick={() => onCanvasBackgroundChange('lines')}
+              className={cn(
+                'w-7 h-7 rounded-sm transition-all border-2 overflow-hidden',
+                'bg-background',
+                canvasBackground === 'lines'
+                  ? 'border-accent ring-2 ring-accent/20'
+                  : 'border-border hover:bg-muted/60'
+              )}
+              aria-label="Lines background"
+              title="Lines"
+            >
+              <div
+                className="w-full h-full"
+                style={{
+                  backgroundImage: 'linear-gradient(to bottom, currentColor 1px, transparent 1px)',
+                  backgroundSize: '6px 6px',
+                }}
+              />
+            </button>
+            <button
+              onClick={() => onCanvasBackgroundChange('grid')}
+              className={cn(
+                'w-7 h-7 rounded-sm transition-all border-2 overflow-hidden',
+                'bg-background',
+                canvasBackground === 'grid'
+                  ? 'border-accent ring-2 ring-accent/20'
+                  : 'border-border hover:bg-muted/60'
+              )}
+              aria-label="Grid background"
+              title="Grid"
+            >
+              <div
+                className="w-full h-full"
+                style={{
+                  backgroundImage: `
+                    linear-gradient(to right, currentColor 1px, transparent 1px),
+                    linear-gradient(to bottom, currentColor 1px, transparent 1px)
+                  `,
+                  backgroundSize: '6px 6px',
+                }}
+              />
+            </button>
+          </div>
         </div>
       </DropdownMenuContent>
     </DropdownMenu>
