@@ -235,10 +235,6 @@ export function Canvas({
   const [lassoPoints, setLassoPoints] = useState<Point[]>([]);
   const [lastMousePos, setLastMousePos] = useState<Point>({ x: 0, y: 0 });
 
-  // Eyedropper state
-  const [eyedropperHoverColor, setEyedropperHoverColor] = useState<string | null>(null);
-  const [eyedropperCursorPos, setEyedropperCursorPos] = useState<Point | null>(null);
-
   // Eraser preview state
   const [eraserMarkedIds, setEraserMarkedIds] = useState<Set<string>>(new Set());
 
@@ -370,14 +366,6 @@ export function Canvas({
     collaboration.updateViewport(pan, zoom);
   }, [collaboration, pan, zoom]);
 
-  // Clear eyedropper state when tool changes
-  useEffect(() => {
-    if (tool !== 'eyedropper') {
-      setEyedropperHoverColor(null);
-      setEyedropperCursorPos(null);
-    }
-  }, [tool]);
-
   // Clear eraser marked IDs when tool changes
   useEffect(() => {
     if (tool !== 'eraser') {
@@ -499,113 +487,6 @@ export function Canvas({
 
     if (collaboration) {
       collaboration.updateCursor(point.x, point.y);
-    }
-
-    // Handle eyedropper hover
-    if (tool === 'eyedropper') {
-      setEyedropperCursorPos({ x: e.clientX, y: e.clientY });
-
-      // Find element under cursor - check if actually over stroke or fill
-      const hoveredElement = [...elements].reverse().find(el => {
-        if (el.type === 'pen') {
-          // For pen strokes, check if near any point
-          const threshold = el.strokeWidth + 2;
-          return el.points.some(p => {
-            const dx = point.x - p.x;
-            const dy = point.y - p.y;
-            return Math.sqrt(dx * dx + dy * dy) <= threshold;
-          });
-        }
-
-        if (el.type === 'line') {
-          // For lines, check distance to line segment
-          if (el.points.length < 2) return false;
-          const p1 = el.points[0];
-          const p2 = el.points[1];
-          const threshold = el.strokeWidth + 2;
-
-          // Calculate distance from point to line segment
-          const dx = p2.x - p1.x;
-          const dy = p2.y - p1.y;
-          const length = Math.sqrt(dx * dx + dy * dy);
-          if (length === 0) return false;
-
-          const t = Math.max(0, Math.min(1, ((point.x - p1.x) * dx + (point.y - p1.y) * dy) / (length * length)));
-          const projX = p1.x + t * dx;
-          const projY = p1.y + t * dy;
-          const dist = Math.sqrt((point.x - projX) ** 2 + (point.y - projY) ** 2);
-
-          return dist <= threshold;
-        }
-
-        if (el.type === 'rectangle' || el.type === 'frame' || el.type === 'web-embed') {
-          const x = el.x ?? 0;
-          const y = el.y ?? 0;
-          const width = el.width ?? 0;
-          const height = el.height ?? 0;
-          const hasFill = el.fillColor && el.fillColor !== 'transparent';
-
-          // Check if inside bounds
-          if (point.x < x || point.x > x + width || point.y < y || point.y > y + height) {
-            return false;
-          }
-
-          // If has fill, hovering anywhere inside counts
-          if (hasFill) {
-            return true;
-          }
-
-          // Otherwise, check if near stroke (edge)
-          const threshold = el.strokeWidth + 2;
-          const nearLeft = Math.abs(point.x - x) <= threshold;
-          const nearRight = Math.abs(point.x - (x + width)) <= threshold;
-          const nearTop = Math.abs(point.y - y) <= threshold;
-          const nearBottom = Math.abs(point.y - (y + height)) <= threshold;
-
-          return (nearLeft || nearRight) && point.y >= y - threshold && point.y <= y + height + threshold ||
-                 (nearTop || nearBottom) && point.x >= x - threshold && point.x <= x + width + threshold;
-        }
-
-        if (el.type === 'ellipse') {
-          const cx = (el.x ?? 0) + (el.width ?? 0) / 2;
-          const cy = (el.y ?? 0) + (el.height ?? 0) / 2;
-          const rx = (el.width ?? 0) / 2;
-          const ry = (el.height ?? 0) / 2;
-          const hasFill = el.fillColor && el.fillColor !== 'transparent';
-
-          // Check if point is on ellipse using ellipse equation
-          const normalizedX = (point.x - cx) / rx;
-          const normalizedY = (point.y - cy) / ry;
-          const distance = normalizedX * normalizedX + normalizedY * normalizedY;
-
-          // If has fill, anywhere inside the ellipse counts
-          if (hasFill && distance <= 1) {
-            return true;
-          }
-
-          // Otherwise check if near the stroke (perimeter)
-          const threshold = (el.strokeWidth + 2) / Math.max(rx, ry);
-          return Math.abs(distance - 1) <= threshold && distance <= 1 + threshold;
-        }
-
-        if (el.type === 'text') {
-          // For text, just use bounding box
-          const x = el.x ?? 0;
-          const y = el.y ?? 0;
-          const width = el.width ?? 100;
-          const height = el.height ?? 30;
-          return point.x >= x && point.x <= x + width && point.y >= y && point.y <= y + height;
-        }
-
-        return false;
-      });
-
-      if (hoveredElement) {
-        setEyedropperHoverColor(hoveredElement.strokeColor);
-      } else {
-        setEyedropperHoverColor(null);
-      }
-      return;
     }
 
     // Handle panning
@@ -877,28 +758,6 @@ export function Canvas({
         });
         break;
       }
-      case 'frame':
-      case 'web-embed': {
-        const width = point.x - startPoint.x;
-        const height = point.y - startPoint.y;
-        let finalWidth = Math.abs(width);
-        let finalHeight = Math.abs(height);
-
-        if (shiftPressed) {
-          const size = Math.max(finalWidth, finalHeight);
-          finalWidth = size;
-          finalHeight = size;
-        }
-
-        setCurrentElement({
-          ...currentElement,
-          x: width < 0 ? startPoint.x - finalWidth : startPoint.x,
-          y: height < 0 ? startPoint.y - finalHeight : startPoint.y,
-          width: finalWidth,
-          height: finalHeight,
-        });
-        break;
-      }
       case 'laser': {
         setCurrentElement({
           ...currentElement,
@@ -1058,21 +917,6 @@ export function Canvas({
       return;
     }
 
-    if (tool === 'eyedropper') {
-      // Pick color from clicked element
-      if (clickedElement) {
-        onStrokeColorChange?.(clickedElement.strokeColor);
-        if (clickedElement.fillColor && clickedElement.fillColor !== 'transparent') {
-          onFillColorChange?.(clickedElement.fillColor);
-        }
-        // Switch back to select tool
-        if (onToolChange) {
-          onToolChange('select');
-        }
-      }
-      return;
-    }
-
     if (tool === 'laser') {
       const newElement: BoardElement = {
         id: uuid(),
@@ -1091,7 +935,7 @@ export function Canvas({
 
     const newElement: BoardElement = {
       id: uuid(),
-      type: tool as 'pen' | 'line' | 'rectangle' | 'ellipse' | 'frame' | 'web-embed',
+      type: tool as 'pen' | 'line' | 'rectangle' | 'ellipse' | 'text',
       points: [point],
       strokeColor,
       strokeWidth,
@@ -1100,7 +944,7 @@ export function Canvas({
       cornerRadius,
     };
 
-    if (tool === 'rectangle' || tool === 'ellipse' || tool === 'frame' || tool === 'web-embed') {
+    if (tool === 'rectangle' || tool === 'ellipse') {
       newElement.x = point.x;
       newElement.y = point.y;
       newElement.width = 0;
@@ -1253,7 +1097,7 @@ export function Canvas({
         }, 2000);
         // Don't switch tool for laser
       } else if (
-        (currentElement.type === 'rectangle' || currentElement.type === 'ellipse' || currentElement.type === 'frame' || currentElement.type === 'web-embed') &&
+        (currentElement.type === 'rectangle' || currentElement.type === 'ellipse') &&
         currentElement.width &&
         currentElement.height &&
         currentElement.width > 2 &&
@@ -1941,8 +1785,6 @@ export function Canvas({
       case 'line':
       case 'rectangle':
       case 'ellipse':
-      case 'frame':
-      case 'web-embed':
         return 'crosshair';
       case 'eraser':
         return 'cell';
@@ -2206,27 +2048,6 @@ export function Canvas({
       <div className="absolute bottom-4 right-4 text-xs text-muted-foreground bg-card/80 backdrop-blur-sm px-3 py-1.5 rounded-lg border border-border">
         Ctrl+Scroll to zoom • Two-finger/Middle-click to pan
       </div>
-
-      {/* Eyedropper color preview box */}
-      {tool === 'eyedropper' && eyedropperCursorPos && eyedropperHoverColor && (
-        <div
-          className="fixed pointer-events-none z-[10000]"
-          style={{
-            left: eyedropperCursorPos.x + 20,
-            top: eyedropperCursorPos.y + 20,
-          }}
-        >
-          <div className="bg-card border-2 border-border rounded-lg shadow-2xl p-2 flex flex-col gap-1">
-            <div
-              className="w-16 h-16 rounded border-2 border-border/50"
-              style={{ backgroundColor: eyedropperHoverColor }}
-            />
-            <div className="text-xs font-mono text-center text-foreground px-1">
-              {eyedropperHoverColor}
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

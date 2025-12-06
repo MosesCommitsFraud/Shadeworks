@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { ChevronLeft, ChevronRight, Circle, Minus, Square, Type, Pencil, ArrowUpToLine, ArrowDownToLine, X, Pipette } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Circle, Minus, Square, Type, Pencil, ArrowUpToLine, ArrowDownToLine, X } from 'lucide-react';
 import { Tool, COLORS, STROKE_WIDTHS, BoardElement } from '@/lib/board-types';
 import { cn } from '@/lib/utils';
 
@@ -22,11 +22,10 @@ interface ToolSidebarProps {
   selectedElements?: BoardElement[];
   onBringToFront?: () => void;
   onSendToBack?: () => void;
-  onToolChange?: (tool: Tool) => void;
 }
 
 // Tools that have adjustable properties
-const ADJUSTABLE_TOOLS: Tool[] = ['pen', 'line', 'rectangle', 'ellipse', 'text', 'frame'];
+const ADJUSTABLE_TOOLS: Tool[] = ['pen', 'line', 'rectangle', 'ellipse', 'text'];
 
 export function ToolSidebar({
   selectedTool,
@@ -45,7 +44,6 @@ export function ToolSidebar({
   selectedElements = [],
   onBringToFront,
   onSendToBack,
-  onToolChange,
 }: ToolSidebarProps) {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [showStrokeColorPicker, setShowStrokeColorPicker] = useState(false);
@@ -63,11 +61,11 @@ export function ToolSidebar({
   // Determine what controls to show based on selected elements or current tool
   const showFill = hasSelectedElements
     ? selectedElements.some(el => el.type === 'rectangle' || el.type === 'ellipse' || el.type === 'frame')
-    : selectedTool === 'rectangle' || selectedTool === 'ellipse' || selectedTool === 'frame';
+    : selectedTool === 'rectangle' || selectedTool === 'ellipse';
 
   const showCornerRadius = hasSelectedElements
     ? selectedElements.some(el => el.type === 'rectangle' || el.type === 'frame')
-    : selectedTool === 'rectangle' || selectedTool === 'frame';
+    : selectedTool === 'rectangle';
 
   return (
     <>
@@ -400,18 +398,6 @@ export function ToolSidebar({
               <div className="flex gap-2">
                 <button
                   onClick={() => {
-                    if (onToolChange) {
-                      onToolChange('eyedropper');
-                      setShowStrokeColorPicker(false);
-                    }
-                  }}
-                  className="px-4 py-2.5 bg-secondary text-foreground rounded-lg font-medium hover:bg-secondary/80 transition-colors flex items-center gap-2"
-                >
-                  <Pipette className="w-4 h-4" />
-                  Pick
-                </button>
-                <button
-                  onClick={() => {
                     onStrokeColorChange(customStrokeColor);
                     setShowStrokeColorPicker(false);
                   }}
@@ -481,18 +467,6 @@ export function ToolSidebar({
                 />
               </div>
               <div className="flex gap-2">
-                <button
-                  onClick={() => {
-                    if (onToolChange) {
-                      onToolChange('eyedropper');
-                      setShowFillColorPicker(false);
-                    }
-                  }}
-                  className="px-4 py-2.5 bg-secondary text-foreground rounded-lg font-medium hover:bg-secondary/80 transition-colors flex items-center gap-2"
-                >
-                  <Pipette className="w-4 h-4" />
-                  Pick
-                </button>
                 <button
                   onClick={() => {
                     if (onFillColorChange) {
