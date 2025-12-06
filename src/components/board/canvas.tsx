@@ -234,7 +234,11 @@ export function Canvas({
   const textInputRef = useRef<HTMLTextAreaElement>(null);
   const [lassoPoints, setLassoPoints] = useState<Point[]>([]);
   const [lastMousePos, setLastMousePos] = useState<Point>({ x: 0, y: 0 });
-  
+
+  // Eyedropper state
+  const [eyedropperHoverColor, setEyedropperHoverColor] = useState<string | null>(null);
+  const [eyedropperCursorPos, setEyedropperCursorPos] = useState<Point | null>(null);
+
   // Move and resize state
   const [isDragging, setIsDragging] = useState(false);
   const [isResizing, setIsResizing] = useState(false);
@@ -363,6 +367,14 @@ export function Canvas({
     collaboration.updateViewport(pan, zoom);
   }, [collaboration, pan, zoom]);
 
+  // Clear eyedropper state when tool changes
+  useEffect(() => {
+    if (tool !== 'eyedropper') {
+      setEyedropperHoverColor(null);
+      setEyedropperCursorPos(null);
+    }
+  }, [tool]);
+
   // Expose viewport setter to parent component
   useEffect(() => {
     if (onSetViewport) {
@@ -478,6 +490,26 @@ export function Canvas({
 
     if (collaboration) {
       collaboration.updateCursor(point.x, point.y);
+    }
+
+    // Handle eyedropper hover
+    if (tool === 'eyedropper') {
+      setEyedropperCursorPos({ x: e.clientX, y: e.clientY });
+
+      // Find element under cursor
+      const hoveredElement = [...elements].reverse().find(el => {
+        const bbox = getBoundingBox(el);
+        if (!bbox) return false;
+        return point.x >= bbox.x && point.x <= bbox.x + bbox.width &&
+               point.y >= bbox.y && point.y <= bbox.y + bbox.height;
+      });
+
+      if (hoveredElement) {
+        setEyedropperHoverColor(hoveredElement.strokeColor);
+      } else {
+        setEyedropperHoverColor(null);
+      }
+      return;
     }
 
     // Handle panning
@@ -1959,6 +1991,27 @@ export function Canvas({
       <div className="absolute bottom-4 right-4 text-xs text-muted-foreground bg-card/80 backdrop-blur-sm px-3 py-1.5 rounded-lg border border-border">
         Ctrl+Scroll to zoom • Two-finger/Middle-click to pan
       </div>
+
+      {/* Eyedropper color preview box */}
+      {tool === 'eyedropper' && eyedropperCursorPos && eyedropperHoverColor && (
+        <div
+          className="fixed pointer-events-none z-[10000]"
+          style={{
+            left: eyedropperCursorPos.x + 20,
+            top: eyedropperCursorPos.y + 20,
+          }}
+        >
+          <div className="bg-card border-2 border-border rounded-lg shadow-2xl p-2 flex flex-col gap-1">
+            <div
+              className="w-16 h-16 rounded border-2 border-border/50"
+              style={{ backgroundColor: eyedropperHoverColor }}
+            />
+            <div className="text-xs font-mono text-center text-foreground px-1">
+              {eyedropperHoverColor}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

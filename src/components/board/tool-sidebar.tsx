@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { ChevronLeft, ChevronRight, Circle, Minus, Square, Type, Pencil, ArrowUpToLine, ArrowDownToLine, X } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Circle, Minus, Square, Type, Pencil, ArrowUpToLine, ArrowDownToLine, X, Pipette } from 'lucide-react';
 import { Tool, COLORS, STROKE_WIDTHS, BoardElement } from '@/lib/board-types';
 import { cn } from '@/lib/utils';
 
@@ -22,6 +22,7 @@ interface ToolSidebarProps {
   selectedElements?: BoardElement[];
   onBringToFront?: () => void;
   onSendToBack?: () => void;
+  onToolChange?: (tool: Tool) => void;
 }
 
 // Tools that have adjustable properties
@@ -44,6 +45,7 @@ export function ToolSidebar({
   selectedElements = [],
   onBringToFront,
   onSendToBack,
+  onToolChange,
 }: ToolSidebarProps) {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [showStrokeColorPicker, setShowStrokeColorPicker] = useState(false);
@@ -68,13 +70,14 @@ export function ToolSidebar({
     : selectedTool === 'rectangle' || selectedTool === 'frame';
 
   return (
-    <div
-      className={cn(
-        'fixed right-4 top-1/2 -translate-y-1/2 z-40 transition-all duration-300 ease-out',
-        isCollapsed ? 'translate-x-[calc(100%-3rem)]' : 'translate-x-0'
-      )}
-    >
-      <div className="relative bg-card/95 backdrop-blur-md border border-border rounded-2xl shadow-2xl overflow-hidden">
+    <>
+      <div
+        className={cn(
+          'fixed right-4 top-1/2 -translate-y-1/2 z-40 transition-all duration-300 ease-out',
+          isCollapsed ? 'translate-x-[calc(100%-3rem)]' : 'translate-x-0'
+        )}
+      >
+        <div className="relative bg-card/95 backdrop-blur-md border border-border rounded-2xl shadow-2xl overflow-hidden">
         {/* Collapse/Expand Button */}
         <button
           onClick={() => setIsCollapsed(!isCollapsed)}
@@ -137,61 +140,6 @@ export function ToolSidebar({
             </div>
           </div>
 
-          {/* Stroke Color Picker Modal */}
-          {showStrokeColorPicker && (
-            <>
-              <div className="fixed inset-0 z-[60] bg-black/50" onClick={() => setShowStrokeColorPicker(false)} />
-              <div
-                className="fixed right-[280px] top-1/2 -translate-y-1/2 z-[70] bg-card border border-border rounded-xl p-6 shadow-2xl w-80"
-                onClick={(e) => e.stopPropagation()}
-              >
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-sm font-semibold text-foreground">Custom Stroke Color</h3>
-                  <button onClick={() => setShowStrokeColorPicker(false)} className="text-muted-foreground hover:text-foreground transition-colors">
-                    <X className="w-4 h-4" />
-                  </button>
-                </div>
-                <div className="space-y-4">
-                  <div>
-                    <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2 block">
-                      Hex Code
-                    </label>
-                    <input
-                      type="text"
-                      value={customStrokeColor}
-                      onChange={(e) => {
-                        const value = e.target.value;
-                        if (/^#[0-9A-F]{0,6}$/i.test(value)) {
-                          setCustomStrokeColor(value);
-                        }
-                      }}
-                      className="w-full px-3 py-2 bg-secondary/50 border-2 border-border/50 rounded-lg text-foreground font-mono text-sm focus:border-accent focus:outline-none transition-colors"
-                      placeholder="#FFFFFF"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2 block">
-                      Preview
-                    </label>
-                    <div
-                      className="w-full h-16 rounded-lg border-2 border-border/50"
-                      style={{ backgroundColor: customStrokeColor }}
-                    />
-                  </div>
-                  <button
-                    onClick={() => {
-                      onStrokeColorChange(customStrokeColor);
-                      setShowStrokeColorPicker(false);
-                    }}
-                    className="w-full px-4 py-2.5 bg-accent text-accent-foreground rounded-lg font-medium hover:bg-accent/90 transition-colors"
-                  >
-                    Apply Color
-                  </button>
-                </div>
-              </div>
-            </>
-          )}
-
           {/* Fill Color (for shapes) */}
           {showFill && onFillColorChange && (
             <>
@@ -249,61 +197,6 @@ export function ToolSidebar({
                   </button>
                 </div>
               </div>
-
-              {/* Fill Color Picker Modal */}
-              {showFillColorPicker && (
-                <>
-                  <div className="fixed inset-0 z-50 bg-black/50" onClick={() => setShowFillColorPicker(false)} />
-                  <div
-                    className="fixed right-[280px] top-1/2 -translate-y-1/2 z-50 bg-card border border-border rounded-xl p-6 shadow-2xl w-80"
-                    onClick={(e) => e.stopPropagation()}
-                  >
-                    <div className="flex items-center justify-between mb-4">
-                      <h3 className="text-sm font-semibold text-foreground">Custom Fill Color</h3>
-                      <button onClick={() => setShowFillColorPicker(false)} className="text-muted-foreground hover:text-foreground transition-colors">
-                        <X className="w-4 h-4" />
-                      </button>
-                    </div>
-                    <div className="space-y-4">
-                      <div>
-                        <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2 block">
-                          Hex Code
-                        </label>
-                        <input
-                          type="text"
-                          value={customFillColor === 'transparent' ? '' : customFillColor}
-                          onChange={(e) => {
-                            const value = e.target.value;
-                            if (/^#[0-9A-F]{0,6}$/i.test(value)) {
-                              setCustomFillColor(value);
-                            }
-                          }}
-                          className="w-full px-3 py-2 bg-secondary/50 border-2 border-border/50 rounded-lg text-foreground font-mono text-sm focus:border-accent focus:outline-none transition-colors"
-                          placeholder="#FFFFFF"
-                        />
-                      </div>
-                      <div>
-                        <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2 block">
-                          Preview
-                        </label>
-                        <div
-                          className="w-full h-16 rounded-lg border-2 border-border/50"
-                          style={{ backgroundColor: customFillColor === 'transparent' ? '#ffffff' : customFillColor }}
-                        />
-                      </div>
-                      <button
-                        onClick={() => {
-                          onFillColorChange(customFillColor);
-                          setShowFillColorPicker(false);
-                        }}
-                        className="w-full px-4 py-2.5 bg-accent text-accent-foreground rounded-lg font-medium hover:bg-accent/90 transition-colors"
-                      >
-                        Apply Color
-                      </button>
-                    </div>
-                  </div>
-                </>
-              )}
             </>
           )}
 
@@ -447,6 +340,175 @@ export function ToolSidebar({
           )}
         </div>
       </div>
-    </div>
+      </div>
+
+      {/* Stroke Color Picker Modal - Outside overflow container */}
+      {showStrokeColorPicker && (
+        <>
+          <div className="fixed inset-0 z-[9998] bg-black/50" onClick={() => setShowStrokeColorPicker(false)} />
+          <div
+            className="fixed right-80 top-1/2 -translate-y-1/2 z-[9999] bg-card border border-border rounded-xl p-6 shadow-2xl w-80"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-sm font-semibold text-foreground">Custom Stroke Color</h3>
+              <button onClick={() => setShowStrokeColorPicker(false)} className="text-muted-foreground hover:text-foreground transition-colors">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <div className="space-y-4">
+              {/* Color Wheel */}
+              <div>
+                <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2 block">
+                  Color Picker
+                </label>
+                <div className="flex justify-center">
+                  <input
+                    type="color"
+                    value={customStrokeColor}
+                    onChange={(e) => setCustomStrokeColor(e.target.value)}
+                    className="w-32 h-32 rounded-lg cursor-pointer border-2 border-border/50"
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2 block">
+                  Hex Code
+                </label>
+                <input
+                  type="text"
+                  value={customStrokeColor}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    if (/^#[0-9A-F]{0,6}$/i.test(value)) {
+                      setCustomStrokeColor(value);
+                    }
+                  }}
+                  className="w-full px-3 py-2 bg-secondary/50 border-2 border-border/50 rounded-lg text-foreground font-mono text-sm focus:border-accent focus:outline-none transition-colors"
+                  placeholder="#FFFFFF"
+                />
+              </div>
+              <div>
+                <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2 block">
+                  Preview
+                </label>
+                <div
+                  className="w-full h-16 rounded-lg border-2 border-border/50"
+                  style={{ backgroundColor: customStrokeColor }}
+                />
+              </div>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => {
+                    if (onToolChange) {
+                      onToolChange('eyedropper');
+                      setShowStrokeColorPicker(false);
+                    }
+                  }}
+                  className="px-4 py-2.5 bg-secondary text-foreground rounded-lg font-medium hover:bg-secondary/80 transition-colors flex items-center gap-2"
+                >
+                  <Pipette className="w-4 h-4" />
+                  Pick
+                </button>
+                <button
+                  onClick={() => {
+                    onStrokeColorChange(customStrokeColor);
+                    setShowStrokeColorPicker(false);
+                  }}
+                  className="flex-1 px-4 py-2.5 bg-accent text-accent-foreground rounded-lg font-medium hover:bg-accent/90 transition-colors"
+                >
+                  Apply Color
+                </button>
+              </div>
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* Fill Color Picker Modal - Outside overflow container */}
+      {showFillColorPicker && (
+        <>
+          <div className="fixed inset-0 z-[9998] bg-black/50" onClick={() => setShowFillColorPicker(false)} />
+          <div
+            className="fixed right-80 top-1/2 -translate-y-1/2 z-[9999] bg-card border border-border rounded-xl p-6 shadow-2xl w-80"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-sm font-semibold text-foreground">Custom Fill Color</h3>
+              <button onClick={() => setShowFillColorPicker(false)} className="text-muted-foreground hover:text-foreground transition-colors">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <div className="space-y-4">
+              {/* Color Wheel */}
+              <div>
+                <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2 block">
+                  Color Picker
+                </label>
+                <div className="flex justify-center">
+                  <input
+                    type="color"
+                    value={customFillColor === 'transparent' ? '#ffffff' : customFillColor}
+                    onChange={(e) => setCustomFillColor(e.target.value)}
+                    className="w-32 h-32 rounded-lg cursor-pointer border-2 border-border/50"
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2 block">
+                  Hex Code
+                </label>
+                <input
+                  type="text"
+                  value={customFillColor === 'transparent' ? '' : customFillColor}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    if (/^#[0-9A-F]{0,6}$/i.test(value)) {
+                      setCustomFillColor(value);
+                    }
+                  }}
+                  className="w-full px-3 py-2 bg-secondary/50 border-2 border-border/50 rounded-lg text-foreground font-mono text-sm focus:border-accent focus:outline-none transition-colors"
+                  placeholder="#FFFFFF"
+                />
+              </div>
+              <div>
+                <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2 block">
+                  Preview
+                </label>
+                <div
+                  className="w-full h-16 rounded-lg border-2 border-border/50"
+                  style={{ backgroundColor: customFillColor === 'transparent' ? '#ffffff' : customFillColor }}
+                />
+              </div>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => {
+                    if (onToolChange) {
+                      onToolChange('eyedropper');
+                      setShowFillColorPicker(false);
+                    }
+                  }}
+                  className="px-4 py-2.5 bg-secondary text-foreground rounded-lg font-medium hover:bg-secondary/80 transition-colors flex items-center gap-2"
+                >
+                  <Pipette className="w-4 h-4" />
+                  Pick
+                </button>
+                <button
+                  onClick={() => {
+                    if (onFillColorChange) {
+                      onFillColorChange(customFillColor);
+                    }
+                    setShowFillColorPicker(false);
+                  }}
+                  className="flex-1 px-4 py-2.5 bg-accent text-accent-foreground rounded-lg font-medium hover:bg-accent/90 transition-colors"
+                >
+                  Apply Color
+                </button>
+              </div>
+            </div>
+          </div>
+        </>
+      )}
+    </>
   );
 }

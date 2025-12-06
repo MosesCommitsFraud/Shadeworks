@@ -50,7 +50,6 @@ const tools: { id: Tool; icon: React.ElementType; label: string }[] = [
   { id: 'ellipse', icon: Circle, label: 'Ellipse' },
   { id: 'text', icon: Type, label: 'Text' },
   { id: 'eraser', icon: Eraser, label: 'Eraser' },
-  { id: 'eyedropper', icon: Pipette, label: 'Color Picker' },
   { id: 'frame', icon: LayoutTemplate, label: 'Frame' },
   { id: 'web-embed', icon: Globe, label: 'Web Embed' },
   { id: 'laser', icon: Pointer, label: 'Laser Pointer' },

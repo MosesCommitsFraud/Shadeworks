@@ -426,6 +426,7 @@ export function Whiteboard({ roomId }: WhiteboardProps) {
         selectedElements={selectedElements}
         onBringToFront={handleBringToFront}
         onSendToBack={handleSendToBack}
+        onToolChange={setTool}
       />
 
       <Canvas
