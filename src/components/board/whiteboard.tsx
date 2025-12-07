@@ -25,8 +25,11 @@ export function Whiteboard({ roomId }: WhiteboardProps) {
   const [opacity, setOpacity] = useState(100);
   const [strokeStyle, setStrokeStyle] = useState<'solid' | 'dashed' | 'dotted'>('solid');
   const [cornerRadius, setCornerRadius] = useState(0);
-  const [fontFamily, setFontFamily] = useState('sans-serif');
+  const [fontFamily, setFontFamily] = useState('var(--font-inter)');
   const [textAlign, setTextAlign] = useState<'left' | 'center' | 'right'>('left');
+  const [fontSize, setFontSize] = useState(24);
+  const [letterSpacing, setLetterSpacing] = useState(0);
+  const [lineHeight, setLineHeight] = useState(1.5);
   const [elements, setElements] = useState<BoardElement[]>([]);
   const [collaboration, setCollaboration] = useState<CollaborationManager | null>(null);
   const [connectedUsers, setConnectedUsers] = useState(1);
@@ -478,6 +481,42 @@ export function Whiteboard({ roomId }: WhiteboardProps) {
     setTextAlign(align);
   }, [selectedElements, saveToUndoStack, handleUpdateElement]);
 
+  const handleFontSizeChange = useCallback((size: number) => {
+    if (selectedElements.length > 0) {
+      saveToUndoStack();
+      selectedElements.forEach((el) => {
+        if (el.type === 'text') {
+          handleUpdateElement(el.id, { fontSize: size });
+        }
+      });
+    }
+    setFontSize(size);
+  }, [selectedElements, saveToUndoStack, handleUpdateElement]);
+
+  const handleLetterSpacingChange = useCallback((spacing: number) => {
+    if (selectedElements.length > 0) {
+      saveToUndoStack();
+      selectedElements.forEach((el) => {
+        if (el.type === 'text') {
+          handleUpdateElement(el.id, { letterSpacing: spacing });
+        }
+      });
+    }
+    setLetterSpacing(spacing);
+  }, [selectedElements, saveToUndoStack, handleUpdateElement]);
+
+  const handleLineHeightChange = useCallback((height: number) => {
+    if (selectedElements.length > 0) {
+      saveToUndoStack();
+      selectedElements.forEach((el) => {
+        if (el.type === 'text') {
+          handleUpdateElement(el.id, { lineHeight: height });
+        }
+      });
+    }
+    setLineHeight(height);
+  }, [selectedElements, saveToUndoStack, handleUpdateElement]);
+
   // Sync sidebar properties with selected elements
   useEffect(() => {
     if (selectedElements.length > 0) {
@@ -502,6 +541,15 @@ export function Whiteboard({ roomId }: WhiteboardProps) {
       }
       if (firstElement.textAlign !== undefined) {
         setTextAlign(firstElement.textAlign);
+      }
+      if (firstElement.fontSize !== undefined) {
+        setFontSize(firstElement.fontSize);
+      }
+      if (firstElement.letterSpacing !== undefined) {
+        setLetterSpacing(firstElement.letterSpacing);
+      }
+      if (firstElement.lineHeight !== undefined) {
+        setLineHeight(firstElement.lineHeight);
       }
     }
   }, [selectedElements]);
@@ -614,6 +662,12 @@ export function Whiteboard({ roomId }: WhiteboardProps) {
         onFontFamilyChange={handleFontFamilyChange}
         textAlign={textAlign}
         onTextAlignChange={handleTextAlignChange}
+        fontSize={fontSize}
+        onFontSizeChange={handleFontSizeChange}
+        letterSpacing={letterSpacing}
+        onLetterSpacingChange={handleLetterSpacingChange}
+        lineHeight={lineHeight}
+        onLineHeightChange={handleLineHeightChange}
         selectedElements={selectedElements}
         onBringToFront={handleBringToFront}
         onSendToBack={handleSendToBack}
@@ -629,6 +683,9 @@ export function Whiteboard({ roomId }: WhiteboardProps) {
         cornerRadius={cornerRadius}
         fontFamily={fontFamily}
         textAlign={textAlign}
+        fontSize={fontSize}
+        letterSpacing={letterSpacing}
+        lineHeight={lineHeight}
         collaboration={collaboration}
         elements={elements}
         onAddElement={handleAddElement}

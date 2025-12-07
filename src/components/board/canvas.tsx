@@ -17,6 +17,9 @@ interface CanvasProps {
   cornerRadius?: number;
   fontFamily?: string;
   textAlign?: 'left' | 'center' | 'right';
+  fontSize?: number;
+  letterSpacing?: number;
+  lineHeight?: number;
   collaboration: CollaborationManager | null;
   elements: BoardElement[];
   onAddElement: (element: BoardElement) => void;
@@ -208,8 +211,11 @@ export function Canvas({
   opacity = 100,
   strokeStyle = 'solid',
   cornerRadius = 0,
-  fontFamily = 'sans-serif',
+  fontFamily = 'var(--font-inter)',
   textAlign = 'left',
+  fontSize = 24,
+  letterSpacing = 0,
+  lineHeight = 1.5,
   collaboration,
   elements,
   onAddElement,
@@ -1187,6 +1193,9 @@ export function Canvas({
           opacity,
           fontFamily,
           textAlign,
+          fontSize,
+          letterSpacing,
+          lineHeight,
         };
         onAddElement(newElement);
 
@@ -1216,6 +1225,9 @@ export function Canvas({
           opacity,
           fontFamily,
           textAlign,
+          fontSize,
+          letterSpacing,
+          lineHeight,
         };
         onAddElement(newElement);
 
@@ -1228,7 +1240,7 @@ export function Canvas({
     }
     setTextInput(null);
     setTextValue('');
-  }, [textInput, textValue, strokeColor, strokeWidth, opacity, fontFamily, textAlign, onAddElement, onToolChange, setSelectedIds, textInputRef, zoom]);
+  }, [textInput, textValue, strokeColor, strokeWidth, opacity, fontFamily, textAlign, fontSize, letterSpacing, lineHeight, onAddElement, onToolChange, setSelectedIds, textInputRef, zoom]);
 
   // Auto-save text on blur or after typing stops
   const textSaveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -1438,7 +1450,9 @@ export function Canvas({
       }
       case 'text': {
         const elOpacity = (element.opacity ?? 100) / 100;
-        const fontSize = element.strokeWidth * 4 + 12;
+        const fontSize = element.fontSize ?? (element.strokeWidth * 4 + 12);
+        const elLetterSpacing = element.letterSpacing ?? 0;
+        const elLineHeight = element.lineHeight ?? 1.4;
         const scaleX = element.scaleX ?? 1;
         const scaleY = element.scaleY ?? 1;
         const x = element.x ?? 0;
@@ -1448,7 +1462,7 @@ export function Canvas({
         if (element.isTextBox && element.width && element.height) {
           // Render text box with wrapping
           const padding = 8;
-          const lineHeight = fontSize * 1.4;
+          const lineHeight = fontSize * elLineHeight;
 
           // Split by newlines first, then wrap each line
           const paragraphs = (element.text || '').split('\n');
@@ -1495,8 +1509,9 @@ export function Canvas({
                     key={i}
                     fill={element.strokeColor}
                     fontSize={fontSize}
-                    fontFamily={element.fontFamily || 'sans-serif'}
+                    fontFamily={element.fontFamily || 'var(--font-inter)'}
                     textAnchor={textAnchor}
+                    letterSpacing={`${elLetterSpacing}px`}
                     x={textX}
                     y={y + padding + baselineOffset + i * lineHeight}
                     opacity={isMarkedForDeletion ? elOpacity * 0.3 : elOpacity}
@@ -1540,8 +1555,9 @@ export function Canvas({
               opacity={isMarkedForDeletion ? elOpacity * 0.3 : elOpacity}
               fill={element.strokeColor}
               fontSize={fontSize}
-              fontFamily={element.fontFamily || 'sans-serif'}
+              fontFamily={element.fontFamily || 'var(--font-inter)'}
               textAnchor={textAnchor}
+              letterSpacing={`${elLetterSpacing}px`}
               x={textX}
               y={baselineOffset}
               transform={`translate(${x}, ${y}) scale(${scaleX}, ${scaleY})`}

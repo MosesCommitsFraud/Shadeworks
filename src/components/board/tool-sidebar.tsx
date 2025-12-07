@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { ChevronLeft, ChevronRight, Circle, Minus, Square, Type, Pencil, ArrowUpToLine, ArrowDownToLine, X, AlignLeft, AlignCenter, AlignRight } from 'lucide-react';
-import { Tool, COLORS, STROKE_WIDTHS, FONTS, BoardElement } from '@/lib/board-types';
+import { Tool, COLORS, STROKE_WIDTHS, FONTS, FONT_SIZES, BoardElement } from '@/lib/board-types';
 import { cn } from '@/lib/utils';
 
 interface ToolSidebarProps {
@@ -23,6 +23,12 @@ interface ToolSidebarProps {
   onFontFamilyChange: (font: string) => void;
   textAlign: 'left' | 'center' | 'right';
   onTextAlignChange: (align: 'left' | 'center' | 'right') => void;
+  fontSize: number;
+  onFontSizeChange: (size: number) => void;
+  letterSpacing: number;
+  onLetterSpacingChange: (spacing: number) => void;
+  lineHeight: number;
+  onLineHeightChange: (height: number) => void;
   selectedElements?: BoardElement[];
   onBringToFront?: () => void;
   onSendToBack?: () => void;
@@ -49,6 +55,12 @@ export function ToolSidebar({
   onFontFamilyChange,
   textAlign,
   onTextAlignChange,
+  fontSize,
+  onFontSizeChange,
+  letterSpacing,
+  onLetterSpacingChange,
+  lineHeight,
+  onLineHeightChange,
   selectedElements = [],
   onBringToFront,
   onSendToBack,
@@ -216,68 +228,112 @@ export function ToolSidebar({
           {isTextTool && (
             <div className="space-y-2">
               <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                Font Family
+                Font
               </label>
-              <div className="space-y-1">
+              <div className="grid grid-cols-2 gap-1">
                 {FONTS.map((font) => (
                   <button
                     key={font.value}
                     onClick={() => onFontFamilyChange(font.value)}
                     className={cn(
-                      'w-full h-10 rounded-lg border-2 transition-all duration-200 flex items-center justify-center hover:bg-secondary/50',
+                      'h-8 rounded-md border transition-all duration-200 flex items-center justify-center text-xs hover:bg-secondary/50',
                       fontFamily === font.value
                         ? 'border-accent bg-secondary/50'
                         : 'border-border/50'
                     )}
                     style={{ fontFamily: font.value }}
                   >
-                    <span className="text-sm">{font.name}</span>
+                    {font.name}
                   </button>
                 ))}
               </div>
             </div>
           )}
 
-          {/* Text Alignment (for text tool) */}
+          {/* Font Size & Text Alignment (for text tool) */}
           {isTextTool && (
             <div className="space-y-2">
               <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                Text Alignment
+                Size & Align
               </label>
-              <div className="grid grid-cols-3 gap-2">
+              <div className="flex gap-1">
+                <select
+                  value={fontSize}
+                  onChange={(e) => onFontSizeChange(Number(e.target.value))}
+                  className="flex-1 h-8 px-2 rounded-md border border-border/50 bg-background text-xs focus:border-accent focus:outline-none"
+                >
+                  {FONT_SIZES.map((size) => (
+                    <option key={size} value={size}>{size}px</option>
+                  ))}
+                </select>
                 <button
                   onClick={() => onTextAlignChange('left')}
                   className={cn(
-                    'h-10 rounded-lg border-2 transition-all duration-200 flex items-center justify-center hover:bg-secondary/50',
-                    textAlign === 'left'
-                      ? 'border-accent bg-secondary/50'
-                      : 'border-border/50'
+                    'h-8 w-8 rounded-md border transition-all duration-200 flex items-center justify-center hover:bg-secondary/50',
+                    textAlign === 'left' ? 'border-accent bg-secondary/50' : 'border-border/50'
                   )}
                 >
-                  <AlignLeft className="w-4 h-4" />
+                  <AlignLeft className="w-3.5 h-3.5" />
                 </button>
                 <button
                   onClick={() => onTextAlignChange('center')}
                   className={cn(
-                    'h-10 rounded-lg border-2 transition-all duration-200 flex items-center justify-center hover:bg-secondary/50',
-                    textAlign === 'center'
-                      ? 'border-accent bg-secondary/50'
-                      : 'border-border/50'
+                    'h-8 w-8 rounded-md border transition-all duration-200 flex items-center justify-center hover:bg-secondary/50',
+                    textAlign === 'center' ? 'border-accent bg-secondary/50' : 'border-border/50'
                   )}
                 >
-                  <AlignCenter className="w-4 h-4" />
+                  <AlignCenter className="w-3.5 h-3.5" />
                 </button>
                 <button
                   onClick={() => onTextAlignChange('right')}
                   className={cn(
-                    'h-10 rounded-lg border-2 transition-all duration-200 flex items-center justify-center hover:bg-secondary/50',
-                    textAlign === 'right'
-                      ? 'border-accent bg-secondary/50'
-                      : 'border-border/50'
+                    'h-8 w-8 rounded-md border transition-all duration-200 flex items-center justify-center hover:bg-secondary/50',
+                    textAlign === 'right' ? 'border-accent bg-secondary/50' : 'border-border/50'
                   )}
                 >
-                  <AlignRight className="w-4 h-4" />
+                  <AlignRight className="w-3.5 h-3.5" />
                 </button>
+              </div>
+            </div>
+          )}
+
+          {/* Letter Spacing & Line Height (for text tool) */}
+          {isTextTool && (
+            <div className="space-y-2">
+              <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                Spacing
+              </label>
+              <div className="space-y-1.5">
+                <div>
+                  <div className="flex justify-between items-center mb-1">
+                    <span className="text-[10px] text-muted-foreground">Letter</span>
+                    <span className="text-[10px] font-medium text-foreground">{letterSpacing.toFixed(1)}px</span>
+                  </div>
+                  <input
+                    type="range"
+                    min="-2"
+                    max="10"
+                    step="0.5"
+                    value={letterSpacing}
+                    onChange={(e) => onLetterSpacingChange(Number(e.target.value))}
+                    className="w-full h-1.5 bg-secondary rounded-lg appearance-none cursor-pointer accent-accent"
+                  />
+                </div>
+                <div>
+                  <div className="flex justify-between items-center mb-1">
+                    <span className="text-[10px] text-muted-foreground">Line</span>
+                    <span className="text-[10px] font-medium text-foreground">{lineHeight.toFixed(1)}</span>
+                  </div>
+                  <input
+                    type="range"
+                    min="1"
+                    max="3"
+                    step="0.1"
+                    value={lineHeight}
+                    onChange={(e) => onLineHeightChange(Number(e.target.value))}
+                    className="w-full h-1.5 bg-secondary rounded-lg appearance-none cursor-pointer accent-accent"
+                  />
+                </div>
               </div>
             </div>
           )}

@@ -35,6 +35,9 @@ export interface BoardElement {
   // Text properties
   fontFamily?: string;
   textAlign?: 'left' | 'center' | 'right';
+  fontSize?: number;
+  letterSpacing?: number;
+  lineHeight?: number;
   // Layer order
   zIndex?: number;
 }
@@ -68,12 +71,16 @@ export const COLORS = [
 export const STROKE_WIDTHS = [2, 4, 6, 8, 12];
 
 export const FONTS = [
-  { name: 'Sans Serif', value: 'sans-serif' },
-  { name: 'Serif', value: 'serif' },
-  { name: 'Monospace', value: 'monospace' },
-  { name: 'Cursive', value: 'cursive' },
-  { name: 'System UI', value: 'system-ui' },
+  { name: 'Inter', value: 'var(--font-inter)' },
+  { name: 'Roboto', value: 'var(--font-roboto)' },
+  { name: 'Playfair', value: 'var(--font-playfair)' },
+  { name: 'Merriweather', value: 'var(--font-merriweather)' },
+  { name: 'Fira Code', value: 'var(--font-fira-code)' },
+  { name: 'Caveat', value: 'var(--font-caveat)' },
+  { name: 'Lobster', value: 'var(--font-lobster)' },
 ];
+
+export const FONT_SIZES = [12, 16, 20, 24, 32, 48, 64];
 
 export interface ShadeworksFile {
   type: 'shadeworks';
