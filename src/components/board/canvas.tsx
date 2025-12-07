@@ -15,6 +15,8 @@ interface CanvasProps {
   opacity?: number;
   strokeStyle?: 'solid' | 'dashed' | 'dotted';
   cornerRadius?: number;
+  fontFamily?: string;
+  textAlign?: 'left' | 'center' | 'right';
   collaboration: CollaborationManager | null;
   elements: BoardElement[];
   onAddElement: (element: BoardElement) => void;
@@ -206,6 +208,8 @@ export function Canvas({
   opacity = 100,
   strokeStyle = 'solid',
   cornerRadius = 0,
+  fontFamily = 'sans-serif',
+  textAlign = 'left',
   collaboration,
   elements,
   onAddElement,
@@ -1181,6 +1185,8 @@ export function Canvas({
           scaleX: 1,
           scaleY: 1,
           opacity,
+          fontFamily,
+          textAlign,
         };
         onAddElement(newElement);
 
@@ -1208,6 +1214,8 @@ export function Canvas({
           scaleX: 1,
           scaleY: 1,
           opacity,
+          fontFamily,
+          textAlign,
         };
         onAddElement(newElement);
 
@@ -1220,7 +1228,7 @@ export function Canvas({
     }
     setTextInput(null);
     setTextValue('');
-  }, [textInput, textValue, strokeColor, strokeWidth, opacity, onAddElement, onToolChange, setSelectedIds, textInputRef, zoom]);
+  }, [textInput, textValue, strokeColor, strokeWidth, opacity, fontFamily, textAlign, onAddElement, onToolChange, setSelectedIds, textInputRef, zoom]);
 
   // Auto-save text on blur or after typing stops
   const textSaveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -1469,20 +1477,35 @@ export function Canvas({
                 pointerEvents="fill"
               />
               {/* Wrapped text */}
-              {allLines.map((line, i) => (
-                <text
-                  key={i}
-                  fill={element.strokeColor}
-                  fontSize={fontSize}
-                  fontFamily="inherit"
-                  x={x + padding}
-                  y={y + padding + baselineOffset + i * lineHeight}
-                  opacity={isMarkedForDeletion ? elOpacity * 0.3 : elOpacity}
-                  pointerEvents="none"
-                >
-                  {line}
-                </text>
-              ))}
+              {allLines.map((line, i) => {
+                const elTextAlign = element.textAlign || 'left';
+                let textX = x + padding;
+                let textAnchor: 'start' | 'middle' | 'end' = 'start';
+
+                if (elTextAlign === 'center') {
+                  textX = x + (element.width ?? 0) / 2;
+                  textAnchor = 'middle';
+                } else if (elTextAlign === 'right') {
+                  textX = x + (element.width ?? 0) - padding;
+                  textAnchor = 'end';
+                }
+
+                return (
+                  <text
+                    key={i}
+                    fill={element.strokeColor}
+                    fontSize={fontSize}
+                    fontFamily={element.fontFamily || 'sans-serif'}
+                    textAnchor={textAnchor}
+                    x={textX}
+                    y={y + padding + baselineOffset + i * lineHeight}
+                    opacity={isMarkedForDeletion ? elOpacity * 0.3 : elOpacity}
+                    pointerEvents="none"
+                  >
+                    {line}
+                  </text>
+                );
+              })}
               {isMarkedForDeletion && (
                 <rect
                   x={x}
@@ -1498,6 +1521,18 @@ export function Canvas({
         }
 
         // Render simple single-line text
+        const elTextAlign = element.textAlign || 'left';
+        let textX = 0;
+        let textAnchor: 'start' | 'middle' | 'end' = 'start';
+
+        if (elTextAlign === 'center') {
+          textX = (element.width ?? 0) / 2;
+          textAnchor = 'middle';
+        } else if (elTextAlign === 'right') {
+          textX = element.width ?? 0;
+          textAnchor = 'end';
+        }
+
         return (
           <g key={element.id}>
             <text
@@ -1505,8 +1540,9 @@ export function Canvas({
               opacity={isMarkedForDeletion ? elOpacity * 0.3 : elOpacity}
               fill={element.strokeColor}
               fontSize={fontSize}
-              fontFamily="inherit"
-              x={0}
+              fontFamily={element.fontFamily || 'sans-serif'}
+              textAnchor={textAnchor}
+              x={textX}
               y={baselineOffset}
               transform={`translate(${x}, ${y}) scale(${scaleX}, ${scaleY})`}
               pointerEvents="auto"

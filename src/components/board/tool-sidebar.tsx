@@ -1,8 +1,8 @@
 'use client';
 
 import { useState } from 'react';
-import { ChevronLeft, ChevronRight, Circle, Minus, Square, Type, Pencil, ArrowUpToLine, ArrowDownToLine, X } from 'lucide-react';
-import { Tool, COLORS, STROKE_WIDTHS, BoardElement } from '@/lib/board-types';
+import { ChevronLeft, ChevronRight, Circle, Minus, Square, Type, Pencil, ArrowUpToLine, ArrowDownToLine, X, AlignLeft, AlignCenter, AlignRight } from 'lucide-react';
+import { Tool, COLORS, STROKE_WIDTHS, FONTS, BoardElement } from '@/lib/board-types';
 import { cn } from '@/lib/utils';
 
 interface ToolSidebarProps {
@@ -19,6 +19,10 @@ interface ToolSidebarProps {
   onStrokeStyleChange: (style: 'solid' | 'dashed' | 'dotted') => void;
   cornerRadius: number;
   onCornerRadiusChange: (radius: number) => void;
+  fontFamily: string;
+  onFontFamilyChange: (font: string) => void;
+  textAlign: 'left' | 'center' | 'right';
+  onTextAlignChange: (align: 'left' | 'center' | 'right') => void;
   selectedElements?: BoardElement[];
   onBringToFront?: () => void;
   onSendToBack?: () => void;
@@ -41,6 +45,10 @@ export function ToolSidebar({
   onStrokeStyleChange,
   cornerRadius,
   onCornerRadiusChange,
+  fontFamily,
+  onFontFamilyChange,
+  textAlign,
+  onTextAlignChange,
   selectedElements = [],
   onBringToFront,
   onSendToBack,
@@ -66,6 +74,12 @@ export function ToolSidebar({
   const showCornerRadius = hasSelectedElements
     ? selectedElements.some(el => el.type === 'rectangle' || el.type === 'frame')
     : selectedTool === 'rectangle';
+
+  const isTextTool = hasSelectedElements
+    ? selectedElements.some(el => el.type === 'text')
+    : selectedTool === 'text';
+
+  const showStrokeWidthAndStyle = !isTextTool;
 
   return (
     <>
@@ -198,73 +212,147 @@ export function ToolSidebar({
             </>
           )}
 
-          {/* Stroke Width */}
-          <div className="space-y-2">
-            <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-              Stroke Width
-            </label>
-            <div className="flex gap-2">
-              {STROKE_WIDTHS.map((width) => (
+          {/* Font Family (for text tool) */}
+          {isTextTool && (
+            <div className="space-y-2">
+              <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                Font Family
+              </label>
+              <div className="space-y-1">
+                {FONTS.map((font) => (
+                  <button
+                    key={font.value}
+                    onClick={() => onFontFamilyChange(font.value)}
+                    className={cn(
+                      'w-full h-10 rounded-lg border-2 transition-all duration-200 flex items-center justify-center hover:bg-secondary/50',
+                      fontFamily === font.value
+                        ? 'border-accent bg-secondary/50'
+                        : 'border-border/50'
+                    )}
+                    style={{ fontFamily: font.value }}
+                  >
+                    <span className="text-sm">{font.name}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Text Alignment (for text tool) */}
+          {isTextTool && (
+            <div className="space-y-2">
+              <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                Text Alignment
+              </label>
+              <div className="grid grid-cols-3 gap-2">
                 <button
-                  key={width}
-                  onClick={() => onStrokeWidthChange(width)}
+                  onClick={() => onTextAlignChange('left')}
                   className={cn(
-                    'flex-1 h-10 rounded-lg border-2 transition-all duration-200 flex items-center justify-center hover:bg-secondary/50',
-                    strokeWidth === width
+                    'h-10 rounded-lg border-2 transition-all duration-200 flex items-center justify-center hover:bg-secondary/50',
+                    textAlign === 'left'
                       ? 'border-accent bg-secondary/50'
                       : 'border-border/50'
                   )}
                 >
-                  <div
-                    className="w-full bg-foreground rounded-full mx-2"
-                    style={{ height: width }}
-                  />
+                  <AlignLeft className="w-4 h-4" />
                 </button>
-              ))}
+                <button
+                  onClick={() => onTextAlignChange('center')}
+                  className={cn(
+                    'h-10 rounded-lg border-2 transition-all duration-200 flex items-center justify-center hover:bg-secondary/50',
+                    textAlign === 'center'
+                      ? 'border-accent bg-secondary/50'
+                      : 'border-border/50'
+                  )}
+                >
+                  <AlignCenter className="w-4 h-4" />
+                </button>
+                <button
+                  onClick={() => onTextAlignChange('right')}
+                  className={cn(
+                    'h-10 rounded-lg border-2 transition-all duration-200 flex items-center justify-center hover:bg-secondary/50',
+                    textAlign === 'right'
+                      ? 'border-accent bg-secondary/50'
+                      : 'border-border/50'
+                  )}
+                >
+                  <AlignRight className="w-4 h-4" />
+                </button>
+              </div>
             </div>
-          </div>
+          )}
 
-          {/* Stroke Style */}
-          <div className="space-y-2">
-            <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-              Stroke Style
-            </label>
-            <div className="grid grid-cols-3 gap-2">
-              <button
-                onClick={() => onStrokeStyleChange('solid')}
-                className={cn(
-                  'h-10 rounded-lg border-2 transition-all duration-200 flex items-center justify-center hover:bg-secondary/50',
-                  strokeStyle === 'solid'
-                    ? 'border-accent bg-secondary/50'
-                    : 'border-border/50'
-                )}
-              >
-                <div className="w-full h-0.5 bg-foreground mx-2" />
-              </button>
-              <button
-                onClick={() => onStrokeStyleChange('dashed')}
-                className={cn(
-                  'h-10 rounded-lg border-2 transition-all duration-200 flex items-center justify-center hover:bg-secondary/50',
-                  strokeStyle === 'dashed'
-                    ? 'border-accent bg-secondary/50'
-                    : 'border-border/50'
-                )}
-              >
-                <div className="w-full h-0.5 border-t-2 border-dashed border-foreground mx-2" />
-              </button>
-              <button
-                onClick={() => onStrokeStyleChange('dotted')}
-                className={cn(
-                  'h-10 rounded-lg border-2 transition-all duration-200 flex items-center justify-center hover:bg-secondary/50',
-                  strokeStyle === 'dotted'
-                    ? 'border-accent bg-secondary/50'
-                    : 'border-border/50'
-                )}
-              >
-                <div className="w-full h-0.5 border-t-2 border-dotted border-foreground mx-2" />
-              </button>
+          {/* Stroke Width (not for text tool) */}
+          {showStrokeWidthAndStyle && (
+            <div className="space-y-2">
+              <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                Stroke Width
+              </label>
+              <div className="flex gap-2">
+                {STROKE_WIDTHS.map((width) => (
+                  <button
+                    key={width}
+                    onClick={() => onStrokeWidthChange(width)}
+                    className={cn(
+                      'flex-1 h-10 rounded-lg border-2 transition-all duration-200 flex items-center justify-center hover:bg-secondary/50',
+                      strokeWidth === width
+                        ? 'border-accent bg-secondary/50'
+                        : 'border-border/50'
+                    )}
+                  >
+                    <div
+                      className="w-full bg-foreground rounded-full mx-2"
+                      style={{ height: width }}
+                    />
+                  </button>
+                ))}
+              </div>
             </div>
-          </div>
+          )}
+
+          {/* Stroke Style (not for text tool) */}
+          {showStrokeWidthAndStyle && (
+            <div className="space-y-2">
+              <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                Stroke Style
+              </label>
+              <div className="grid grid-cols-3 gap-2">
+                <button
+                  onClick={() => onStrokeStyleChange('solid')}
+                  className={cn(
+                    'h-10 rounded-lg border-2 transition-all duration-200 flex items-center justify-center hover:bg-secondary/50',
+                    strokeStyle === 'solid'
+                      ? 'border-accent bg-secondary/50'
+                      : 'border-border/50'
+                  )}
+                >
+                  <div className="w-full h-0.5 bg-foreground mx-2" />
+                </button>
+                <button
+                  onClick={() => onStrokeStyleChange('dashed')}
+                  className={cn(
+                    'h-10 rounded-lg border-2 transition-all duration-200 flex items-center justify-center hover:bg-secondary/50',
+                    strokeStyle === 'dashed'
+                      ? 'border-accent bg-secondary/50'
+                      : 'border-border/50'
+                  )}
+                >
+                  <div className="w-full h-0.5 border-t-2 border-dashed border-foreground mx-2" />
+                </button>
+                <button
+                  onClick={() => onStrokeStyleChange('dotted')}
+                  className={cn(
+                    'h-10 rounded-lg border-2 transition-all duration-200 flex items-center justify-center hover:bg-secondary/50',
+                    strokeStyle === 'dotted'
+                      ? 'border-accent bg-secondary/50'
+                      : 'border-border/50'
+                  )}
+                >
+                  <div className="w-full h-0.5 border-t-2 border-dotted border-foreground mx-2" />
+                </button>
+              </div>
+            </div>
+          )}
 
           {/* Corner Radius (for rectangles) */}
           {showCornerRadius && (

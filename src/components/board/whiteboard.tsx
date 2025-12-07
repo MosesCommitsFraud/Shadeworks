@@ -25,6 +25,8 @@ export function Whiteboard({ roomId }: WhiteboardProps) {
   const [opacity, setOpacity] = useState(100);
   const [strokeStyle, setStrokeStyle] = useState<'solid' | 'dashed' | 'dotted'>('solid');
   const [cornerRadius, setCornerRadius] = useState(0);
+  const [fontFamily, setFontFamily] = useState('sans-serif');
+  const [textAlign, setTextAlign] = useState<'left' | 'center' | 'right'>('left');
   const [elements, setElements] = useState<BoardElement[]>([]);
   const [collaboration, setCollaboration] = useState<CollaborationManager | null>(null);
   const [connectedUsers, setConnectedUsers] = useState(1);
@@ -452,6 +454,30 @@ export function Whiteboard({ roomId }: WhiteboardProps) {
     setCornerRadius(radius);
   }, [selectedElements, saveToUndoStack, handleUpdateElement]);
 
+  const handleFontFamilyChange = useCallback((font: string) => {
+    if (selectedElements.length > 0) {
+      saveToUndoStack();
+      selectedElements.forEach((el) => {
+        if (el.type === 'text') {
+          handleUpdateElement(el.id, { fontFamily: font });
+        }
+      });
+    }
+    setFontFamily(font);
+  }, [selectedElements, saveToUndoStack, handleUpdateElement]);
+
+  const handleTextAlignChange = useCallback((align: 'left' | 'center' | 'right') => {
+    if (selectedElements.length > 0) {
+      saveToUndoStack();
+      selectedElements.forEach((el) => {
+        if (el.type === 'text') {
+          handleUpdateElement(el.id, { textAlign: align });
+        }
+      });
+    }
+    setTextAlign(align);
+  }, [selectedElements, saveToUndoStack, handleUpdateElement]);
+
   // Sync sidebar properties with selected elements
   useEffect(() => {
     if (selectedElements.length > 0) {
@@ -470,6 +496,12 @@ export function Whiteboard({ roomId }: WhiteboardProps) {
       }
       if (firstElement.cornerRadius !== undefined) {
         setCornerRadius(firstElement.cornerRadius);
+      }
+      if (firstElement.fontFamily !== undefined) {
+        setFontFamily(firstElement.fontFamily);
+      }
+      if (firstElement.textAlign !== undefined) {
+        setTextAlign(firstElement.textAlign);
       }
     }
   }, [selectedElements]);
@@ -578,6 +610,10 @@ export function Whiteboard({ roomId }: WhiteboardProps) {
         onStrokeStyleChange={handleStrokeStyleChange}
         cornerRadius={cornerRadius}
         onCornerRadiusChange={handleCornerRadiusChange}
+        fontFamily={fontFamily}
+        onFontFamilyChange={handleFontFamilyChange}
+        textAlign={textAlign}
+        onTextAlignChange={handleTextAlignChange}
         selectedElements={selectedElements}
         onBringToFront={handleBringToFront}
         onSendToBack={handleSendToBack}
@@ -591,6 +627,8 @@ export function Whiteboard({ roomId }: WhiteboardProps) {
         opacity={opacity}
         strokeStyle={strokeStyle}
         cornerRadius={cornerRadius}
+        fontFamily={fontFamily}
+        textAlign={textAlign}
         collaboration={collaboration}
         elements={elements}
         onAddElement={handleAddElement}

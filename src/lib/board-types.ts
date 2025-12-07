@@ -32,6 +32,9 @@ export interface BoardElement {
   opacity?: number;
   strokeStyle?: 'solid' | 'dashed' | 'dotted';
   cornerRadius?: number;
+  // Text properties
+  fontFamily?: string;
+  textAlign?: 'left' | 'center' | 'right';
   // Layer order
   zIndex?: number;
 }
@@ -63,6 +66,14 @@ export const COLORS = [
 ];
 
 export const STROKE_WIDTHS = [2, 4, 6, 8, 12];
+
+export const FONTS = [
+  { name: 'Sans Serif', value: 'sans-serif' },
+  { name: 'Serif', value: 'serif' },
+  { name: 'Monospace', value: 'monospace' },
+  { name: 'Cursive', value: 'cursive' },
+  { name: 'System UI', value: 'system-ui' },
+];
 
 export interface ShadeworksFile {
   type: 'shadeworks';
