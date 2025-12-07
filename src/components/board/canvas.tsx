@@ -847,7 +847,8 @@ export function Canvas({
       }
       
       // Check if clicking inside the selection box (for moving)
-      if (selectedBounds &&
+      // Only allow drag if we actually clicked on an element (not just in the bounding box)
+      if (clickedElement && selectedIds.includes(clickedElement.id) && selectedBounds &&
         point.x >= selectedBounds.x &&
         point.x <= selectedBounds.x + selectedBounds.width &&
         point.y >= selectedBounds.y &&
@@ -988,23 +989,28 @@ export function Canvas({
 
     // Finish box selection
     if (isBoxSelecting && selectionBox) {
-      const selected: string[] = [];
-      elements.forEach(el => {
-        const bounds = getBoundingBox(el);
-        if (bounds) {
-          // Check if element intersects with selection box (any overlap)
-          const intersects = !(
-            bounds.x + bounds.width < selectionBox.x ||
-            bounds.x > selectionBox.x + selectionBox.width ||
-            bounds.y + bounds.height < selectionBox.y ||
-            bounds.y > selectionBox.y + selectionBox.height
-          );
-          if (intersects) {
-            selected.push(el.id);
+      // Only perform box selection if the box has a minimum size (5px)
+      // This prevents accidental selections from single clicks
+      const minBoxSize = 5;
+      if (selectionBox.width >= minBoxSize || selectionBox.height >= minBoxSize) {
+        const selected: string[] = [];
+        elements.forEach(el => {
+          const bounds = getBoundingBox(el);
+          if (bounds) {
+            // Check if element intersects with selection box (any overlap)
+            const intersects = !(
+              bounds.x + bounds.width < selectionBox.x ||
+              bounds.x > selectionBox.x + selectionBox.width ||
+              bounds.y + bounds.height < selectionBox.y ||
+              bounds.y > selectionBox.y + selectionBox.height
+            );
+            if (intersects) {
+              selected.push(el.id);
+            }
           }
-        }
-      });
-      setSelectedIds(selected);
+        });
+        setSelectedIds(selected);
+      }
       setIsBoxSelecting(false);
       setSelectionBox(null);
       return;
@@ -1308,10 +1314,23 @@ export function Canvas({
         // For dashed/dotted strokes, use polyline with stroke
         const strokeDasharray = elStrokeStyle === 'dashed' ? '10,10' : elStrokeStyle === 'dotted' ? '2,6' : 'none';
         const points = element.points.map(p => `${p.x},${p.y}`).join(' ');
+        // Create a wider invisible hitbox for easier clicking (minimum 12px)
+        const hitboxWidth = Math.max(element.strokeWidth * 4, 12);
         return (
           <g key={element.id}>
+            {/* Invisible wider hitbox for easier clicking */}
             <polyline
               data-element-id={element.id}
+              points={points}
+              stroke="transparent"
+              strokeWidth={hitboxWidth}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              fill="none"
+              pointerEvents="stroke"
+            />
+            {/* Visible dashed/dotted stroke */}
+            <polyline
               points={points}
               stroke={element.strokeColor}
               strokeWidth={element.strokeWidth}
@@ -1320,7 +1339,7 @@ export function Canvas({
               strokeDasharray={strokeDasharray}
               fill="none"
               opacity={isMarkedForDeletion ? elOpacity * 0.3 : elOpacity}
-              pointerEvents="stroke"
+              pointerEvents="none"
             />
             {isMarkedForDeletion && (
               <polyline
@@ -1341,10 +1360,24 @@ export function Canvas({
         const elOpacity = (element.opacity ?? 100) / 100;
         const elStrokeStyle = element.strokeStyle || 'solid';
         const strokeDasharray = elStrokeStyle === 'dashed' ? '10,10' : elStrokeStyle === 'dotted' ? '2,6' : 'none';
+        // Create a wider invisible hitbox for easier clicking (minimum 12px)
+        const hitboxWidth = Math.max(element.strokeWidth * 4, 12);
         return (
           <g key={element.id}>
+            {/* Invisible wider hitbox for easier clicking */}
             <line
               data-element-id={element.id}
+              x1={element.points[0].x}
+              y1={element.points[0].y}
+              x2={element.points[1].x}
+              y2={element.points[1].y}
+              stroke="transparent"
+              strokeWidth={hitboxWidth}
+              strokeLinecap="round"
+              pointerEvents="stroke"
+            />
+            {/* Visible line */}
+            <line
               x1={element.points[0].x}
               y1={element.points[0].y}
               x2={element.points[1].x}
@@ -1354,7 +1387,7 @@ export function Canvas({
               strokeLinecap="round"
               strokeDasharray={strokeDasharray}
               opacity={isMarkedForDeletion ? elOpacity * 0.3 : elOpacity}
-              pointerEvents="stroke"
+              pointerEvents="none"
             />
             {isMarkedForDeletion && (
               <line
@@ -1377,6 +1410,14 @@ export function Canvas({
         const strokeDasharray = elStrokeStyle === 'dashed' ? '10,10' : elStrokeStyle === 'dotted' ? '2,6' : 'none';
         const elCornerRadius = element.cornerRadius ?? 4;
         const elFillColor = element.fillColor || 'none';
+        // Treat 'transparent' same as 'none' for hit detection - invisible fills shouldn't be clickable
+        const hasVisibleFill = elFillColor !== 'none' && elFillColor !== 'transparent';
+        // Convert transparent to none for proper pointer-events behavior in SVG
+        const fillValue = elFillColor === 'transparent' ? 'none' : elFillColor;
+        // Only visible parts should be clickable: if has fill AND stroke, allow both; if only stroke, only stroke; if only fill, only fill
+        const pointerEventsValue = hasVisibleFill && element.strokeWidth > 0 ? 'visible' :
+                                   hasVisibleFill ? 'fill' :
+                                   element.strokeWidth > 0 ? 'stroke' : 'none';
         return (
           <g key={element.id}>
             <rect
@@ -1388,10 +1429,10 @@ export function Canvas({
               stroke={element.strokeColor}
               strokeWidth={element.strokeWidth}
               strokeDasharray={strokeDasharray}
-              fill={elFillColor}
+              fill={fillValue}
               rx={elCornerRadius}
               opacity={isMarkedForDeletion ? elOpacity * 0.3 : elOpacity}
-              pointerEvents="stroke"
+              pointerEvents={pointerEventsValue}
             />
             {isMarkedForDeletion && (
               <rect
@@ -1414,6 +1455,14 @@ export function Canvas({
         const elFillColor = element.fillColor || 'none';
         const cx = (element.x || 0) + (element.width || 0) / 2;
         const cy = (element.y || 0) + (element.height || 0) / 2;
+        // Treat 'transparent' same as 'none' for hit detection - invisible fills shouldn't be clickable
+        const hasVisibleFill = elFillColor !== 'none' && elFillColor !== 'transparent';
+        // Convert transparent to none for proper pointer-events behavior in SVG
+        const fillValue = elFillColor === 'transparent' ? 'none' : elFillColor;
+        // Only visible parts should be clickable: if has fill AND stroke, allow both; if only stroke, only stroke; if only fill, only fill
+        const pointerEventsValue = hasVisibleFill && element.strokeWidth > 0 ? 'visible' :
+                                   hasVisibleFill ? 'fill' :
+                                   element.strokeWidth > 0 ? 'stroke' : 'none';
         return (
           <g key={element.id}>
             <ellipse
@@ -1425,9 +1474,9 @@ export function Canvas({
               stroke={element.strokeColor}
               strokeWidth={element.strokeWidth}
               strokeDasharray={strokeDasharray}
-              fill={elFillColor}
+              fill={fillValue}
               opacity={isMarkedForDeletion ? elOpacity * 0.3 : elOpacity}
-              pointerEvents="stroke"
+              pointerEvents={pointerEventsValue}
             />
             {isMarkedForDeletion && (
               <ellipse
@@ -1579,6 +1628,14 @@ export function Canvas({
         const strokeDasharray = elStrokeStyle === 'dashed' ? '8,4' : elStrokeStyle === 'dotted' ? '2,6' : '8,4'; // Frame defaults to dashed
         const elCornerRadius = element.cornerRadius ?? 8;
         const elFillColor = element.fillColor || 'none';
+        // Treat 'transparent' same as 'none' for hit detection - invisible fills shouldn't be clickable
+        const hasVisibleFill = elFillColor !== 'none' && elFillColor !== 'transparent';
+        // Convert transparent to none for proper pointer-events behavior in SVG
+        const fillValue = elFillColor === 'transparent' ? 'none' : elFillColor;
+        // Only visible parts should be clickable: if has fill AND stroke, allow both; if only stroke, only stroke; if only fill, only fill
+        const pointerEventsValue = hasVisibleFill && element.strokeWidth > 0 ? 'visible' :
+                                   hasVisibleFill ? 'fill' :
+                                   element.strokeWidth > 0 ? 'stroke' : 'none';
         return (
           <g key={element.id}>
             <rect
@@ -1589,11 +1646,11 @@ export function Canvas({
               height={element.height}
               stroke={element.strokeColor}
               strokeWidth={element.strokeWidth}
-              fill={elFillColor}
+              fill={fillValue}
               rx={elCornerRadius}
               opacity={isMarkedForDeletion ? elOpacity * 0.3 : elOpacity}
               strokeDasharray={strokeDasharray}
-              pointerEvents="stroke"
+              pointerEvents={pointerEventsValue}
             />
             {element.label && (
               <text
