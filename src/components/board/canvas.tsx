@@ -1314,8 +1314,8 @@ export function Canvas({
         // For dashed/dotted strokes, use polyline with stroke
         const strokeDasharray = elStrokeStyle === 'dashed' ? '10,10' : elStrokeStyle === 'dotted' ? '2,6' : 'none';
         const points = element.points.map(p => `${p.x},${p.y}`).join(' ');
-        // Create a wider invisible hitbox for easier clicking (minimum 12px)
-        const hitboxWidth = Math.max(element.strokeWidth * 4, 12);
+        // Create a wider invisible hitbox for easier clicking (minimum 16px)
+        const hitboxWidth = Math.max(element.strokeWidth * 6, 16);
         return (
           <g key={element.id}>
             {/* Invisible wider hitbox for easier clicking */}
@@ -1360,8 +1360,8 @@ export function Canvas({
         const elOpacity = (element.opacity ?? 100) / 100;
         const elStrokeStyle = element.strokeStyle || 'solid';
         const strokeDasharray = elStrokeStyle === 'dashed' ? '10,10' : elStrokeStyle === 'dotted' ? '2,6' : 'none';
-        // Create a wider invisible hitbox for easier clicking (minimum 12px)
-        const hitboxWidth = Math.max(element.strokeWidth * 4, 12);
+        // Create a wider invisible hitbox for easier clicking (minimum 16px)
+        const hitboxWidth = Math.max(element.strokeWidth * 6, 16);
         return (
           <g key={element.id}>
             {/* Invisible wider hitbox for easier clicking */}
@@ -1418,10 +1418,29 @@ export function Canvas({
         const pointerEventsValue = hasVisibleFill && element.strokeWidth > 0 ? 'visible' :
                                    hasVisibleFill ? 'fill' :
                                    element.strokeWidth > 0 ? 'stroke' : 'none';
+        // Create wider invisible hitbox for easier clicking on stroke-only shapes
+        const hitboxStrokeWidth = Math.max(element.strokeWidth * 6, 16);
+        const hitboxOffset = (hitboxStrokeWidth - element.strokeWidth) / 2;
         return (
           <g key={element.id}>
+            {/* Invisible wider hitbox for easier clicking (stroke-only shapes) */}
+            {!hasVisibleFill && element.strokeWidth > 0 && (
+              <rect
+                data-element-id={element.id}
+                x={(element.x ?? 0) - hitboxOffset}
+                y={(element.y ?? 0) - hitboxOffset}
+                width={(element.width ?? 0) + hitboxOffset * 2}
+                height={(element.height ?? 0) + hitboxOffset * 2}
+                stroke="transparent"
+                strokeWidth={hitboxStrokeWidth}
+                fill="none"
+                rx={elCornerRadius}
+                pointerEvents="stroke"
+              />
+            )}
+            {/* Visible rectangle */}
             <rect
-              data-element-id={element.id}
+              data-element-id={!hasVisibleFill && element.strokeWidth > 0 ? undefined : element.id}
               x={element.x}
               y={element.y}
               width={element.width}
@@ -1432,7 +1451,7 @@ export function Canvas({
               fill={fillValue}
               rx={elCornerRadius}
               opacity={isMarkedForDeletion ? elOpacity * 0.3 : elOpacity}
-              pointerEvents={pointerEventsValue}
+              pointerEvents={!hasVisibleFill && element.strokeWidth > 0 ? 'none' : pointerEventsValue}
             />
             {isMarkedForDeletion && (
               <rect
@@ -1463,10 +1482,28 @@ export function Canvas({
         const pointerEventsValue = hasVisibleFill && element.strokeWidth > 0 ? 'visible' :
                                    hasVisibleFill ? 'fill' :
                                    element.strokeWidth > 0 ? 'stroke' : 'none';
+        // Create wider invisible hitbox for easier clicking on stroke-only shapes
+        const hitboxStrokeWidth = Math.max(element.strokeWidth * 6, 16);
+        const hitboxOffset = (hitboxStrokeWidth - element.strokeWidth) / 2;
         return (
           <g key={element.id}>
+            {/* Invisible wider hitbox for easier clicking (stroke-only shapes) */}
+            {!hasVisibleFill && element.strokeWidth > 0 && (
+              <ellipse
+                data-element-id={element.id}
+                cx={cx}
+                cy={cy}
+                rx={(element.width || 0) / 2 + hitboxOffset}
+                ry={(element.height || 0) / 2 + hitboxOffset}
+                stroke="transparent"
+                strokeWidth={hitboxStrokeWidth}
+                fill="none"
+                pointerEvents="stroke"
+              />
+            )}
+            {/* Visible ellipse */}
             <ellipse
-              data-element-id={element.id}
+              data-element-id={!hasVisibleFill && element.strokeWidth > 0 ? undefined : element.id}
               cx={cx}
               cy={cy}
               rx={(element.width || 0) / 2}
@@ -1476,7 +1513,7 @@ export function Canvas({
               strokeDasharray={strokeDasharray}
               fill={fillValue}
               opacity={isMarkedForDeletion ? elOpacity * 0.3 : elOpacity}
-              pointerEvents={pointerEventsValue}
+              pointerEvents={!hasVisibleFill && element.strokeWidth > 0 ? 'none' : pointerEventsValue}
             />
             {isMarkedForDeletion && (
               <ellipse
@@ -1636,10 +1673,30 @@ export function Canvas({
         const pointerEventsValue = hasVisibleFill && element.strokeWidth > 0 ? 'visible' :
                                    hasVisibleFill ? 'fill' :
                                    element.strokeWidth > 0 ? 'stroke' : 'none';
+        // Create wider invisible hitbox for easier clicking on stroke-only shapes
+        const hitboxStrokeWidth = Math.max(element.strokeWidth * 6, 16);
+        const hitboxOffset = (hitboxStrokeWidth - element.strokeWidth) / 2;
         return (
           <g key={element.id}>
+            {/* Invisible wider hitbox for easier clicking (stroke-only shapes) */}
+            {!hasVisibleFill && element.strokeWidth > 0 && (
+              <rect
+                data-element-id={element.id}
+                x={(element.x ?? 0) - hitboxOffset}
+                y={(element.y ?? 0) - hitboxOffset}
+                width={(element.width ?? 0) + hitboxOffset * 2}
+                height={(element.height ?? 0) + hitboxOffset * 2}
+                stroke="transparent"
+                strokeWidth={hitboxStrokeWidth}
+                fill="none"
+                rx={elCornerRadius}
+                strokeDasharray={strokeDasharray}
+                pointerEvents="stroke"
+              />
+            )}
+            {/* Visible frame */}
             <rect
-              data-element-id={element.id}
+              data-element-id={!hasVisibleFill && element.strokeWidth > 0 ? undefined : element.id}
               x={element.x}
               y={element.y}
               width={element.width}
@@ -1650,7 +1707,7 @@ export function Canvas({
               rx={elCornerRadius}
               opacity={isMarkedForDeletion ? elOpacity * 0.3 : elOpacity}
               strokeDasharray={strokeDasharray}
-              pointerEvents={pointerEventsValue}
+              pointerEvents={!hasVisibleFill && element.strokeWidth > 0 ? 'none' : pointerEventsValue}
             />
             {element.label && (
               <text
