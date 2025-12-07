@@ -64,3 +64,14 @@ export const COLORS = [
 
 export const STROKE_WIDTHS = [2, 4, 6, 8, 12];
 
+export interface ShadeworksFile {
+  type: 'shadeworks';
+  version: number;
+  elements: BoardElement[];
+  appState: {
+    canvasBackground: 'none' | 'dots' | 'lines' | 'grid';
+    gridSize?: number;
+    viewBackgroundColor?: string;
+  };
+}
+
