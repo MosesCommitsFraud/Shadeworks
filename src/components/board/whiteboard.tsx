@@ -5,6 +5,8 @@ import { Canvas } from './canvas';
 import { Toolbar } from './toolbar';
 import { ToolSidebar } from './tool-sidebar';
 import { BurgerMenu } from './burger-menu';
+import { ExportImageModal } from './export-image-modal';
+import { FindCanvas } from './find-canvas';
 import { CollaborationManager, type ConnectionStatus } from '@/lib/collaboration';
 import { generateFunnyName } from '@/lib/funny-names';
 import type { Tool, BoardElement, ShadeworksFile } from '@/lib/board-types';
@@ -36,6 +38,9 @@ export function Whiteboard({ roomId }: WhiteboardProps) {
   const [canvasBackground, setCanvasBackground] = useState<'none' | 'dots' | 'lines' | 'grid'>('grid');
   const [showSaveDialog, setShowSaveDialog] = useState(false);
   const [saveFileName, setSaveFileName] = useState('');
+  const [showExportDialog, setShowExportDialog] = useState(false);
+  const [showFindCanvas, setShowFindCanvas] = useState(false);
+  const [highlightedElementIds, setHighlightedElementIds] = useState<string[]>([]);
 
   // Undo/Redo stacks - store snapshots
   const undoStackRef = useRef<BoardElement[][]>([]);
@@ -318,6 +323,45 @@ export function Whiteboard({ roomId }: WhiteboardProps) {
     input.click();
   }, [collaboration, saveToUndoStack]);
 
+  const handleExportImage = useCallback(() => {
+    setShowExportDialog(true);
+  }, []);
+
+  const handleFindOnCanvas = useCallback(() => {
+    setShowFindCanvas(true);
+  }, []);
+
+  const handleFocusElement = useCallback((element: BoardElement) => {
+    // Pan viewport to center on the element
+    if (setViewportRef.current) {
+      let centerX = 0;
+      let centerY = 0;
+
+      if (element.type === 'text' || element.type === 'rectangle' || element.type === 'ellipse' || element.type === 'frame') {
+        centerX = (element.x ?? 0) + (element.width ?? 0) / 2;
+        centerY = (element.y ?? 0) + (element.height ?? 0) / 2;
+      } else if (element.type === 'pen' || element.type === 'line') {
+        const xs = element.points.map(p => p.x);
+        const ys = element.points.map(p => p.y);
+        centerX = (Math.min(...xs) + Math.max(...xs)) / 2;
+        centerY = (Math.min(...ys) + Math.max(...ys)) / 2;
+      }
+
+      // Get viewport dimensions (assuming window size)
+      const viewportWidth = window.innerWidth;
+      const viewportHeight = window.innerHeight;
+
+      // Pan to center the element
+      const panX = viewportWidth / 2 - centerX;
+      const panY = viewportHeight / 2 - centerY;
+
+      setViewportRef.current({ x: panX, y: panY }, 1);
+    }
+
+    // Select the element
+    setSelectedElements([element]);
+  }, []);
+
   const handleFollowUser = useCallback((userId: string) => {
     // Toggle follow mode - if clicking the same user, unfollow
     setFollowedUserId(prev => prev === userId ? null : userId);
@@ -462,11 +506,22 @@ export function Whiteboard({ roomId }: WhiteboardProps) {
           onClear={handleClear}
           onSave={handleSave}
           onOpen={handleOpen}
+          onExportImage={handleExportImage}
+          onFindOnCanvas={handleFindOnCanvas}
           canvasBackground={canvasBackground}
           onCanvasBackgroundChange={setCanvasBackground}
           roomId={roomId}
         />
       </div>
+
+      {/* Find Canvas */}
+      <FindCanvas
+        isOpen={showFindCanvas}
+        onClose={() => setShowFindCanvas(false)}
+        elements={elements}
+        onFocusElement={handleFocusElement}
+        onHighlightElements={setHighlightedElementIds}
+      />
 
       {/* Colored frame when following a user */}
       {followedUser && (
@@ -552,6 +607,7 @@ export function Whiteboard({ roomId }: WhiteboardProps) {
         onStrokeColorChange={handleStrokeColorChange}
         onFillColorChange={handleFillColorChange}
         canvasBackground={canvasBackground}
+        highlightedElementIds={highlightedElementIds}
       />
 
       {/* Save File Dialog */}
@@ -601,6 +657,14 @@ export function Whiteboard({ roomId }: WhiteboardProps) {
           </div>
         </div>
       )}
+
+      {/* Export Image Dialog */}
+      <ExportImageModal
+        isOpen={showExportDialog}
+        onClose={() => setShowExportDialog(false)}
+        elements={elements}
+        canvasBackground={canvasBackground}
+      />
     </div>
   );
 }

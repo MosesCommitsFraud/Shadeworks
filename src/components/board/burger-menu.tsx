@@ -96,7 +96,7 @@ export function BurgerMenu({
       }
 
       // Ctrl+Shift+E - Export Image
-      if (ctrlKey && e.shiftKey && e.key === 'E') {
+      if (ctrlKey && e.shiftKey && (e.key === 'E' || e.key === 'e')) {
         e.preventDefault();
         handleExportImage();
       }
@@ -116,7 +116,7 @@ export function BurgerMenu({
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [onOpen, onSave, onFindOnCanvas, onHelp]);
+  }, [onOpen, onSave, onExportImage, onFindOnCanvas, onHelp]);
 
   const modKey = isMac() ? '⌘' : 'Ctrl';
 
