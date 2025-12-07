@@ -1259,27 +1259,63 @@ export function Canvas({
 
     switch (element.type) {
       case 'pen': {
-        const stroke = getStroke(element.points.map((p) => [p.x, p.y]), {
-          size: element.strokeWidth * 2,
-          thinning: 0.5,
-          smoothing: 0.5,
-          streamline: 0.5,
-        });
-        const pathData = getSvgPathFromStroke(stroke);
         const elOpacity = (element.opacity ?? 100) / 100;
+        const elStrokeStyle = element.strokeStyle || 'solid';
+
+        // For solid strokes, use the filled path approach
+        if (elStrokeStyle === 'solid') {
+          const stroke = getStroke(element.points.map((p) => [p.x, p.y]), {
+            size: element.strokeWidth * 2,
+            thinning: 0.5,
+            smoothing: 0.5,
+            streamline: 0.5,
+          });
+          const pathData = getSvgPathFromStroke(stroke);
+          return (
+            <g key={element.id}>
+              <path
+                data-element-id={element.id}
+                d={pathData}
+                fill={element.strokeColor}
+                opacity={isMarkedForDeletion ? elOpacity * 0.3 : elOpacity}
+                pointerEvents="auto"
+              />
+              {isMarkedForDeletion && (
+                <path
+                  d={pathData}
+                  fill="rgba(0, 0, 0, 0.6)"
+                  pointerEvents="none"
+                />
+              )}
+            </g>
+          );
+        }
+
+        // For dashed/dotted strokes, use polyline with stroke
+        const strokeDasharray = elStrokeStyle === 'dashed' ? '10,10' : elStrokeStyle === 'dotted' ? '2,6' : 'none';
+        const points = element.points.map(p => `${p.x},${p.y}`).join(' ');
         return (
           <g key={element.id}>
-            <path
+            <polyline
               data-element-id={element.id}
-              d={pathData}
-              fill={element.strokeColor}
+              points={points}
+              stroke={element.strokeColor}
+              strokeWidth={element.strokeWidth}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeDasharray={strokeDasharray}
+              fill="none"
               opacity={isMarkedForDeletion ? elOpacity * 0.3 : elOpacity}
-              pointerEvents="auto"
+              pointerEvents="stroke"
             />
             {isMarkedForDeletion && (
-              <path
-                d={pathData}
-                fill="rgba(0, 0, 0, 0.6)"
+              <polyline
+                points={points}
+                stroke="rgba(0, 0, 0, 0.6)"
+                strokeWidth={element.strokeWidth}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                fill="none"
                 pointerEvents="none"
               />
             )}
