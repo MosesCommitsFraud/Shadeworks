@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { useTheme } from 'next-themes';
 import { ChevronLeft, ChevronRight, Circle, Minus, Square, Type, Pencil, ArrowUpToLine, ArrowDownToLine, X, AlignLeft, AlignCenter, AlignRight } from 'lucide-react';
 import { Tool, COLORS, STROKE_WIDTHS, FONTS, FONT_SIZES, BoardElement } from '@/lib/board-types';
 import { cn } from '@/lib/utils';
@@ -65,6 +66,7 @@ export function ToolSidebar({
   onBringToFront,
   onSendToBack,
 }: ToolSidebarProps) {
+  const { theme, resolvedTheme } = useTheme();
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [showStrokeColorPicker, setShowStrokeColorPicker] = useState(false);
   const [showFillColorPicker, setShowFillColorPicker] = useState(false);
@@ -77,6 +79,12 @@ export function ToolSidebar({
   }
 
   const hasSelectedElements = selectedElements.length > 0;
+
+  // Reorder colors based on theme: black first in light mode, white first in dark mode
+  const currentTheme = resolvedTheme || theme;
+  const orderedColors = currentTheme === 'light'
+    ? COLORS
+    : [COLORS[1], COLORS[0], ...COLORS.slice(2)];
 
   // Determine what controls to show based on selected elements or current tool
   const showFill = hasSelectedElements
@@ -134,7 +142,7 @@ export function ToolSidebar({
               Stroke Color
             </label>
             <div className="flex flex-wrap gap-1">
-              {COLORS.map((color) => (
+              {orderedColors.map((color) => (
                 <button
                   key={color}
                   onClick={() => onStrokeColorChange(color)}
@@ -192,7 +200,7 @@ export function ToolSidebar({
                       <div className="w-5 h-0.5 bg-red-500 rotate-45" />
                     </div>
                   </button>
-                  {COLORS.map((color) => (
+                  {orderedColors.map((color) => (
                     <button
                       key={`fill-${color}`}
                       onClick={() => onFillColorChange(color)}

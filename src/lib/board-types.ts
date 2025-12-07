@@ -51,6 +51,7 @@ export interface Cursor {
 }
 
 export const COLORS = [
+  '#000000',
   '#ffffff',
   '#f87171',
   '#fb923c',

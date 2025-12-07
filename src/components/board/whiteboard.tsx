@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { useTheme } from 'next-themes';
 import { Canvas } from './canvas';
 import { Toolbar } from './toolbar';
 import { ToolSidebar } from './tool-sidebar';
@@ -18,8 +19,16 @@ interface WhiteboardProps {
 const MAX_UNDO_STACK = 100;
 
 export function Whiteboard({ roomId }: WhiteboardProps) {
+  const { theme, resolvedTheme } = useTheme();
   const [tool, setTool] = useState<Tool>('select');
-  const [strokeColor, setStrokeColor] = useState('#ffffff');
+
+  // Default color based on theme: black in light mode, white in dark mode
+  const getDefaultStrokeColor = () => {
+    const currentTheme = resolvedTheme || theme;
+    return currentTheme === 'light' ? '#000000' : '#ffffff';
+  };
+
+  const [strokeColor, setStrokeColor] = useState(getDefaultStrokeColor());
   const [strokeWidth, setStrokeWidth] = useState(4);
   const [fillColor, setFillColor] = useState('transparent');
   const [opacity, setOpacity] = useState(100);
@@ -54,6 +63,27 @@ export function Whiteboard({ roomId }: WhiteboardProps) {
 
   // Ref to store the setViewport function from Canvas
   const setViewportRef = useRef<((pan: { x: number; y: number }, zoom: number) => void) | null>(null);
+
+  // Update default stroke color when theme changes
+  useEffect(() => {
+    const currentTheme = resolvedTheme || theme;
+    const defaultColor = currentTheme === 'light' ? '#000000' : '#ffffff';
+    const oldDefaultColor = currentTheme === 'light' ? '#ffffff' : '#000000';
+
+    // Update current stroke color if it's a default color
+    if (strokeColor === '#ffffff' || strokeColor === '#000000') {
+      setStrokeColor(defaultColor);
+    }
+
+    // Update all existing elements that use default colors
+    if (collaboration) {
+      elements.forEach((element) => {
+        if (element.strokeColor === oldDefaultColor) {
+          collaboration.updateElement(element.id, { strokeColor: defaultColor });
+        }
+      });
+    }
+  }, [theme, resolvedTheme, strokeColor, collaboration, elements]);
 
   // Initialize collaboration with a random funny name
   useEffect(() => {
