@@ -89,8 +89,14 @@ export function BurgerMenu({
         onOpen?.();
       }
 
+      // Ctrl+S - Save
+      if (ctrlKey && e.key === 's') {
+        e.preventDefault();
+        onSave?.();
+      }
+
       // Ctrl+Shift+E - Export Image
-      if (ctrlKey && e.shiftKey && e.key === 'E') {
+      if (ctrlKey && e.shiftKey && (e.key === 'E' || e.key === 'e')) {
         e.preventDefault();
         handleExportImage();
       }
@@ -110,7 +116,7 @@ export function BurgerMenu({
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [onOpen, onFindOnCanvas, onHelp]);
+  }, [onOpen, onSave, onExportImage, onFindOnCanvas, onHelp]);
 
   const modKey = isMac() ? '⌘' : 'Ctrl';
 
@@ -143,6 +149,10 @@ export function BurgerMenu({
         <DropdownMenuItem onClick={onSave}>
           <Save className="w-4 h-4" />
           <span>Save to...</span>
+          <div className="ml-auto flex gap-0.5">
+            <Kbd>{modKey}</Kbd>
+            <Kbd>S</Kbd>
+          </div>
         </DropdownMenuItem>
 
         <DropdownMenuItem onClick={handleExportImage}>

@@ -5,9 +5,11 @@ import { Canvas } from './canvas';
 import { Toolbar } from './toolbar';
 import { ToolSidebar } from './tool-sidebar';
 import { BurgerMenu } from './burger-menu';
+import { ExportImageModal } from './export-image-modal';
+import { FindCanvas } from './find-canvas';
 import { CollaborationManager, type ConnectionStatus } from '@/lib/collaboration';
 import { generateFunnyName } from '@/lib/funny-names';
-import type { Tool, BoardElement } from '@/lib/board-types';
+import type { Tool, BoardElement, ShadeworksFile } from '@/lib/board-types';
 
 interface WhiteboardProps {
   roomId: string;
@@ -34,6 +36,11 @@ export function Whiteboard({ roomId }: WhiteboardProps) {
   const [followedUserId, setFollowedUserId] = useState<string | null>(null);
   const [selectedElements, setSelectedElements] = useState<BoardElement[]>([]);
   const [canvasBackground, setCanvasBackground] = useState<'none' | 'dots' | 'lines' | 'grid'>('grid');
+  const [showSaveDialog, setShowSaveDialog] = useState(false);
+  const [saveFileName, setSaveFileName] = useState('');
+  const [showExportDialog, setShowExportDialog] = useState(false);
+  const [showFindCanvas, setShowFindCanvas] = useState(false);
+  const [highlightedElementIds, setHighlightedElementIds] = useState<string[]>([]);
 
   // Undo/Redo stacks - store snapshots
   const undoStackRef = useRef<BoardElement[][]>([]);
@@ -232,6 +239,129 @@ export function Whiteboard({ roomId }: WhiteboardProps) {
     }
   }, [collaboration, saveToUndoStack]);
 
+  const handleSave = useCallback(() => {
+    // Set default filename with current date
+    setSaveFileName(`shadeworks-${new Date().toISOString().split('T')[0]}`);
+    setShowSaveDialog(true);
+  }, []);
+
+  const handleConfirmSave = useCallback(() => {
+    const shadeworksFile: ShadeworksFile = {
+      type: 'shadeworks',
+      version: 1,
+      elements: elements,
+      appState: {
+        canvasBackground: canvasBackground,
+      },
+    };
+
+    const jsonString = JSON.stringify(shadeworksFile, null, 2);
+    const blob = new Blob([jsonString], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+
+    const link = document.createElement('a');
+    link.href = url;
+    // Ensure .shadeworks extension
+    const fileName = saveFileName.endsWith('.shadeworks')
+      ? saveFileName
+      : `${saveFileName}.shadeworks`;
+    link.download = fileName;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+
+    setShowSaveDialog(false);
+    setSaveFileName('');
+  }, [elements, canvasBackground, saveFileName]);
+
+  const handleOpen = useCallback(() => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.shadeworks,application/json';
+
+    input.onchange = (e: Event) => {
+      const file = (e.target as HTMLInputElement).files?.[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        try {
+          const content = event.target?.result as string;
+          const data: ShadeworksFile = JSON.parse(content);
+
+          // Validate file format
+          if (data.type !== 'shadeworks') {
+            alert('Invalid file format. Please select a .shadeworks file.');
+            return;
+          }
+
+          // Save current state to undo before loading
+          saveToUndoStack();
+
+          // Load elements
+          if (collaboration) {
+            collaboration.clearAll();
+            data.elements.forEach(el => collaboration.addElement(el));
+          } else {
+            setElements(data.elements);
+          }
+
+          // Load app state
+          if (data.appState?.canvasBackground) {
+            setCanvasBackground(data.appState.canvasBackground);
+          }
+        } catch (error) {
+          console.error('Error loading file:', error);
+          alert('Failed to load file. Please ensure it is a valid .shadeworks file.');
+        }
+      };
+
+      reader.readAsText(file);
+    };
+
+    input.click();
+  }, [collaboration, saveToUndoStack]);
+
+  const handleExportImage = useCallback(() => {
+    setShowExportDialog(true);
+  }, []);
+
+  const handleFindOnCanvas = useCallback(() => {
+    setShowFindCanvas(true);
+  }, []);
+
+  const handleFocusElement = useCallback((element: BoardElement) => {
+    // Pan viewport to center on the element
+    if (setViewportRef.current) {
+      let centerX = 0;
+      let centerY = 0;
+
+      if (element.type === 'text' || element.type === 'rectangle' || element.type === 'ellipse' || element.type === 'frame') {
+        centerX = (element.x ?? 0) + (element.width ?? 0) / 2;
+        centerY = (element.y ?? 0) + (element.height ?? 0) / 2;
+      } else if (element.type === 'pen' || element.type === 'line') {
+        const xs = element.points.map(p => p.x);
+        const ys = element.points.map(p => p.y);
+        centerX = (Math.min(...xs) + Math.max(...xs)) / 2;
+        centerY = (Math.min(...ys) + Math.max(...ys)) / 2;
+      }
+
+      // Get viewport dimensions (assuming window size)
+      const viewportWidth = window.innerWidth;
+      const viewportHeight = window.innerHeight;
+
+      // Pan to center the element
+      const panX = viewportWidth / 2 - centerX;
+      const panY = viewportHeight / 2 - centerY;
+
+      setViewportRef.current({ x: panX, y: panY }, 1);
+    }
+
+    // Select the element
+    setSelectedElements([element]);
+  }, []);
+
   const handleFollowUser = useCallback((userId: string) => {
     // Toggle follow mode - if clicking the same user, unfollow
     setFollowedUserId(prev => prev === userId ? null : userId);
@@ -374,11 +504,24 @@ export function Whiteboard({ roomId }: WhiteboardProps) {
       <div className="absolute top-4 left-4 z-50">
         <BurgerMenu
           onClear={handleClear}
+          onSave={handleSave}
+          onOpen={handleOpen}
+          onExportImage={handleExportImage}
+          onFindOnCanvas={handleFindOnCanvas}
           canvasBackground={canvasBackground}
           onCanvasBackgroundChange={setCanvasBackground}
           roomId={roomId}
         />
       </div>
+
+      {/* Find Canvas */}
+      <FindCanvas
+        isOpen={showFindCanvas}
+        onClose={() => setShowFindCanvas(false)}
+        elements={elements}
+        onFocusElement={handleFocusElement}
+        onHighlightElements={setHighlightedElementIds}
+      />
 
       {/* Colored frame when following a user */}
       {followedUser && (
@@ -463,6 +606,63 @@ export function Whiteboard({ roomId }: WhiteboardProps) {
         onSelectionChange={setSelectedElements}
         onStrokeColorChange={handleStrokeColorChange}
         onFillColorChange={handleFillColorChange}
+        canvasBackground={canvasBackground}
+        highlightedElementIds={highlightedElementIds}
+      />
+
+      {/* Save File Dialog */}
+      {showSaveDialog && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/50 backdrop-blur-sm">
+          <div className="bg-card border border-border rounded-lg shadow-2xl p-6 w-96 max-w-[90vw]">
+            <h2 className="text-lg font-semibold mb-4">Save Shadeworks File</h2>
+            <div className="mb-4">
+              <label htmlFor="filename" className="block text-sm font-medium mb-2 text-muted-foreground">
+                File name
+              </label>
+              <input
+                id="filename"
+                type="text"
+                className="w-full px-3 py-2 bg-background border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-accent"
+                value={saveFileName}
+                onChange={(e) => setSaveFileName(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    handleConfirmSave();
+                  } else if (e.key === 'Escape') {
+                    setShowSaveDialog(false);
+                  }
+                }}
+                autoFocus
+                placeholder="Enter file name"
+              />
+              <p className="text-xs text-muted-foreground mt-1">
+                {saveFileName && !saveFileName.endsWith('.shadeworks')}
+              </p>
+            </div>
+            <div className="flex gap-2 justify-end">
+              <button
+                onClick={() => setShowSaveDialog(false)}
+                className="px-4 py-2 rounded-md bg-background hover:bg-muted transition-colors border border-border"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleConfirmSave}
+                disabled={!saveFileName.trim()}
+                className="px-4 py-2 rounded-md bg-accent hover:bg-accent/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Save
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Export Image Dialog */}
+      <ExportImageModal
+        isOpen={showExportDialog}
+        onClose={() => setShowExportDialog(false)}
+        elements={elements}
         canvasBackground={canvasBackground}
       />
     </div>

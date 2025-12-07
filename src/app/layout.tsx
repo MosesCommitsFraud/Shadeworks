@@ -14,7 +14,16 @@ export const metadata: Metadata = {
   title: "Shadeworks",
   description: "A collection of tools that i dont want to spend money on.",
   icons: {
-    icon: "/logo-sw-white.svg",
+    icon: [
+      {
+        url: "/logo-sw-dark.svg",
+        media: "(prefers-color-scheme: light)",
+      },
+      {
+        url: "/logo-sw-white.svg",
+        media: "(prefers-color-scheme: dark)",
+      },
+    ],
   },
 }
 
@@ -28,7 +37,7 @@ export default function RootLayout({
       <body className={`font-sans antialiased`}>
         <ThemeProvider
           attribute="class"
-          defaultTheme="dark"
+          defaultTheme="system"
           enableSystem
           disableTransitionOnChange
         >
