@@ -108,7 +108,7 @@ export function Toolbar({
   }, [onToolChange]);
 
   return (
-    <div className="absolute top-4 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2">
+    <div className="absolute top-4 left-1/2 -translate-x-1/2 z-50 flex items-stretch gap-2">
       {/* Main Tools */}
       <div className="flex items-center gap-1 bg-card/95 backdrop-blur-md border border-border rounded-xl p-1.5 shadow-2xl">
         {tools.map((tool) => (
@@ -117,14 +117,14 @@ export function Toolbar({
               <button
                 onClick={() => onToolChange(tool.id)}
                 className={cn(
-                  'p-2.5 rounded-lg transition-all duration-200',
+                  'p-2 rounded-lg transition-all duration-200',
                   'hover:bg-secondary/80',
                   selectedTool === tool.id
                     ? 'bg-accent text-accent-foreground shadow-lg'
                     : 'text-muted-foreground hover:text-foreground'
                 )}
               >
-                <tool.icon className="w-5 h-5" />
+                <tool.icon className="w-4 h-4" />
               </button>
             </TooltipTrigger>
             <TooltipContent>
@@ -136,16 +136,16 @@ export function Toolbar({
           </Tooltip>
         ))}
 
-        <div className="w-px h-6 bg-border mx-1" />
+        <div className="w-px h-5 bg-border mx-1" />
 
         {/* Clear Canvas */}
         <Tooltip>
           <TooltipTrigger asChild>
             <button
               onClick={onClear}
-              className="p-2.5 rounded-lg hover:bg-destructive/20 text-muted-foreground hover:text-destructive transition-all duration-200"
+              className="p-2 rounded-lg hover:bg-destructive/20 text-muted-foreground hover:text-destructive transition-all duration-200"
             >
-              <Trash2 className="w-5 h-5" />
+              <Trash2 className="w-4 h-4" />
             </button>
           </TooltipTrigger>
           <TooltipContent>
@@ -153,11 +153,11 @@ export function Toolbar({
           </TooltipContent>
         </Tooltip>
       </div>
-      
+
       {/* Collaboration Panel */}
-      <div className="flex items-center gap-2 bg-card/95 backdrop-blur-md border border-border rounded-xl p-1.5 shadow-2xl">
+      <div className="flex items-center gap-2 bg-card/95 backdrop-blur-md border border-border rounded-xl px-2 py-1.5 shadow-2xl">
         {/* Your Name */}
-        <div className="flex items-center gap-2 px-3 py-1.5 h-10">
+        <div className="flex items-center gap-2 px-1">
           {/* Status indicator */}
           <div
             className={cn(
@@ -177,19 +177,19 @@ export function Toolbar({
                     : 'Disconnected'
             }
           />
-          <span className="text-sm font-medium text-foreground max-w-[140px] truncate" title={myName}>
+          <span className="text-xs font-medium text-foreground max-w-[120px] truncate" title={myName}>
             {myName}
           </span>
           <CollaboratorAvatars users={collaboratorUsers} maxDisplay={5} onFollowUser={onFollowUser} followedUserId={followedUserId} />
         </div>
 
-        <div className="w-px h-6 bg-border" />
+        <div className="w-px h-5 bg-border" />
 
         {/* Share Button */}
         <button
           onClick={copyInviteLink}
           className={cn(
-            'flex items-center gap-2 px-3 py-2 rounded-lg transition-all duration-200',
+            'flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg transition-all duration-200',
             copied
               ? 'bg-green-500/20 text-green-400'
               : 'hover:bg-secondary/80 text-muted-foreground hover:text-foreground'
@@ -197,13 +197,13 @@ export function Toolbar({
         >
           {copied ? (
             <>
-              <Check className="w-4 h-4" />
-              <span className="text-sm font-medium">Copied!</span>
+              <Check className="w-3.5 h-3.5" />
+              <span className="text-xs font-medium">Copied!</span>
             </>
           ) : (
             <>
-              <Share2 className="w-4 h-4" />
-              <span className="text-sm font-medium">Invite</span>
+              <Share2 className="w-3.5 h-3.5" />
+              <span className="text-xs font-medium">Invite</span>
             </>
           )}
         </button>
