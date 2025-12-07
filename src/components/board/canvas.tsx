@@ -1815,26 +1815,27 @@ export function Canvas({
   const getBackgroundStyle = () => {
     const spacing = 40 * zoom;
     const position = `${pan.x}px ${pan.y}px`;
+    const gridColor = 'currentColor'; // Will inherit from parent's text color
 
     switch (canvasBackground) {
       case 'grid':
         return {
           backgroundImage: `
-            linear-gradient(to right, #fff 1px, transparent 1px),
-            linear-gradient(to bottom, #fff 1px, transparent 1px)
+            linear-gradient(to right, ${gridColor} 1px, transparent 1px),
+            linear-gradient(to bottom, ${gridColor} 1px, transparent 1px)
           `,
           backgroundSize: `${spacing}px ${spacing}px`,
           backgroundPosition: position,
         };
       case 'dots':
         return {
-          backgroundImage: `radial-gradient(circle, #fff 1.5px, transparent 1.5px)`,
+          backgroundImage: `radial-gradient(circle, ${gridColor} 1.5px, transparent 1.5px)`,
           backgroundSize: `${spacing}px ${spacing}px`,
           backgroundPosition: position,
         };
       case 'lines':
         return {
-          backgroundImage: `linear-gradient(to bottom, #fff 1px, transparent 1px)`,
+          backgroundImage: `linear-gradient(to bottom, ${gridColor} 1px, transparent 1px)`,
           backgroundSize: `${spacing}px ${spacing}px`,
           backgroundPosition: position,
         };
@@ -1847,11 +1848,11 @@ export function Canvas({
   };
 
   return (
-    <div ref={containerRef} className="relative w-full h-full overflow-hidden bg-[#0a0a0a]">
+    <div ref={containerRef} className="relative w-full h-full overflow-hidden bg-background">
       {/* Canvas Background */}
       {canvasBackground !== 'none' && (
         <div
-          className="absolute inset-0 pointer-events-none opacity-[0.03]"
+          className="absolute inset-0 pointer-events-none text-foreground opacity-[0.08] dark:opacity-[0.05]"
           style={getBackgroundStyle()}
         />
       )}
