@@ -610,8 +610,8 @@ export function Whiteboard({ roomId }: WhiteboardProps) {
 
   return (
     <div className="relative w-screen h-screen overflow-hidden">
-      {/* Burger Menu - Top Left */}
-      <div className="absolute top-4 left-4 z-50">
+      {/* Burger Menu and Logo - Top Left */}
+      <div className="absolute top-4 left-4 z-50 flex items-center gap-3">
         <BurgerMenu
           onClear={handleClear}
           onSave={handleSave}
@@ -622,6 +622,14 @@ export function Whiteboard({ roomId }: WhiteboardProps) {
           onCanvasBackgroundChange={setCanvasBackground}
           roomId={roomId}
         />
+        {/* Shadeworks Logo */}
+        <div className="bg-card/95 backdrop-blur-md border border-border rounded-lg px-3 py-2 shadow-2xl">
+          <img
+            src={(resolvedTheme || theme) === 'light' ? '/logo-text-sw-dark.svg' : '/logo-text-sw-white.svg'}
+            alt="Shadeworks"
+            className="h-6"
+          />
+        </div>
       </div>
 
       {/* Find Canvas */}
