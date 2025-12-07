@@ -623,13 +623,16 @@ export function Whiteboard({ roomId }: WhiteboardProps) {
           roomId={roomId}
         />
         {/* Shadeworks Logo */}
-        <div className="bg-card/95 backdrop-blur-md border border-border rounded-lg px-3 py-2 shadow-2xl">
+        <a
+          href="/"
+          className="bg-card/95 backdrop-blur-md border border-border rounded-lg px-3 py-2 shadow-2xl hover:bg-muted/60 transition-colors"
+        >
           <img
             src={(resolvedTheme || theme) === 'light' ? '/logo-text-sw-dark.svg' : '/logo-text-sw-white.svg'}
             alt="Shadeworks"
             className="h-6"
           />
-        </div>
+        </a>
       </div>
 
       {/* Find Canvas */}
