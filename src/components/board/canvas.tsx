@@ -1199,11 +1199,8 @@ export function Canvas({
         };
         onAddElement(newElement);
 
-        // Select the new text element and switch back to select tool
-        setSelectedIds([newElement.id]);
-        if (onToolChange) {
-          onToolChange('select');
-        }
+        // Don't switch tools - stay in text mode for continued text creation
+        // setSelectedIds([newElement.id]);
       } else {
         // Create simple single-line text
         const textWidth = textValue.length * fontSize * 0.55;
@@ -1231,11 +1228,8 @@ export function Canvas({
         };
         onAddElement(newElement);
 
-        // Select the new text element and switch back to select tool
-        setSelectedIds([newElement.id]);
-        if (onToolChange) {
-          onToolChange('select');
-        }
+        // Don't switch tools - stay in text mode for continued text creation
+        // setSelectedIds([newElement.id]);
       }
     }
     setTextInput(null);
@@ -2085,7 +2079,17 @@ export function Canvas({
                 setTextValue('');
               }
             }}
-            onBlur={() => {
+            onBlur={(e) => {
+              // Don't close if clicking on sidebar or other UI elements
+              const relatedTarget = e.relatedTarget as HTMLElement;
+              if (relatedTarget && (
+                relatedTarget.closest('.fixed.right-4') || // Sidebar
+                relatedTarget.tagName === 'BUTTON' ||
+                relatedTarget.tagName === 'SELECT' ||
+                relatedTarget.tagName === 'INPUT'
+              )) {
+                return;
+              }
               // Save text on blur if there's content
               if (textValue.trim()) {
                 handleTextSubmit();
@@ -2099,13 +2103,16 @@ export function Canvas({
               left: textInput.x * zoom + pan.x,
               top: textInput.y * zoom + pan.y - 2 * zoom, // Account for 2px border
               width: (textInput.width ?? 200) * zoom,
-              fontSize: (strokeWidth * 4 + 12) * zoom,
+              fontSize: fontSize * zoom,
+              fontFamily: fontFamily,
+              letterSpacing: `${letterSpacing}px`,
               color: strokeColor,
-              lineHeight: '1.4',
+              lineHeight: lineHeight.toString(),
+              textAlign: textAlign,
               // Match SVG padding: horizontal is 8, vertical is 8 but adjusted for baseline
               paddingLeft: `${8 * zoom}px`,
               paddingRight: `${8 * zoom}px`,
-              paddingTop: `${(8 - (strokeWidth * 4 + 12) * 0.18) * zoom}px`,
+              paddingTop: `${(8 - fontSize * 0.18) * zoom}px`,
               paddingBottom: `${8 * zoom}px`,
               wordWrap: 'break-word',
               whiteSpace: 'pre-wrap',
@@ -2129,7 +2136,17 @@ export function Canvas({
                 setTextValue('');
               }
             }}
-            onBlur={() => {
+            onBlur={(e) => {
+              // Don't close if clicking on sidebar or other UI elements
+              const relatedTarget = e.relatedTarget as HTMLElement;
+              if (relatedTarget && (
+                relatedTarget.closest('.fixed.right-4') || // Sidebar
+                relatedTarget.tagName === 'BUTTON' ||
+                relatedTarget.tagName === 'SELECT' ||
+                relatedTarget.tagName === 'INPUT'
+              )) {
+                return;
+              }
               // Save text on blur if there's content
               if (textValue.trim()) {
                 handleTextSubmit();
@@ -2141,9 +2158,12 @@ export function Canvas({
             className="absolute bg-transparent border-none outline-none text-foreground"
             style={{
               left: textInput.x * zoom + pan.x,
-              top: textInput.y * zoom + pan.y - (strokeWidth * 4 + 12) * 0.82 * zoom,
-              fontSize: (strokeWidth * 4 + 12) * zoom,
+              top: textInput.y * zoom + pan.y - fontSize * 0.82 * zoom,
+              fontSize: fontSize * zoom,
+              fontFamily: fontFamily,
+              letterSpacing: `${letterSpacing}px`,
               color: strokeColor,
+              textAlign: textAlign,
               minWidth: '100px',
             }}
             placeholder="Type..."
