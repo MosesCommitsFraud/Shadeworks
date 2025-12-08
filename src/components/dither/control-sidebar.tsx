@@ -10,6 +10,8 @@ import { PaletteSection } from './sections/palette-section';
 import { AdjustmentsSection } from './sections/adjustments-section';
 import { ColorModeSection } from './sections/color-mode-section';
 import { ExportSection, type ExportOptions } from './sections/export-section';
+import { PresetSection } from './sections/preset-section';
+import type { DitherPreset } from '@/lib/dither/presets';
 
 interface ControlSidebarProps {
   originalImage: ImageData | null;
@@ -25,6 +27,7 @@ interface ControlSidebarProps {
   onColorModeSettingsChange: (settings: Partial<ColorModeSettings>) => void;
   onExport: (options: ExportOptions) => void;
   isExporting: boolean;
+  onApplyPreset: (preset: DitherPreset) => void;
 }
 
 export function ControlSidebar({
@@ -41,18 +44,20 @@ export function ControlSidebar({
   onColorModeSettingsChange,
   onExport,
   isExporting,
+  onApplyPreset,
 }: ControlSidebarProps) {
   return (
     <aside className="w-80 border-r border-border bg-card flex flex-col">
       <ScrollArea className="flex-1">
         <div className="p-4">
           <Tabs defaultValue="upload" className="w-full">
-            <TabsList className="grid w-full grid-cols-6 text-xs">
+            <TabsList className="grid w-full grid-cols-7 text-xs">
               <TabsTrigger value="upload">Upload</TabsTrigger>
               <TabsTrigger value="adjust">Adjust</TabsTrigger>
               <TabsTrigger value="mode">Mode</TabsTrigger>
               <TabsTrigger value="dither">Dither</TabsTrigger>
               <TabsTrigger value="palette">Palette</TabsTrigger>
+              <TabsTrigger value="preset">Preset</TabsTrigger>
               <TabsTrigger value="export">Export</TabsTrigger>
             </TabsList>
 
@@ -90,6 +95,17 @@ export function ControlSidebar({
                 onPaletteChange={onPaletteChange}
                 hasImage={!!originalImage}
                 originalImage={originalImage}
+              />
+            </TabsContent>
+
+            <TabsContent value="preset" className="mt-4">
+              <PresetSection
+                ditheringSettings={ditheringSettings}
+                adjustmentSettings={adjustmentSettings}
+                colorModeSettings={colorModeSettings}
+                palette={palette}
+                onApplyPreset={onApplyPreset}
+                hasImage={!!originalImage}
               />
             </TabsContent>
 

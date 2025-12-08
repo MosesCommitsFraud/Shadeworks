@@ -2,8 +2,9 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { ZoomIn, ZoomOut, Maximize2 } from 'lucide-react';
+import { ZoomIn, ZoomOut, Maximize2, SplitSquareHorizontal } from 'lucide-react';
 import { Progress } from '@/components/ui/progress';
+import { BeforeAfterSlider } from './components/before-after-slider';
 
 interface CanvasPreviewProps {
   originalImage: ImageData | null;
@@ -11,6 +12,13 @@ interface CanvasPreviewProps {
   isProcessing: boolean;
   zoom: number;
   onZoomChange: (zoom: number) => void;
+  comparisonMode?: boolean;
+  onComparisonModeChange?: (mode: boolean) => void;
+  onRegisterZoomHandlers?: (handlers: {
+    zoomIn: () => void;
+    zoomOut: () => void;
+    zoomFit: () => void;
+  }) => void;
 }
 
 export function CanvasPreview({
@@ -19,12 +27,19 @@ export function CanvasPreview({
   isProcessing,
   zoom,
   onZoomChange,
+  comparisonMode: externalComparisonMode,
+  onComparisonModeChange,
+  onRegisterZoomHandlers,
 }: CanvasPreviewProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState(false);
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
+  const [internalComparisonMode, setInternalComparisonMode] = useState(false);
+
+  // Use external comparison mode if provided, otherwise use internal
+  const comparisonMode = externalComparisonMode !== undefined ? externalComparisonMode : internalComparisonMode;
 
   // Draw image on canvas
   useEffect(() => {
@@ -91,7 +106,28 @@ export function CanvasPreview({
     setIsDragging(false);
   };
 
+  // Register zoom handlers with parent
+  useEffect(() => {
+    if (onRegisterZoomHandlers) {
+      onRegisterZoomHandlers({
+        zoomIn: handleZoomIn,
+        zoomOut: handleZoomOut,
+        zoomFit: handleFitToScreen,
+      });
+    }
+  }, [onRegisterZoomHandlers, handleZoomIn, handleZoomOut, handleFitToScreen]);
+
+  const handleToggleComparison = () => {
+    if (onComparisonModeChange) {
+      onComparisonModeChange(!comparisonMode);
+    } else {
+      setInternalComparisonMode(!comparisonMode);
+    }
+  };
+
   const displayImage = processedImage || originalImage;
+
+  const canCompare = originalImage && processedImage;
 
   return (
     <div className="flex-1 flex flex-col bg-background relative overflow-hidden">
@@ -125,6 +161,16 @@ export function CanvasPreview({
         <div className="flex items-center px-3 bg-card border border-border rounded-md text-sm">
           {Math.round(zoom)}%
         </div>
+        <Button
+          variant={comparisonMode ? 'default' : 'outline'}
+          size="sm"
+          onClick={handleToggleComparison}
+          disabled={!canCompare}
+          title="Compare before/after (C)"
+        >
+          <SplitSquareHorizontal className="h-4 w-4 mr-2" />
+          Compare
+        </Button>
       </div>
 
       {/* Processing indicator */}
@@ -138,16 +184,32 @@ export function CanvasPreview({
       {/* Canvas container */}
       <div
         ref={containerRef}
-        className="flex-1 flex items-center justify-center overflow-hidden cursor-move"
-        onMouseDown={handleMouseDown}
-        onMouseMove={handleMouseMove}
-        onMouseUp={handleMouseUp}
-        onMouseLeave={handleMouseUp}
+        className="flex-1 flex items-center justify-center overflow-hidden"
+        style={{
+          cursor: comparisonMode && canCompare ? 'ew-resize' : 'move',
+        }}
+        onMouseDown={comparisonMode ? undefined : handleMouseDown}
+        onMouseMove={comparisonMode ? undefined : handleMouseMove}
+        onMouseUp={comparisonMode ? undefined : handleMouseUp}
+        onMouseLeave={comparisonMode ? undefined : handleMouseUp}
       >
         {!displayImage ? (
           <div className="text-center text-muted-foreground">
             <p className="text-lg mb-2">No image loaded</p>
             <p className="text-sm">Upload an image to get started</p>
+          </div>
+        ) : comparisonMode && canCompare ? (
+          <div
+            style={{
+              transform: `translate(${pan.x}px, ${pan.y}px)`,
+            }}
+          >
+            <BeforeAfterSlider
+              originalImage={originalImage}
+              processedImage={processedImage}
+              zoom={zoom}
+              className="shadow-lg"
+            />
           </div>
         ) : (
           <div

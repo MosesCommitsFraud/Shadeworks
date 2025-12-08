@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import type { Palette, DitheringSettings, AdjustmentSettings, ColorModeSettings } from '@/lib/dither/types';
 import { getDefaultPalette } from '@/lib/dither/palettes';
 import { applyDithering } from '@/lib/dither/algorithms';
@@ -10,8 +10,14 @@ import { copyImageData, debounce } from '@/lib/dither/utils';
 import { CanvasPreview } from './canvas-preview';
 import { ControlSidebar } from './control-sidebar';
 import type { ExportOptions } from './sections/export-section';
+import type { DitherPreset } from '@/lib/dither/presets';
+import { getPaletteByType } from '@/lib/dither/palettes';
+import {
+  useKeyboardShortcuts,
+  getDefaultShortcuts,
+} from '@/lib/dither/keyboard-shortcuts';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, Keyboard } from 'lucide-react';
 import Link from 'next/link';
 
 const INITIAL_DITHERING_SETTINGS: DitheringSettings = {
@@ -42,6 +48,18 @@ export function DitherEditor() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
   const [zoom, setZoom] = useState<number>(100);
+  const [comparisonMode, setComparisonMode] = useState(false);
+
+  // Ref to store zoom/fit handlers from CanvasPreview
+  const zoomHandlers = useRef<{
+    zoomIn: () => void;
+    zoomOut: () => void;
+    zoomFit: () => void;
+  }>({
+    zoomIn: () => {},
+    zoomOut: () => {},
+    zoomFit: () => {},
+  });
 
   // Process image with current settings
   const processImage = useCallback(() => {
@@ -112,6 +130,19 @@ export function DitherEditor() {
     setColorModeSettings((prev) => ({ ...prev, ...newSettings }));
   }, []);
 
+  const handleApplyPreset = useCallback((preset: DitherPreset) => {
+    // Apply all settings from the preset
+    setDitheringSettings(preset.ditheringSettings);
+    setAdjustmentSettings(preset.adjustmentSettings);
+    setColorModeSettings(preset.colorModeSettings);
+
+    // Apply palette if it exists
+    const presetPalette = getPaletteByType(preset.paletteType);
+    if (presetPalette) {
+      setPalette(presetPalette);
+    }
+  }, []);
+
   const handleExport = useCallback(async (options: ExportOptions) => {
     if (!processedImage) return;
 
@@ -163,6 +194,39 @@ export function DitherEditor() {
     }
   }, [processedImage, palette]);
 
+  // Quick export function for keyboard shortcut
+  const quickExport = useCallback(() => {
+    if (!processedImage) return;
+    handleExport({
+      format: 'png',
+      dpi: 72,
+      quality: 0.95,
+      halftoneAngle: null,
+      colorSeparation: false,
+      cmykSeparation: false,
+      filename: 'dithered-image',
+    });
+  }, [processedImage, handleExport]);
+
+  // Toggle comparison mode
+  const toggleComparison = useCallback(() => {
+    if (originalImage && processedImage) {
+      setComparisonMode((prev) => !prev);
+    }
+  }, [originalImage, processedImage]);
+
+  // Keyboard shortcuts
+  useKeyboardShortcuts(
+    getDefaultShortcuts({
+      onExport: processedImage ? quickExport : undefined,
+      onToggleComparison: originalImage && processedImage ? toggleComparison : undefined,
+      onZoomIn: () => zoomHandlers.current.zoomIn(),
+      onZoomOut: () => zoomHandlers.current.zoomOut(),
+      onZoomFit: () => zoomHandlers.current.zoomFit(),
+    }),
+    !isProcessing && !isExporting
+  );
+
   return (
     <div className="flex flex-col h-screen bg-background">
       {/* Header */}
@@ -201,6 +265,7 @@ export function DitherEditor() {
           onColorModeSettingsChange={handleColorModeSettingsChange}
           onExport={handleExport}
           isExporting={isExporting}
+          onApplyPreset={handleApplyPreset}
         />
 
         {/* Canvas */}
@@ -210,6 +275,11 @@ export function DitherEditor() {
           isProcessing={isProcessing}
           zoom={zoom}
           onZoomChange={setZoom}
+          comparisonMode={comparisonMode}
+          onComparisonModeChange={setComparisonMode}
+          onRegisterZoomHandlers={(handlers) => {
+            zoomHandlers.current = handlers;
+          }}
         />
       </div>
     </div>
