@@ -16,6 +16,11 @@ interface HelpDialogProps {
 }
 
 export function HelpDialog({ open, onOpenChange }: HelpDialogProps) {
+  // Don't render dialog content if not open to avoid performance issues
+  if (!open) {
+    return <Dialog open={false} onOpenChange={onOpenChange} />;
+  }
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-4xl max-h-[80vh]">

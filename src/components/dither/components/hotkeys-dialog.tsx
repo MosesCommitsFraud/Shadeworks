@@ -1,5 +1,6 @@
 'use client';
 
+import { useMemo } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -18,10 +19,10 @@ interface HotkeysDialogProps {
 }
 
 export function HotkeysDialog({ open, onOpenChange }: HotkeysDialogProps) {
-  const modKey = getModifierKey();
-  const shiftKey = getShiftKey();
+  const modKey = useMemo(() => getModifierKey(), []);
+  const shiftKey = useMemo(() => getShiftKey(), []);
 
-  const shortcuts = [
+  const shortcuts = useMemo(() => [
     {
       category: 'General',
       items: [
@@ -57,7 +58,12 @@ export function HotkeysDialog({ open, onOpenChange }: HotkeysDialogProps) {
         { keys: [modKey, shiftKey, 'S'], description: 'Save As...' },
       ],
     },
-  ];
+  ], [modKey, shiftKey]);
+
+  // Don't render dialog content if not open to avoid performance issues
+  if (!open) {
+    return <Dialog open={false} onOpenChange={onOpenChange} />;
+  }
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>

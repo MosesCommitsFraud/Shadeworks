@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { ZoomIn, ZoomOut, Maximize2, SplitSquareHorizontal } from 'lucide-react';
 import { Progress } from '@/components/ui/progress';
@@ -44,7 +44,7 @@ export function CanvasPreview({
   const comparisonMode = externalComparisonMode !== undefined ? externalComparisonMode : internalComparisonMode;
 
   // Get OS-appropriate modifier key
-  const modKey = getModifierKey();
+  const modKey = useMemo(() => getModifierKey(), []);
 
   // Derived values
   const displayImage = processedImage || originalImage;
