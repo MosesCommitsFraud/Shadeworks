@@ -1,10 +1,11 @@
 'use client';
 
 import { useState, useCallback, useEffect } from 'react';
-import type { Palette, DitheringSettings, AdjustmentSettings } from '@/lib/dither/types';
+import type { Palette, DitheringSettings, AdjustmentSettings, ColorModeSettings } from '@/lib/dither/types';
 import { getDefaultPalette } from '@/lib/dither/palettes';
 import { applyDithering } from '@/lib/dither/algorithms';
 import { applyAllAdjustments, getDefaultAdjustmentSettings } from '@/lib/dither/adjustments';
+import { applyColorMode } from '@/lib/dither/color-modes';
 import { copyImageData, debounce } from '@/lib/dither/utils';
 import { CanvasPreview } from './canvas-preview';
 import { ControlSidebar } from './control-sidebar';
@@ -19,6 +20,11 @@ const INITIAL_DITHERING_SETTINGS: DitheringSettings = {
   randomNoise: 0,
 };
 
+const INITIAL_COLOR_MODE_SETTINGS: ColorModeSettings = {
+  mode: 'rgb',
+  shades: 16,
+};
+
 export function DitherEditor() {
   const [originalImage, setOriginalImage] = useState<ImageData | null>(null);
   const [processedImage, setProcessedImage] = useState<ImageData | null>(null);
@@ -28,6 +34,9 @@ export function DitherEditor() {
   );
   const [adjustmentSettings, setAdjustmentSettings] = useState<AdjustmentSettings>(
     getDefaultAdjustmentSettings()
+  );
+  const [colorModeSettings, setColorModeSettings] = useState<ColorModeSettings>(
+    INITIAL_COLOR_MODE_SETTINGS
   );
   const [isProcessing, setIsProcessing] = useState(false);
   const [zoom, setZoom] = useState<number>(100);
@@ -47,8 +56,18 @@ export function DitherEditor() {
           adjustmentSettings
         );
 
+        // Apply color mode
+        let colorModeApplied = applyColorMode(
+          adjusted,
+          colorModeSettings.mode,
+          palette,
+          {
+            tonalShades: colorModeSettings.shades,
+          }
+        );
+
         // Then apply dithering
-        const dithered = applyDithering(adjusted, palette, ditheringSettings);
+        const dithered = applyDithering(colorModeApplied, palette, ditheringSettings);
         setProcessedImage(dithered);
       } catch (error) {
         console.error('Error processing image:', error);
@@ -56,7 +75,7 @@ export function DitherEditor() {
         setIsProcessing(false);
       }
     }, 10);
-  }, [originalImage, palette, ditheringSettings, adjustmentSettings]);
+  }, [originalImage, palette, ditheringSettings, adjustmentSettings, colorModeSettings]);
 
   // Debounced version for real-time preview
   const debouncedProcessImage = useCallback(
@@ -69,7 +88,7 @@ export function DitherEditor() {
     if (originalImage) {
       debouncedProcessImage();
     }
-  }, [originalImage, palette, ditheringSettings, adjustmentSettings, debouncedProcessImage]);
+  }, [originalImage, palette, ditheringSettings, adjustmentSettings, colorModeSettings, debouncedProcessImage]);
 
   const handleImageUpload = useCallback((imageData: ImageData) => {
     setOriginalImage(imageData);
@@ -85,6 +104,10 @@ export function DitherEditor() {
 
   const handleAdjustmentSettingsChange = useCallback((newSettings: Partial<AdjustmentSettings>) => {
     setAdjustmentSettings((prev) => ({ ...prev, ...newSettings }));
+  }, []);
+
+  const handleColorModeSettingsChange = useCallback((newSettings: Partial<ColorModeSettings>) => {
+    setColorModeSettings((prev) => ({ ...prev, ...newSettings }));
   }, []);
 
   const handleExport = useCallback(() => {
@@ -141,6 +164,8 @@ export function DitherEditor() {
           onDitheringSettingsChange={handleDitheringSettingsChange}
           adjustmentSettings={adjustmentSettings}
           onAdjustmentSettingsChange={handleAdjustmentSettingsChange}
+          colorModeSettings={colorModeSettings}
+          onColorModeSettingsChange={handleColorModeSettingsChange}
         />
 
         {/* Canvas */}

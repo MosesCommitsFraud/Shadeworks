@@ -3,11 +3,12 @@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
-import type { Palette, DitheringSettings, AdjustmentSettings } from '@/lib/dither/types';
+import type { Palette, DitheringSettings, AdjustmentSettings, ColorModeSettings } from '@/lib/dither/types';
 import { UploadSection } from './sections/upload-section';
 import { DitheringSection } from './sections/dithering-section';
 import { PaletteSection } from './sections/palette-section';
 import { AdjustmentsSection } from './sections/adjustments-section';
+import { ColorModeSection } from './sections/color-mode-section';
 
 interface ControlSidebarProps {
   originalImage: ImageData | null;
@@ -18,6 +19,8 @@ interface ControlSidebarProps {
   onDitheringSettingsChange: (settings: Partial<DitheringSettings>) => void;
   adjustmentSettings: AdjustmentSettings;
   onAdjustmentSettingsChange: (settings: Partial<AdjustmentSettings>) => void;
+  colorModeSettings: ColorModeSettings;
+  onColorModeSettingsChange: (settings: Partial<ColorModeSettings>) => void;
 }
 
 export function ControlSidebar({
@@ -29,15 +32,18 @@ export function ControlSidebar({
   onDitheringSettingsChange,
   adjustmentSettings,
   onAdjustmentSettingsChange,
+  colorModeSettings,
+  onColorModeSettingsChange,
 }: ControlSidebarProps) {
   return (
     <aside className="w-80 border-r border-border bg-card flex flex-col">
       <ScrollArea className="flex-1">
         <div className="p-4">
           <Tabs defaultValue="upload" className="w-full">
-            <TabsList className="grid w-full grid-cols-4">
+            <TabsList className="grid w-full grid-cols-5 text-xs">
               <TabsTrigger value="upload">Upload</TabsTrigger>
               <TabsTrigger value="adjust">Adjust</TabsTrigger>
+              <TabsTrigger value="mode">Mode</TabsTrigger>
               <TabsTrigger value="dither">Dither</TabsTrigger>
               <TabsTrigger value="palette">Palette</TabsTrigger>
             </TabsList>
@@ -50,6 +56,14 @@ export function ControlSidebar({
               <AdjustmentsSection
                 settings={adjustmentSettings}
                 onSettingsChange={onAdjustmentSettingsChange}
+                hasImage={!!originalImage}
+              />
+            </TabsContent>
+
+            <TabsContent value="mode" className="mt-4">
+              <ColorModeSection
+                settings={colorModeSettings}
+                onSettingsChange={onColorModeSettingsChange}
                 hasImage={!!originalImage}
               />
             </TabsContent>
@@ -67,6 +81,7 @@ export function ControlSidebar({
                 palette={palette}
                 onPaletteChange={onPaletteChange}
                 hasImage={!!originalImage}
+                originalImage={originalImage}
               />
             </TabsContent>
           </Tabs>
