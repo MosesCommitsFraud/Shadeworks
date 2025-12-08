@@ -168,6 +168,378 @@ export function bayerDither(
 }
 
 /**
+ * Jarvis-Judice-Ninke dithering
+ * Wider error diffusion pattern
+ */
+export function jarvisJudiceNinke(
+  imageData: ImageData,
+  palette: Palette,
+  settings: DitheringSettings
+): ImageData {
+  const { width, height, data } = imageData;
+  const output = new ImageData(width, height);
+  output.data.set(data);
+
+  const serpentine = settings.serpentine ?? true;
+  const errorAttenuation = settings.errorAttenuation ?? 1.0;
+
+  for (let y = 0; y < height; y++) {
+    const reverse = serpentine && y % 2 === 1;
+    const xStart = reverse ? width - 1 : 0;
+    const xEnd = reverse ? -1 : width;
+    const xDelta = reverse ? -1 : 1;
+
+    for (let x = xStart; x !== xEnd; x += xDelta) {
+      const idx = (y * width + x) * 4;
+
+      const oldColor: Color = {
+        r: output.data[idx],
+        g: output.data[idx + 1],
+        b: output.data[idx + 2],
+        a: output.data[idx + 3],
+      };
+
+      const newColor = findClosestColor(oldColor, palette.colors);
+
+      output.data[idx] = newColor.r;
+      output.data[idx + 1] = newColor.g;
+      output.data[idx + 2] = newColor.b;
+      output.data[idx + 3] = newColor.a ?? 255;
+
+      const errR = (oldColor.r - newColor.r) * errorAttenuation;
+      const errG = (oldColor.g - newColor.g) * errorAttenuation;
+      const errB = (oldColor.b - newColor.b) * errorAttenuation;
+
+      // Jarvis-Judice-Ninke matrix:
+      //         X   7   5
+      // 3   5   7   5   3
+      // 1   3   5   3   1
+
+      distributeError(output, width, height, x + xDelta, y, errR, errG, errB, 7 / 48);
+      distributeError(output, width, height, x + 2 * xDelta, y, errR, errG, errB, 5 / 48);
+      distributeError(output, width, height, x - 2 * xDelta, y + 1, errR, errG, errB, 3 / 48);
+      distributeError(output, width, height, x - xDelta, y + 1, errR, errG, errB, 5 / 48);
+      distributeError(output, width, height, x, y + 1, errR, errG, errB, 7 / 48);
+      distributeError(output, width, height, x + xDelta, y + 1, errR, errG, errB, 5 / 48);
+      distributeError(output, width, height, x + 2 * xDelta, y + 1, errR, errG, errB, 3 / 48);
+      distributeError(output, width, height, x - 2 * xDelta, y + 2, errR, errG, errB, 1 / 48);
+      distributeError(output, width, height, x - xDelta, y + 2, errR, errG, errB, 3 / 48);
+      distributeError(output, width, height, x, y + 2, errR, errG, errB, 5 / 48);
+      distributeError(output, width, height, x + xDelta, y + 2, errR, errG, errB, 3 / 48);
+      distributeError(output, width, height, x + 2 * xDelta, y + 2, errR, errG, errB, 1 / 48);
+    }
+  }
+
+  return output;
+}
+
+/**
+ * Stucki dithering
+ * Balanced error diffusion
+ */
+export function stucki(
+  imageData: ImageData,
+  palette: Palette,
+  settings: DitheringSettings
+): ImageData {
+  const { width, height, data } = imageData;
+  const output = new ImageData(width, height);
+  output.data.set(data);
+
+  const serpentine = settings.serpentine ?? true;
+  const errorAttenuation = settings.errorAttenuation ?? 1.0;
+
+  for (let y = 0; y < height; y++) {
+    const reverse = serpentine && y % 2 === 1;
+    const xStart = reverse ? width - 1 : 0;
+    const xEnd = reverse ? -1 : width;
+    const xDelta = reverse ? -1 : 1;
+
+    for (let x = xStart; x !== xEnd; x += xDelta) {
+      const idx = (y * width + x) * 4;
+
+      const oldColor: Color = {
+        r: output.data[idx],
+        g: output.data[idx + 1],
+        b: output.data[idx + 2],
+        a: output.data[idx + 3],
+      };
+
+      const newColor = findClosestColor(oldColor, palette.colors);
+
+      output.data[idx] = newColor.r;
+      output.data[idx + 1] = newColor.g;
+      output.data[idx + 2] = newColor.b;
+      output.data[idx + 3] = newColor.a ?? 255;
+
+      const errR = (oldColor.r - newColor.r) * errorAttenuation;
+      const errG = (oldColor.g - newColor.g) * errorAttenuation;
+      const errB = (oldColor.b - newColor.b) * errorAttenuation;
+
+      // Stucki matrix:
+      //         X   8   4
+      // 2   4   8   4   2
+      // 1   2   4   2   1
+
+      distributeError(output, width, height, x + xDelta, y, errR, errG, errB, 8 / 42);
+      distributeError(output, width, height, x + 2 * xDelta, y, errR, errG, errB, 4 / 42);
+      distributeError(output, width, height, x - 2 * xDelta, y + 1, errR, errG, errB, 2 / 42);
+      distributeError(output, width, height, x - xDelta, y + 1, errR, errG, errB, 4 / 42);
+      distributeError(output, width, height, x, y + 1, errR, errG, errB, 8 / 42);
+      distributeError(output, width, height, x + xDelta, y + 1, errR, errG, errB, 4 / 42);
+      distributeError(output, width, height, x + 2 * xDelta, y + 1, errR, errG, errB, 2 / 42);
+      distributeError(output, width, height, x - 2 * xDelta, y + 2, errR, errG, errB, 1 / 42);
+      distributeError(output, width, height, x - xDelta, y + 2, errR, errG, errB, 2 / 42);
+      distributeError(output, width, height, x, y + 2, errR, errG, errB, 4 / 42);
+      distributeError(output, width, height, x + xDelta, y + 2, errR, errG, errB, 2 / 42);
+      distributeError(output, width, height, x + 2 * xDelta, y + 2, errR, errG, errB, 1 / 42);
+    }
+  }
+
+  return output;
+}
+
+/**
+ * Burkes dithering
+ * Fast with good quality
+ */
+export function burkes(
+  imageData: ImageData,
+  palette: Palette,
+  settings: DitheringSettings
+): ImageData {
+  const { width, height, data } = imageData;
+  const output = new ImageData(width, height);
+  output.data.set(data);
+
+  const serpentine = settings.serpentine ?? true;
+  const errorAttenuation = settings.errorAttenuation ?? 1.0;
+
+  for (let y = 0; y < height; y++) {
+    const reverse = serpentine && y % 2 === 1;
+    const xStart = reverse ? width - 1 : 0;
+    const xEnd = reverse ? -1 : width;
+    const xDelta = reverse ? -1 : 1;
+
+    for (let x = xStart; x !== xEnd; x += xDelta) {
+      const idx = (y * width + x) * 4;
+
+      const oldColor: Color = {
+        r: output.data[idx],
+        g: output.data[idx + 1],
+        b: output.data[idx + 2],
+        a: output.data[idx + 3],
+      };
+
+      const newColor = findClosestColor(oldColor, palette.colors);
+
+      output.data[idx] = newColor.r;
+      output.data[idx + 1] = newColor.g;
+      output.data[idx + 2] = newColor.b;
+      output.data[idx + 3] = newColor.a ?? 255;
+
+      const errR = (oldColor.r - newColor.r) * errorAttenuation;
+      const errG = (oldColor.g - newColor.g) * errorAttenuation;
+      const errB = (oldColor.b - newColor.b) * errorAttenuation;
+
+      // Burkes matrix:
+      //         X   8   4
+      // 2   4   8   4   2
+
+      distributeError(output, width, height, x + xDelta, y, errR, errG, errB, 8 / 32);
+      distributeError(output, width, height, x + 2 * xDelta, y, errR, errG, errB, 4 / 32);
+      distributeError(output, width, height, x - 2 * xDelta, y + 1, errR, errG, errB, 2 / 32);
+      distributeError(output, width, height, x - xDelta, y + 1, errR, errG, errB, 4 / 32);
+      distributeError(output, width, height, x, y + 1, errR, errG, errB, 8 / 32);
+      distributeError(output, width, height, x + xDelta, y + 1, errR, errG, errB, 4 / 32);
+      distributeError(output, width, height, x + 2 * xDelta, y + 1, errR, errG, errB, 2 / 32);
+    }
+  }
+
+  return output;
+}
+
+/**
+ * Sierra dithering
+ * Three-row error diffusion
+ */
+export function sierra(
+  imageData: ImageData,
+  palette: Palette,
+  settings: DitheringSettings
+): ImageData {
+  const { width, height, data } = imageData;
+  const output = new ImageData(width, height);
+  output.data.set(data);
+
+  const serpentine = settings.serpentine ?? true;
+  const errorAttenuation = settings.errorAttenuation ?? 1.0;
+
+  for (let y = 0; y < height; y++) {
+    const reverse = serpentine && y % 2 === 1;
+    const xStart = reverse ? width - 1 : 0;
+    const xEnd = reverse ? -1 : width;
+    const xDelta = reverse ? -1 : 1;
+
+    for (let x = xStart; x !== xEnd; x += xDelta) {
+      const idx = (y * width + x) * 4;
+
+      const oldColor: Color = {
+        r: output.data[idx],
+        g: output.data[idx + 1],
+        b: output.data[idx + 2],
+        a: output.data[idx + 3],
+      };
+
+      const newColor = findClosestColor(oldColor, palette.colors);
+
+      output.data[idx] = newColor.r;
+      output.data[idx + 1] = newColor.g;
+      output.data[idx + 2] = newColor.b;
+      output.data[idx + 3] = newColor.a ?? 255;
+
+      const errR = (oldColor.r - newColor.r) * errorAttenuation;
+      const errG = (oldColor.g - newColor.g) * errorAttenuation;
+      const errB = (oldColor.b - newColor.b) * errorAttenuation;
+
+      // Sierra matrix:
+      //         X   5   3
+      // 2   4   5   4   2
+      //     2   3   2
+
+      distributeError(output, width, height, x + xDelta, y, errR, errG, errB, 5 / 32);
+      distributeError(output, width, height, x + 2 * xDelta, y, errR, errG, errB, 3 / 32);
+      distributeError(output, width, height, x - 2 * xDelta, y + 1, errR, errG, errB, 2 / 32);
+      distributeError(output, width, height, x - xDelta, y + 1, errR, errG, errB, 4 / 32);
+      distributeError(output, width, height, x, y + 1, errR, errG, errB, 5 / 32);
+      distributeError(output, width, height, x + xDelta, y + 1, errR, errG, errB, 4 / 32);
+      distributeError(output, width, height, x + 2 * xDelta, y + 1, errR, errG, errB, 2 / 32);
+      distributeError(output, width, height, x - xDelta, y + 2, errR, errG, errB, 2 / 32);
+      distributeError(output, width, height, x, y + 2, errR, errG, errB, 3 / 32);
+      distributeError(output, width, height, x + xDelta, y + 2, errR, errG, errB, 2 / 32);
+    }
+  }
+
+  return output;
+}
+
+/**
+ * Sierra Two-Row dithering
+ * Lighter Sierra variant
+ */
+export function sierraTwoRow(
+  imageData: ImageData,
+  palette: Palette,
+  settings: DitheringSettings
+): ImageData {
+  const { width, height, data } = imageData;
+  const output = new ImageData(width, height);
+  output.data.set(data);
+
+  const serpentine = settings.serpentine ?? true;
+  const errorAttenuation = settings.errorAttenuation ?? 1.0;
+
+  for (let y = 0; y < height; y++) {
+    const reverse = serpentine && y % 2 === 1;
+    const xStart = reverse ? width - 1 : 0;
+    const xEnd = reverse ? -1 : width;
+    const xDelta = reverse ? -1 : 1;
+
+    for (let x = xStart; x !== xEnd; x += xDelta) {
+      const idx = (y * width + x) * 4;
+
+      const oldColor: Color = {
+        r: output.data[idx],
+        g: output.data[idx + 1],
+        b: output.data[idx + 2],
+        a: output.data[idx + 3],
+      };
+
+      const newColor = findClosestColor(oldColor, palette.colors);
+
+      output.data[idx] = newColor.r;
+      output.data[idx + 1] = newColor.g;
+      output.data[idx + 2] = newColor.b;
+      output.data[idx + 3] = newColor.a ?? 255;
+
+      const errR = (oldColor.r - newColor.r) * errorAttenuation;
+      const errG = (oldColor.g - newColor.g) * errorAttenuation;
+      const errB = (oldColor.b - newColor.b) * errorAttenuation;
+
+      // Sierra Two-Row matrix:
+      //         X   4   3
+      // 1   2   3   2   1
+
+      distributeError(output, width, height, x + xDelta, y, errR, errG, errB, 4 / 16);
+      distributeError(output, width, height, x + 2 * xDelta, y, errR, errG, errB, 3 / 16);
+      distributeError(output, width, height, x - 2 * xDelta, y + 1, errR, errG, errB, 1 / 16);
+      distributeError(output, width, height, x - xDelta, y + 1, errR, errG, errB, 2 / 16);
+      distributeError(output, width, height, x, y + 1, errR, errG, errB, 3 / 16);
+      distributeError(output, width, height, x + xDelta, y + 1, errR, errG, errB, 2 / 16);
+      distributeError(output, width, height, x + 2 * xDelta, y + 1, errR, errG, errB, 1 / 16);
+    }
+  }
+
+  return output;
+}
+
+/**
+ * Sierra Lite dithering
+ * Simplest Sierra variant
+ */
+export function sierraLite(
+  imageData: ImageData,
+  palette: Palette,
+  settings: DitheringSettings
+): ImageData {
+  const { width, height, data } = imageData;
+  const output = new ImageData(width, height);
+  output.data.set(data);
+
+  const serpentine = settings.serpentine ?? true;
+  const errorAttenuation = settings.errorAttenuation ?? 1.0;
+
+  for (let y = 0; y < height; y++) {
+    const reverse = serpentine && y % 2 === 1;
+    const xStart = reverse ? width - 1 : 0;
+    const xEnd = reverse ? -1 : width;
+    const xDelta = reverse ? -1 : 1;
+
+    for (let x = xStart; x !== xEnd; x += xDelta) {
+      const idx = (y * width + x) * 4;
+
+      const oldColor: Color = {
+        r: output.data[idx],
+        g: output.data[idx + 1],
+        b: output.data[idx + 2],
+        a: output.data[idx + 3],
+      };
+
+      const newColor = findClosestColor(oldColor, palette.colors);
+
+      output.data[idx] = newColor.r;
+      output.data[idx + 1] = newColor.g;
+      output.data[idx + 2] = newColor.b;
+      output.data[idx + 3] = newColor.a ?? 255;
+
+      const errR = (oldColor.r - newColor.r) * errorAttenuation;
+      const errG = (oldColor.g - newColor.g) * errorAttenuation;
+      const errB = (oldColor.b - newColor.b) * errorAttenuation;
+
+      // Sierra Lite matrix:
+      //     X   2
+      // 1   1
+
+      distributeError(output, width, height, x + xDelta, y, errR, errG, errB, 2 / 4);
+      distributeError(output, width, height, x - xDelta, y + 1, errR, errG, errB, 1 / 4);
+      distributeError(output, width, height, x, y + 1, errR, errG, errB, 1 / 4);
+    }
+  }
+
+  return output;
+}
+
+/**
  * Helper function to distribute error to a neighboring pixel
  */
 function distributeError(
@@ -253,6 +625,24 @@ export function applyDithering(
 
     case 'atkinson':
       return atkinson(imageData, palette, settings);
+
+    case 'jarvis-judice-ninke':
+      return jarvisJudiceNinke(imageData, palette, settings);
+
+    case 'stucki':
+      return stucki(imageData, palette, settings);
+
+    case 'burkes':
+      return burkes(imageData, palette, settings);
+
+    case 'sierra':
+      return sierra(imageData, palette, settings);
+
+    case 'sierra-2row':
+      return sierraTwoRow(imageData, palette, settings);
+
+    case 'sierra-lite':
+      return sierraLite(imageData, palette, settings);
 
     case 'bayer-2x2':
       return bayerDither(imageData, palette, 2);

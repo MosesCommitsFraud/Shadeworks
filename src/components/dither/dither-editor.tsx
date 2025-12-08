@@ -1,9 +1,10 @@
 'use client';
 
 import { useState, useCallback, useEffect } from 'react';
-import type { Palette, DitheringSettings, DitherState } from '@/lib/dither/types';
+import type { Palette, DitheringSettings, AdjustmentSettings } from '@/lib/dither/types';
 import { getDefaultPalette } from '@/lib/dither/palettes';
 import { applyDithering } from '@/lib/dither/algorithms';
+import { applyAllAdjustments, getDefaultAdjustmentSettings } from '@/lib/dither/adjustments';
 import { copyImageData, debounce } from '@/lib/dither/utils';
 import { CanvasPreview } from './canvas-preview';
 import { ControlSidebar } from './control-sidebar';
@@ -25,6 +26,9 @@ export function DitherEditor() {
   const [ditheringSettings, setDitheringSettings] = useState<DitheringSettings>(
     INITIAL_DITHERING_SETTINGS
   );
+  const [adjustmentSettings, setAdjustmentSettings] = useState<AdjustmentSettings>(
+    getDefaultAdjustmentSettings()
+  );
   const [isProcessing, setIsProcessing] = useState(false);
   const [zoom, setZoom] = useState<number>(100);
 
@@ -37,11 +41,14 @@ export function DitherEditor() {
     // Use setTimeout to allow UI to update
     setTimeout(() => {
       try {
-        const dithered = applyDithering(
+        // Apply adjustments first
+        let adjusted = applyAllAdjustments(
           copyImageData(originalImage),
-          palette,
-          ditheringSettings
+          adjustmentSettings
         );
+
+        // Then apply dithering
+        const dithered = applyDithering(adjusted, palette, ditheringSettings);
         setProcessedImage(dithered);
       } catch (error) {
         console.error('Error processing image:', error);
@@ -49,7 +56,7 @@ export function DitherEditor() {
         setIsProcessing(false);
       }
     }, 10);
-  }, [originalImage, palette, ditheringSettings]);
+  }, [originalImage, palette, ditheringSettings, adjustmentSettings]);
 
   // Debounced version for real-time preview
   const debouncedProcessImage = useCallback(
@@ -62,7 +69,7 @@ export function DitherEditor() {
     if (originalImage) {
       debouncedProcessImage();
     }
-  }, [originalImage, palette, ditheringSettings, debouncedProcessImage]);
+  }, [originalImage, palette, ditheringSettings, adjustmentSettings, debouncedProcessImage]);
 
   const handleImageUpload = useCallback((imageData: ImageData) => {
     setOriginalImage(imageData);
@@ -74,6 +81,10 @@ export function DitherEditor() {
 
   const handleDitheringSettingsChange = useCallback((newSettings: Partial<DitheringSettings>) => {
     setDitheringSettings((prev) => ({ ...prev, ...newSettings }));
+  }, []);
+
+  const handleAdjustmentSettingsChange = useCallback((newSettings: Partial<AdjustmentSettings>) => {
+    setAdjustmentSettings((prev) => ({ ...prev, ...newSettings }));
   }, []);
 
   const handleExport = useCallback(() => {
@@ -128,6 +139,8 @@ export function DitherEditor() {
           onPaletteChange={handlePaletteChange}
           ditheringSettings={ditheringSettings}
           onDitheringSettingsChange={handleDitheringSettingsChange}
+          adjustmentSettings={adjustmentSettings}
+          onAdjustmentSettingsChange={handleAdjustmentSettingsChange}
         />
 
         {/* Canvas */}

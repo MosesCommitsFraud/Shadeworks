@@ -22,6 +22,12 @@ interface DitheringSectionProps {
 const ALGORITHMS: Array<{ value: DitheringAlgorithm; label: string; category: string }> = [
   { value: 'floyd-steinberg', label: 'Floyd-Steinberg', category: 'Error Diffusion' },
   { value: 'atkinson', label: 'Atkinson', category: 'Error Diffusion' },
+  { value: 'jarvis-judice-ninke', label: 'Jarvis-Judice-Ninke', category: 'Error Diffusion' },
+  { value: 'stucki', label: 'Stucki', category: 'Error Diffusion' },
+  { value: 'burkes', label: 'Burkes', category: 'Error Diffusion' },
+  { value: 'sierra', label: 'Sierra', category: 'Error Diffusion' },
+  { value: 'sierra-2row', label: 'Sierra Two-Row', category: 'Error Diffusion' },
+  { value: 'sierra-lite', label: 'Sierra Lite', category: 'Error Diffusion' },
   { value: 'bayer-2x2', label: 'Bayer 2×2', category: 'Ordered' },
   { value: 'bayer-4x4', label: 'Bayer 4×4', category: 'Ordered' },
   { value: 'bayer-8x8', label: 'Bayer 8×8', category: 'Ordered' },
@@ -174,6 +180,18 @@ export function DitheringSection({
             'Classic error diffusion with excellent quality. Best for most images.'}
           {settings.algorithm === 'atkinson' &&
             'Mac-style algorithm with softer, more artistic results.'}
+          {settings.algorithm === 'jarvis-judice-ninke' &&
+            'Wider error diffusion pattern for smoother gradients and better detail preservation.'}
+          {settings.algorithm === 'stucki' &&
+            'Balanced error diffusion with good quality and moderate processing speed.'}
+          {settings.algorithm === 'burkes' &&
+            'Fast error diffusion with good quality. Efficient for large images.'}
+          {settings.algorithm === 'sierra' &&
+            'Three-row error diffusion for excellent gradient rendering.'}
+          {settings.algorithm === 'sierra-2row' &&
+            'Lighter Sierra variant with faster processing and less error spreading.'}
+          {settings.algorithm === 'sierra-lite' &&
+            'Simplest Sierra variant. Very fast with minimal error diffusion.'}
           {settings.algorithm.startsWith('bayer') &&
             'Ordered dithering creates characteristic patterns. Fast and consistent.'}
         </p>

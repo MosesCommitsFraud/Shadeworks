@@ -3,10 +3,11 @@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
-import type { Palette, DitheringSettings } from '@/lib/dither/types';
+import type { Palette, DitheringSettings, AdjustmentSettings } from '@/lib/dither/types';
 import { UploadSection } from './sections/upload-section';
 import { DitheringSection } from './sections/dithering-section';
 import { PaletteSection } from './sections/palette-section';
+import { AdjustmentsSection } from './sections/adjustments-section';
 
 interface ControlSidebarProps {
   originalImage: ImageData | null;
@@ -15,6 +16,8 @@ interface ControlSidebarProps {
   onPaletteChange: (palette: Palette) => void;
   ditheringSettings: DitheringSettings;
   onDitheringSettingsChange: (settings: Partial<DitheringSettings>) => void;
+  adjustmentSettings: AdjustmentSettings;
+  onAdjustmentSettingsChange: (settings: Partial<AdjustmentSettings>) => void;
 }
 
 export function ControlSidebar({
@@ -24,20 +27,31 @@ export function ControlSidebar({
   onPaletteChange,
   ditheringSettings,
   onDitheringSettingsChange,
+  adjustmentSettings,
+  onAdjustmentSettingsChange,
 }: ControlSidebarProps) {
   return (
     <aside className="w-80 border-r border-border bg-card flex flex-col">
       <ScrollArea className="flex-1">
         <div className="p-4">
           <Tabs defaultValue="upload" className="w-full">
-            <TabsList className="grid w-full grid-cols-3">
+            <TabsList className="grid w-full grid-cols-4">
               <TabsTrigger value="upload">Upload</TabsTrigger>
+              <TabsTrigger value="adjust">Adjust</TabsTrigger>
               <TabsTrigger value="dither">Dither</TabsTrigger>
               <TabsTrigger value="palette">Palette</TabsTrigger>
             </TabsList>
 
             <TabsContent value="upload" className="mt-4">
               <UploadSection onImageUpload={onImageUpload} />
+            </TabsContent>
+
+            <TabsContent value="adjust" className="mt-4">
+              <AdjustmentsSection
+                settings={adjustmentSettings}
+                onSettingsChange={onAdjustmentSettingsChange}
+                hasImage={!!originalImage}
+              />
             </TabsContent>
 
             <TabsContent value="dither" className="mt-4">
