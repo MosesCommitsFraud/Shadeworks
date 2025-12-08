@@ -66,7 +66,12 @@ export type PaletteType =
 /**
  * Export format types
  */
-export type ExportFormat = 'png' | 'jpeg' | 'webp';
+export type ExportFormat = 'png' | 'jpeg' | 'webp' | 'mp4' | 'webm' | 'gif';
+
+/**
+ * Media type (image or video)
+ */
+export type MediaType = 'image' | 'video';
 
 /**
  * Resampling algorithm types
@@ -249,4 +254,58 @@ export interface AlgorithmInfo {
   supportsSerpentine?: boolean;
   supportsErrorAttenuation?: boolean;
   supportsRandomNoise?: boolean;
+}
+
+/**
+ * Video settings and metadata
+ */
+export interface VideoSettings {
+  fps: number;
+  duration: number; // in seconds
+  totalFrames: number;
+  width: number;
+  height: number;
+}
+
+/**
+ * Easing function types for keyframe interpolation
+ */
+export type EasingFunction = 'linear' | 'ease-in' | 'ease-out' | 'ease-in-out';
+
+/**
+ * Keyframe for animation
+ */
+export interface Keyframe<T> {
+  frame: number;
+  time: number; // in seconds
+  settings: T;
+  easing?: EasingFunction;
+}
+
+/**
+ * Animated settings with keyframes
+ */
+export interface AnimatedSettings<T> {
+  keyframes: Keyframe<T>[];
+  enabled: boolean;
+}
+
+/**
+ * Timeline playback state
+ */
+export interface TimelineState {
+  currentFrame: number;
+  currentTime: number; // in seconds
+  isPlaying: boolean;
+  playbackSpeed: 0.25 | 0.5 | 1 | 2;
+}
+
+/**
+ * GIF export options
+ */
+export interface GIFExportOptions {
+  quality?: number; // 1-100
+  loop?: number; // 0 = infinite, -1 = no loop, n = loop n times
+  maxFrames?: number; // Limit frames for file size
+  downsample?: number; // Scale down by factor (e.g., 2 = half resolution)
 }
