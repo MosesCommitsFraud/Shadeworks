@@ -46,6 +46,10 @@ export function CanvasPreview({
   // Get OS-appropriate modifier key
   const modKey = getModifierKey();
 
+  // Derived values
+  const displayImage = processedImage || originalImage;
+  const canCompare = originalImage && processedImage;
+
   // Wheel zoom handler with native event listener to prevent browser zoom
   useEffect(() => {
     const container = containerRef.current;
@@ -100,6 +104,9 @@ export function CanvasPreview({
 
   // Draw image on canvas
   useEffect(() => {
+    // Skip drawing if in comparison mode (BeforeAfterSlider handles it)
+    if (comparisonMode && canCompare) return;
+
     const canvas = canvasRef.current;
     if (!canvas) return;
 
@@ -120,7 +127,7 @@ export function CanvasPreview({
 
     // Draw image
     ctx.putImageData(imageToDisplay, 0, 0);
-  }, [originalImage, processedImage]);
+  }, [originalImage, processedImage, comparisonMode, canCompare]);
 
   const handleZoomIn = () => {
     onZoomChange(Math.min(zoom * 1.25, 400));
@@ -181,10 +188,6 @@ export function CanvasPreview({
       setInternalComparisonMode(!comparisonMode);
     }
   };
-
-  const displayImage = processedImage || originalImage;
-
-  const canCompare = originalImage && processedImage;
 
   return (
     <div className="flex-1 flex flex-col bg-background relative overflow-hidden">
@@ -265,10 +268,9 @@ export function CanvasPreview({
               originalImage={originalImage}
               processedImage={processedImage}
               zoom={zoom}
-              className="shadow-lg"
             />
           </div>
-        ) : (
+        ) : displayImage ? (
           <div
             style={{
               transform: `translate(${pan.x}px, ${pan.y}px)`,
@@ -278,15 +280,15 @@ export function CanvasPreview({
             <canvas
               ref={canvasRef}
               style={{
-                width: `${(canvasRef.current?.width || 0) * (zoom / 100)}px`,
-                height: `${(canvasRef.current?.height || 0) * (zoom / 100)}px`,
+                width: `${displayImage.width * (zoom / 100)}px`,
+                height: `${displayImage.height * (zoom / 100)}px`,
                 boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)',
                 background:
                   'repeating-conic-gradient(#e5e5e5 0% 25%, #ffffff 0% 50%) 50% / 20px 20px',
               }}
             />
           </div>
-        )}
+        ) : null}
       </div>
 
       {/* Image info */}

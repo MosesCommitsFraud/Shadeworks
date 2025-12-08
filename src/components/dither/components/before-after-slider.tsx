@@ -29,38 +29,24 @@ export function BeforeAfterSlider({
     const originalCanvas = originalCanvasRef.current;
     const processedCanvas = processedCanvasRef.current;
 
-    // Set canvas sizes based on zoom
+    // Set canvas sizes to actual image dimensions (will be scaled via CSS)
     const width = originalImage.width;
     const height = originalImage.height;
-    const scaledWidth = Math.round(width * (zoom / 100));
-    const scaledHeight = Math.round(height * (zoom / 100));
 
-    originalCanvas.width = scaledWidth;
-    originalCanvas.height = scaledHeight;
-    processedCanvas.width = scaledWidth;
-    processedCanvas.height = scaledHeight;
+    originalCanvas.width = width;
+    originalCanvas.height = height;
+    processedCanvas.width = width;
+    processedCanvas.height = height;
 
     const originalCtx = originalCanvas.getContext('2d')!;
     const processedCtx = processedCanvas.getContext('2d')!;
 
-    // Draw original image
-    const tempOriginalCanvas = document.createElement('canvas');
-    tempOriginalCanvas.width = width;
-    tempOriginalCanvas.height = height;
-    const tempOriginalCtx = tempOriginalCanvas.getContext('2d')!;
-    tempOriginalCtx.putImageData(originalImage, 0, 0);
-    originalCtx.imageSmoothingEnabled = zoom < 100;
-    originalCtx.drawImage(tempOriginalCanvas, 0, 0, scaledWidth, scaledHeight);
+    // Draw original image at native size
+    originalCtx.putImageData(originalImage, 0, 0);
 
-    // Draw processed image
-    const tempProcessedCanvas = document.createElement('canvas');
-    tempProcessedCanvas.width = width;
-    tempProcessedCanvas.height = height;
-    const tempProcessedCtx = tempProcessedCanvas.getContext('2d')!;
-    tempProcessedCtx.putImageData(processedImage, 0, 0);
-    processedCtx.imageSmoothingEnabled = zoom < 100;
-    processedCtx.drawImage(tempProcessedCanvas, 0, 0, scaledWidth, scaledHeight);
-  }, [originalImage, processedImage, zoom]);
+    // Draw processed image at native size
+    processedCtx.putImageData(processedImage, 0, 0);
+  }, [originalImage, processedImage]);
 
   // Handle mouse/touch move
   const handleMove = useCallback(
@@ -137,6 +123,9 @@ export function BeforeAfterSlider({
     };
   }, [isDragging]);
 
+  const scaledWidth = originalImage.width * (zoom / 100);
+  const scaledHeight = originalImage.height * (zoom / 100);
+
   return (
     <div
       ref={containerRef}
@@ -155,9 +144,13 @@ export function BeforeAfterSlider({
       {/* Processed image (full width) */}
       <canvas
         ref={processedCanvasRef}
-        className="block"
         style={{
-          imageRendering: zoom >= 200 ? 'pixelated' : 'auto',
+          display: 'block',
+          width: `${scaledWidth}px`,
+          height: `${scaledHeight}px`,
+          imageRendering: zoom > 100 ? 'pixelated' : 'auto',
+          background: 'repeating-conic-gradient(#e5e5e5 0% 25%, #ffffff 0% 50%) 50% / 20px 20px',
+          boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)',
         }}
       />
 
@@ -168,9 +161,12 @@ export function BeforeAfterSlider({
       >
         <canvas
           ref={originalCanvasRef}
-          className="block"
           style={{
-            imageRendering: zoom >= 200 ? 'pixelated' : 'auto',
+            display: 'block',
+            width: `${scaledWidth}px`,
+            height: `${scaledHeight}px`,
+            imageRendering: zoom > 100 ? 'pixelated' : 'auto',
+            background: 'repeating-conic-gradient(#e5e5e5 0% 25%, #ffffff 0% 50%) 50% / 20px 20px',
           }}
         />
       </div>
