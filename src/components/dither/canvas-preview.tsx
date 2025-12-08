@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { ZoomIn, ZoomOut, Maximize2, SplitSquareHorizontal } from 'lucide-react';
 import { Progress } from '@/components/ui/progress';
+import { Kbd } from '@/components/ui/kbd';
 import { BeforeAfterSlider } from './components/before-after-slider';
 
 interface CanvasPreviewProps {
@@ -40,6 +41,58 @@ export function CanvasPreview({
 
   // Use external comparison mode if provided, otherwise use internal
   const comparisonMode = externalComparisonMode !== undefined ? externalComparisonMode : internalComparisonMode;
+
+  // Wheel zoom handler with native event listener to prevent browser zoom
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+
+    const handleWheel = (e: WheelEvent) => {
+      // Ctrl+Scroll or pinch-to-zoom (two-finger trackpad)
+      if (e.ctrlKey || e.metaKey) {
+        e.preventDefault();
+
+        const rect = container.getBoundingClientRect();
+        const mouseX = e.clientX - rect.left;
+        const mouseY = e.clientY - rect.top;
+
+        // Zoom delta
+        const delta = e.deltaY > 0 ? 0.9 : 1.1;
+        const prevZoom = zoom;
+        const newZoom = Math.max(25, Math.min(400, prevZoom * delta));
+
+        // Calculate canvas center position before zoom
+        const canvasElement = canvasRef.current;
+        if (canvasElement) {
+          const canvasRect = canvasElement.getBoundingClientRect();
+          const canvasCenterX = canvasRect.left + canvasRect.width / 2 - rect.left;
+          const canvasCenterY = canvasRect.top + canvasRect.height / 2 - rect.top;
+
+          // Calculate offset from mouse to canvas center
+          const offsetX = mouseX - canvasCenterX;
+          const offsetY = mouseY - canvasCenterY;
+
+          // Adjust pan to keep the same point under cursor
+          const scaleFactor = newZoom / prevZoom - 1;
+          setPan((prevPan) => ({
+            x: prevPan.x - offsetX * scaleFactor,
+            y: prevPan.y - offsetY * scaleFactor,
+          }));
+        }
+
+        onZoomChange(newZoom);
+      } else {
+        // Regular scroll for panning
+        setPan((prev) => ({
+          x: prev.x - e.deltaX,
+          y: prev.y - e.deltaY,
+        }));
+      }
+    };
+
+    container.addEventListener('wheel', handleWheel, { passive: false });
+    return () => container.removeEventListener('wheel', handleWheel);
+  }, [onZoomChange, zoom]);
 
   // Draw image on canvas
   useEffect(() => {
@@ -238,6 +291,35 @@ export function CanvasPreview({
           {displayImage.width} × {displayImage.height}
         </div>
       )}
+
+      {/* Keyboard shortcuts hint */}
+      <div className="absolute bottom-4 right-4 z-10 bg-card/90 backdrop-blur-sm border border-border rounded-lg px-3 py-2 text-xs text-muted-foreground flex flex-col gap-1.5">
+        <div className="flex items-center gap-2">
+          <Kbd>Ctrl</Kbd>
+          <span>+</span>
+          <Kbd>S</Kbd>
+          <span>Export</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <Kbd>C</Kbd>
+          <span>Compare</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <Kbd>+</Kbd>
+          <span>/</span>
+          <Kbd>-</Kbd>
+          <span>Zoom</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <Kbd>0</Kbd>
+          <span>Fit</span>
+        </div>
+        <div className="border-t border-border pt-1.5 mt-0.5">
+          <Kbd>Ctrl</Kbd>
+          <span className="mx-1">+</span>
+          <span>Scroll to zoom</span>
+        </div>
+      </div>
     </div>
   );
 }
