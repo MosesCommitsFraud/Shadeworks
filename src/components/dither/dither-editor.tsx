@@ -1,7 +1,16 @@
 'use client';
 
 import { useState, useCallback, useEffect, useRef } from 'react';
-import type { Palette, DitheringSettings, AdjustmentSettings, ColorModeSettings } from '@/lib/dither/types';
+import type {
+  Palette,
+  DitheringSettings,
+  AdjustmentSettings,
+  ColorModeSettings,
+  MediaType,
+  VideoSettings,
+  TimelineState,
+  AnimatedSettings,
+} from '@/lib/dither/types';
 import { getDefaultPalette } from '@/lib/dither/palettes';
 import { applyDithering } from '@/lib/dither/algorithms';
 import { applyAllAdjustments, getDefaultAdjustmentSettings } from '@/lib/dither/adjustments';
@@ -63,6 +72,32 @@ export function DitherEditor() {
   const [pendingNavigation, setPendingNavigation] = useState<(() => void) | null>(null);
   const [showHelpDialog, setShowHelpDialog] = useState(false);
   const [showHotkeysDialog, setShowHotkeysDialog] = useState(false);
+
+  // Video mode state
+  const [mediaType, setMediaType] = useState<MediaType>('image');
+  const [videoSettings, setVideoSettings] = useState<VideoSettings | null>(null);
+  const [videoFrames, setVideoFrames] = useState<ImageData[]>([]);
+  const [processedFrames, setProcessedFrames] = useState<ImageData[]>([]);
+  const [timelineState, setTimelineState] = useState<TimelineState>({
+    currentFrame: 0,
+    currentTime: 0,
+    isPlaying: false,
+    playbackSpeed: 1,
+  });
+
+  // Animated settings for video mode
+  const [animatedAdjustments, setAnimatedAdjustments] = useState<AnimatedSettings<AdjustmentSettings>>({
+    keyframes: [],
+    enabled: false,
+  });
+  const [animatedDithering, setAnimatedDithering] = useState<AnimatedSettings<DitheringSettings>>({
+    keyframes: [],
+    enabled: false,
+  });
+  const [animatedColorMode, setAnimatedColorMode] = useState<AnimatedSettings<ColorModeSettings>>({
+    keyframes: [],
+    enabled: false,
+  });
 
   // Ref to store zoom/fit handlers from CanvasPreview
   const zoomHandlers = useRef<{
