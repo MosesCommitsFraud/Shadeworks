@@ -9,6 +9,8 @@ import {
 } from '@/components/ui/dialog';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
+import { Kbd, KbdGroup } from '@/components/ui/kbd';
+import { getModifierKey, getShiftKey, isMac } from '@/lib/utils/platform';
 
 interface HotkeysDialogProps {
   open: boolean;
@@ -16,14 +18,17 @@ interface HotkeysDialogProps {
 }
 
 export function HotkeysDialog({ open, onOpenChange }: HotkeysDialogProps) {
+  const modKey = getModifierKey();
+  const shiftKey = getShiftKey();
+
   const shortcuts = [
     {
       category: 'General',
       items: [
-        { keys: ['Ctrl', 'S'], description: 'Save project (quick save)' },
-        { keys: ['Ctrl', 'E'], description: 'Export image (PNG, 72 DPI)' },
-        { keys: ['Ctrl', 'Z'], description: 'Undo (if available)' },
-        { keys: ['Ctrl', 'Y'], description: 'Redo (if available)' },
+        { keys: [modKey, 'S'], description: 'Save project (quick save)' },
+        { keys: [modKey, 'E'], description: 'Export image (PNG, 72 DPI)' },
+        { keys: [modKey, 'Z'], description: 'Undo (if available)' },
+        { keys: [modKey, 'Y'], description: 'Redo (if available)' },
         { keys: ['?'], description: 'Show keyboard shortcuts' },
       ],
     },
@@ -47,9 +52,9 @@ export function HotkeysDialog({ open, onOpenChange }: HotkeysDialogProps) {
     {
       category: 'File Management',
       items: [
-        { keys: ['Ctrl', 'N'], description: 'New project' },
-        { keys: ['Ctrl', 'O'], description: 'Open project (.swdither)' },
-        { keys: ['Ctrl', 'Shift', 'S'], description: 'Save As...' },
+        { keys: [modKey, 'N'], description: 'New project' },
+        { keys: [modKey, 'O'], description: 'Open project (.swdither)' },
+        { keys: [modKey, shiftKey, 'S'], description: 'Save As...' },
       ],
     },
   ];
@@ -78,18 +83,18 @@ export function HotkeysDialog({ open, onOpenChange }: HotkeysDialogProps) {
                       <span className="text-sm text-muted-foreground">
                         {shortcut.description}
                       </span>
-                      <div className="flex items-center gap-1">
+                      <KbdGroup>
                         {shortcut.keys.map((key, keyIdx) => (
                           <span key={keyIdx} className="flex items-center gap-1">
-                            <kbd className="px-2 py-1 text-xs font-semibold text-foreground bg-muted border border-border rounded">
-                              {key}
-                            </kbd>
-                            {keyIdx < shortcut.keys.length - 1 && (
-                              <span className="text-xs text-muted-foreground">+</span>
+                            <Kbd>{key}</Kbd>
+                            {keyIdx < shortcut.keys.length - 1 && key !== '+' && (
+                              <span className="text-xs text-muted-foreground">
+                                {shortcut.keys[keyIdx + 1] === '+' ? '' : '+'}
+                              </span>
                             )}
                           </span>
                         ))}
-                      </div>
+                      </KbdGroup>
                     </div>
                   ))}
                 </div>
@@ -104,9 +109,11 @@ export function HotkeysDialog({ open, onOpenChange }: HotkeysDialogProps) {
               <p>
                 <strong className="text-foreground">Note:</strong> Some shortcuts may vary depending on your browser and operating system.
               </p>
-              <p>
-                On macOS, use <kbd className="px-1 py-0.5 text-xs bg-muted border border-border rounded">Cmd</kbd> instead of <kbd className="px-1 py-0.5 text-xs bg-muted border border-border rounded">Ctrl</kbd>.
-              </p>
+              {!isMac() && (
+                <p>
+                  On macOS, use <Kbd>⌘</Kbd> instead of <Kbd>Ctrl</Kbd>.
+                </p>
+              )}
               <p>
                 The editor will warn you before navigating away if you have unsaved changes.
               </p>

@@ -4,8 +4,9 @@ import { useEffect, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { ZoomIn, ZoomOut, Maximize2, SplitSquareHorizontal } from 'lucide-react';
 import { Progress } from '@/components/ui/progress';
-import { Kbd } from '@/components/ui/kbd';
+import { Kbd, KbdGroup } from '@/components/ui/kbd';
 import { BeforeAfterSlider } from './components/before-after-slider';
+import { getModifierKey } from '@/lib/utils/platform';
 
 interface CanvasPreviewProps {
   originalImage: ImageData | null;
@@ -41,6 +42,9 @@ export function CanvasPreview({
 
   // Use external comparison mode if provided, otherwise use internal
   const comparisonMode = externalComparisonMode !== undefined ? externalComparisonMode : internalComparisonMode;
+
+  // Get OS-appropriate modifier key
+  const modKey = getModifierKey();
 
   // Wheel zoom handler with native event listener to prevent browser zoom
   useEffect(() => {
@@ -295,9 +299,11 @@ export function CanvasPreview({
       {/* Keyboard shortcuts hint */}
       <div className="absolute bottom-4 right-4 z-10 bg-card/90 backdrop-blur-sm border border-border rounded-lg px-3 py-2 text-xs text-muted-foreground flex flex-col gap-1.5">
         <div className="flex items-center gap-2">
-          <Kbd>Ctrl</Kbd>
-          <span>+</span>
-          <Kbd>S</Kbd>
+          <KbdGroup>
+            <Kbd>{modKey}</Kbd>
+            <span>+</span>
+            <Kbd>S</Kbd>
+          </KbdGroup>
           <span>Export</span>
         </div>
         <div className="flex items-center gap-2">
@@ -305,9 +311,11 @@ export function CanvasPreview({
           <span>Compare</span>
         </div>
         <div className="flex items-center gap-2">
-          <Kbd>+</Kbd>
-          <span>/</span>
-          <Kbd>-</Kbd>
+          <KbdGroup>
+            <Kbd>+</Kbd>
+            <span>/</span>
+            <Kbd>-</Kbd>
+          </KbdGroup>
           <span>Zoom</span>
         </div>
         <div className="flex items-center gap-2">
@@ -315,9 +323,11 @@ export function CanvasPreview({
           <span>Fit</span>
         </div>
         <div className="border-t border-border pt-1.5 mt-0.5">
-          <Kbd>Ctrl</Kbd>
-          <span className="mx-1">+</span>
-          <span>Scroll to zoom</span>
+          <KbdGroup>
+            <Kbd>{modKey}</Kbd>
+            <span className="mx-1">+</span>
+            <span>Scroll to zoom</span>
+          </KbdGroup>
         </div>
       </div>
     </div>

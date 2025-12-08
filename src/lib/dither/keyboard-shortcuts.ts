@@ -1,4 +1,5 @@
 import { useEffect, useCallback } from 'react';
+import { isMac } from '@/lib/utils/platform';
 
 export interface KeyboardShortcut {
   key: string;
@@ -72,16 +73,16 @@ export function formatShortcut(shortcut: KeyboardShortcut): string {
   const parts: string[] = [];
 
   // Use Cmd on Mac, Ctrl on Windows/Linux
-  const isMac = typeof navigator !== 'undefined' && /Mac/.test(navigator.platform);
+  const macOS = isMac();
 
   if (shortcut.ctrl) {
-    parts.push(isMac ? '⌘' : 'Ctrl');
+    parts.push(macOS ? '⌘' : 'Ctrl');
   }
   if (shortcut.shift) {
-    parts.push(isMac ? '⇧' : 'Shift');
+    parts.push(macOS ? '⇧' : 'Shift');
   }
   if (shortcut.alt) {
-    parts.push(isMac ? '⌥' : 'Alt');
+    parts.push(macOS ? '⌥' : 'Alt');
   }
 
   // Format key name
@@ -109,7 +110,7 @@ export function formatShortcut(shortcut: KeyboardShortcut): string {
 
   parts.push(keyName);
 
-  return parts.join(isMac ? '' : '+');
+  return parts.join(macOS ? '' : '+');
 }
 
 /**
