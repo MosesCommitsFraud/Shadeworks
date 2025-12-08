@@ -1,7 +1,7 @@
 import Image from "next/image"
 import Link from "next/link"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
-import { ChevronDown } from "lucide-react"
+import { ChevronDown, Pencil, Grip } from "lucide-react"
 
 export function Header() {
   return (
@@ -29,10 +29,16 @@ export function Header() {
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="start">
                   <DropdownMenuItem asChild>
-                    <Link href="/board">Whiteboard</Link>
+                    <Link href="/board" className="flex items-center gap-2">
+                      <Pencil className="h-4 w-4" />
+                      Whiteboard
+                    </Link>
                   </DropdownMenuItem>
                   <DropdownMenuItem asChild>
-                    <Link href="/dither">Dither Editor</Link>
+                    <Link href="/dither" className="flex items-center gap-2">
+                      <Grip className="h-4 w-4" />
+                      Dither Editor
+                    </Link>
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
