@@ -1,4 +1,5 @@
 import Image from "next/image"
+import Link from "next/link"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { ChevronDown } from "lucide-react"
 
@@ -8,16 +9,16 @@ export function Header() {
       <div className="max-w-6xl mx-auto px-4">
         <nav className="flex items-center justify-start gap-10 h-16">
           {/* Logo */}
-          <div className="flex items-center">
-            <Image 
-              src="/logo-text-sw-white.svg" 
-              alt="shadeworks" 
-              width={160} 
-              height={32} 
+          <Link href="/" className="flex items-center">
+            <Image
+              src="/logo-text-sw-white.svg"
+              alt="shadeworks"
+              width={160}
+              height={32}
               className="h-8 w-auto"
               priority
             />
-          </div>
+          </Link>
 
           {/* Navigation */}
           <div className="hidden md:flex items-center gap-6 pt-[1px]">
@@ -27,10 +28,12 @@ export function Header() {
                   <ChevronDown className="h-4 w-4" />
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="start">
-                  <DropdownMenuItem>Image Editor</DropdownMenuItem>
-                  <DropdownMenuItem>Vector Tools</DropdownMenuItem>
-                  <DropdownMenuItem>Color Palette</DropdownMenuItem>
-                  <DropdownMenuItem>Typography</DropdownMenuItem>
+                  <DropdownMenuItem asChild>
+                    <Link href="/board">Whiteboard</Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem asChild>
+                    <Link href="/dither">Dither Editor</Link>
+                  </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
 

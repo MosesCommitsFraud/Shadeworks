@@ -1,0 +1,273 @@
+import type { Color, Palette, DitheringSettings } from './types';
+import { findClosestColor, clamp } from './utils';
+
+/**
+ * Floyd-Steinberg error diffusion dithering
+ * Classic algorithm with good quality
+ */
+export function floydSteinberg(
+  imageData: ImageData,
+  palette: Palette,
+  settings: DitheringSettings
+): ImageData {
+  const { width, height, data } = imageData;
+  const output = new ImageData(width, height);
+  output.data.set(data);
+
+  const serpentine = settings.serpentine ?? true;
+  const errorAttenuation = settings.errorAttenuation ?? 1.0;
+
+  for (let y = 0; y < height; y++) {
+    const reverse = serpentine && y % 2 === 1;
+    const xStart = reverse ? width - 1 : 0;
+    const xEnd = reverse ? -1 : width;
+    const xDelta = reverse ? -1 : 1;
+
+    for (let x = xStart; x !== xEnd; x += xDelta) {
+      const idx = (y * width + x) * 4;
+
+      // Get current pixel color
+      const oldColor: Color = {
+        r: output.data[idx],
+        g: output.data[idx + 1],
+        b: output.data[idx + 2],
+        a: output.data[idx + 3],
+      };
+
+      // Find closest color in palette
+      const newColor = findClosestColor(oldColor, palette.colors);
+
+      // Set new color
+      output.data[idx] = newColor.r;
+      output.data[idx + 1] = newColor.g;
+      output.data[idx + 2] = newColor.b;
+      output.data[idx + 3] = newColor.a ?? 255;
+
+      // Calculate error
+      const errR = (oldColor.r - newColor.r) * errorAttenuation;
+      const errG = (oldColor.g - newColor.g) * errorAttenuation;
+      const errB = (oldColor.b - newColor.b) * errorAttenuation;
+
+      // Distribute error to neighboring pixels
+      // Floyd-Steinberg matrix:
+      //     X   7/16
+      // 3/16 5/16 1/16
+
+      distributeError(output, width, height, x + xDelta, y, errR, errG, errB, 7 / 16);
+      distributeError(output, width, height, x - xDelta, y + 1, errR, errG, errB, 3 / 16);
+      distributeError(output, width, height, x, y + 1, errR, errG, errB, 5 / 16);
+      distributeError(output, width, height, x + xDelta, y + 1, errR, errG, errB, 1 / 16);
+    }
+  }
+
+  return output;
+}
+
+/**
+ * Atkinson dithering
+ * Mac-style algorithm, softer than Floyd-Steinberg
+ */
+export function atkinson(
+  imageData: ImageData,
+  palette: Palette,
+  settings: DitheringSettings
+): ImageData {
+  const { width, height, data } = imageData;
+  const output = new ImageData(width, height);
+  output.data.set(data);
+
+  const serpentine = settings.serpentine ?? true;
+  const errorAttenuation = settings.errorAttenuation ?? 1.0;
+
+  for (let y = 0; y < height; y++) {
+    const reverse = serpentine && y % 2 === 1;
+    const xStart = reverse ? width - 1 : 0;
+    const xEnd = reverse ? -1 : width;
+    const xDelta = reverse ? -1 : 1;
+
+    for (let x = xStart; x !== xEnd; x += xDelta) {
+      const idx = (y * width + x) * 4;
+
+      const oldColor: Color = {
+        r: output.data[idx],
+        g: output.data[idx + 1],
+        b: output.data[idx + 2],
+        a: output.data[idx + 3],
+      };
+
+      const newColor = findClosestColor(oldColor, palette.colors);
+
+      output.data[idx] = newColor.r;
+      output.data[idx + 1] = newColor.g;
+      output.data[idx + 2] = newColor.b;
+      output.data[idx + 3] = newColor.a ?? 255;
+
+      // Calculate error (Atkinson uses 1/8 factor)
+      const errR = ((oldColor.r - newColor.r) / 8) * errorAttenuation;
+      const errG = ((oldColor.g - newColor.g) / 8) * errorAttenuation;
+      const errB = ((oldColor.b - newColor.b) / 8) * errorAttenuation;
+
+      // Atkinson matrix:
+      //     X   1   1
+      // 1   1   1
+      //     1
+
+      distributeError(output, width, height, x + xDelta, y, errR, errG, errB, 1);
+      distributeError(output, width, height, x + 2 * xDelta, y, errR, errG, errB, 1);
+      distributeError(output, width, height, x - xDelta, y + 1, errR, errG, errB, 1);
+      distributeError(output, width, height, x, y + 1, errR, errG, errB, 1);
+      distributeError(output, width, height, x + xDelta, y + 1, errR, errG, errB, 1);
+      distributeError(output, width, height, x, y + 2, errR, errG, errB, 1);
+    }
+  }
+
+  return output;
+}
+
+/**
+ * Bayer matrix ordered dithering
+ * Fast, creates characteristic patterns
+ */
+export function bayerDither(
+  imageData: ImageData,
+  palette: Palette,
+  matrixSize: 2 | 4 | 8 | 16 = 4
+): ImageData {
+  const { width, height, data } = imageData;
+  const output = new ImageData(width, height);
+
+  const bayerMatrix = getBayerMatrix(matrixSize);
+  const matrixScale = matrixSize * matrixSize;
+
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      const idx = (y * width + x) * 4;
+
+      // Get Bayer threshold for this position
+      const threshold = bayerMatrix[y % matrixSize][x % matrixSize] / matrixScale - 0.5;
+
+      // Apply threshold to color
+      const color: Color = {
+        r: clamp(data[idx] + threshold * 255, 0, 255),
+        g: clamp(data[idx + 1] + threshold * 255, 0, 255),
+        b: clamp(data[idx + 2] + threshold * 255, 0, 255),
+        a: data[idx + 3],
+      };
+
+      // Find closest color in palette
+      const newColor = findClosestColor(color, palette.colors);
+
+      output.data[idx] = newColor.r;
+      output.data[idx + 1] = newColor.g;
+      output.data[idx + 2] = newColor.b;
+      output.data[idx + 3] = newColor.a ?? 255;
+    }
+  }
+
+  return output;
+}
+
+/**
+ * Helper function to distribute error to a neighboring pixel
+ */
+function distributeError(
+  imageData: ImageData,
+  width: number,
+  height: number,
+  x: number,
+  y: number,
+  errR: number,
+  errG: number,
+  errB: number,
+  factor: number
+): void {
+  if (x < 0 || x >= width || y < 0 || y >= height) return;
+
+  const idx = (y * width + x) * 4;
+  imageData.data[idx] = clamp(imageData.data[idx] + errR * factor, 0, 255);
+  imageData.data[idx + 1] = clamp(imageData.data[idx + 1] + errG * factor, 0, 255);
+  imageData.data[idx + 2] = clamp(imageData.data[idx + 2] + errB * factor, 0, 255);
+}
+
+/**
+ * Get Bayer matrix for ordered dithering
+ */
+function getBayerMatrix(size: 2 | 4 | 8 | 16): number[][] {
+  if (size === 2) {
+    return [
+      [0, 2],
+      [3, 1],
+    ];
+  }
+
+  if (size === 4) {
+    return [
+      [0, 8, 2, 10],
+      [12, 4, 14, 6],
+      [3, 11, 1, 9],
+      [15, 7, 13, 5],
+    ];
+  }
+
+  if (size === 8) {
+    return [
+      [0, 32, 8, 40, 2, 34, 10, 42],
+      [48, 16, 56, 24, 50, 18, 58, 26],
+      [12, 44, 4, 36, 14, 46, 6, 38],
+      [60, 28, 52, 20, 62, 30, 54, 22],
+      [3, 35, 11, 43, 1, 33, 9, 41],
+      [51, 19, 59, 27, 49, 17, 57, 25],
+      [15, 47, 7, 39, 13, 45, 5, 37],
+      [63, 31, 55, 23, 61, 29, 53, 21],
+    ];
+  }
+
+  // 16x16 Bayer matrix (generated)
+  const matrix: number[][] = [];
+  for (let i = 0; i < 16; i++) {
+    matrix[i] = [];
+    for (let j = 0; j < 16; j++) {
+      matrix[i][j] =
+        (i % 4) * 64 +
+        (j % 4) * 16 +
+        Math.floor(i / 4) * 4 +
+        Math.floor(j / 4);
+    }
+  }
+  return matrix;
+}
+
+/**
+ * Apply dithering based on algorithm selection
+ */
+export function applyDithering(
+  imageData: ImageData,
+  palette: Palette,
+  settings: DitheringSettings
+): ImageData {
+  const algorithm = settings.algorithm;
+
+  switch (algorithm) {
+    case 'floyd-steinberg':
+      return floydSteinberg(imageData, palette, settings);
+
+    case 'atkinson':
+      return atkinson(imageData, palette, settings);
+
+    case 'bayer-2x2':
+      return bayerDither(imageData, palette, 2);
+
+    case 'bayer-4x4':
+      return bayerDither(imageData, palette, 4);
+
+    case 'bayer-8x8':
+      return bayerDither(imageData, palette, 8);
+
+    case 'bayer-16x16':
+      return bayerDither(imageData, palette, 16);
+
+    default:
+      // Default to Floyd-Steinberg
+      return floydSteinberg(imageData, palette, settings);
+  }
+}
