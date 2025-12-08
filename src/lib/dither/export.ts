@@ -1,4 +1,169 @@
-import type { ExportSettings, DPI } from './types';
+import type { ExportSettings, DPI, HalftoneAngle, Color } from './types';
+
+/**
+ * Generate halftone pattern
+ * Creates a halftone effect by rotating and applying dot patterns
+ */
+export function applyHalftone(
+  imageData: ImageData,
+  angle: HalftoneAngle = 45,
+  frequency: number = 10
+): ImageData {
+  const { width, height, data } = imageData;
+  const output = new ImageData(width, height);
+  output.data.set(data);
+
+  const angleRad = (angle * Math.PI) / 180;
+  const cos = Math.cos(angleRad);
+  const sin = Math.sin(angleRad);
+
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      const idx = (y * width + x) * 4;
+
+      // Get grayscale value
+      const gray = 0.299 * data[idx] + 0.587 * data[idx + 1] + 0.114 * data[idx + 2];
+
+      // Rotate coordinates
+      const rx = x * cos - y * sin;
+      const ry = x * sin + y * cos;
+
+      // Calculate halftone dot size based on brightness
+      const cellX = Math.floor(rx / frequency);
+      const cellY = Math.floor(ry / frequency);
+      const cellCenterX = (cellX + 0.5) * frequency;
+      const cellCenterY = (cellY + 0.5) * frequency;
+
+      const dx = rx - cellCenterX;
+      const dy = ry - cellCenterY;
+      const distance = Math.sqrt(dx * dx + dy * dy);
+
+      // Dot radius based on gray value (darker = larger dot)
+      const maxRadius = frequency / 2;
+      const dotRadius = maxRadius * (1 - gray / 255);
+
+      const value = distance < dotRadius ? 0 : 255;
+
+      output.data[idx] = value;
+      output.data[idx + 1] = value;
+      output.data[idx + 2] = value;
+      output.data[idx + 3] = data[idx + 3];
+    }
+  }
+
+  return output;
+}
+
+/**
+ * Separate image into color channels
+ * Returns individual layers for each color
+ */
+export function separateColors(
+  imageData: ImageData,
+  colors: Color[]
+): ImageData[] {
+  const { width, height, data } = imageData;
+  const layers: ImageData[] = [];
+
+  for (const targetColor of colors) {
+    const layer = new ImageData(width, height);
+
+    for (let i = 0; i < data.length; i += 4) {
+      const pixelColor = {
+        r: data[i],
+        g: data[i + 1],
+        b: data[i + 2],
+        a: data[i + 3],
+      };
+
+      // Check if pixel matches this color (with small tolerance)
+      const tolerance = 10;
+      const matches =
+        Math.abs(pixelColor.r - targetColor.r) < tolerance &&
+        Math.abs(pixelColor.g - targetColor.g) < tolerance &&
+        Math.abs(pixelColor.b - targetColor.b) < tolerance;
+
+      if (matches) {
+        // Show this color
+        layer.data[i] = targetColor.r;
+        layer.data[i + 1] = targetColor.g;
+        layer.data[i + 2] = targetColor.b;
+        layer.data[i + 3] = 255;
+      } else {
+        // Transparent
+        layer.data[i] = 255;
+        layer.data[i + 1] = 255;
+        layer.data[i + 2] = 255;
+        layer.data[i + 3] = 0;
+      }
+    }
+
+    layers.push(layer);
+  }
+
+  return layers;
+}
+
+/**
+ * Create CMYK simulation layers
+ * Approximates CMYK separation for print
+ */
+export function separateToCMYK(imageData: ImageData): {
+  cyan: ImageData;
+  magenta: ImageData;
+  yellow: ImageData;
+  black: ImageData;
+} {
+  const { width, height, data } = imageData;
+
+  const cyan = new ImageData(width, height);
+  const magenta = new ImageData(width, height);
+  const yellow = new ImageData(width, height);
+  const black = new ImageData(width, height);
+
+  for (let i = 0; i < data.length; i += 4) {
+    const r = data[i] / 255;
+    const g = data[i + 1] / 255;
+    const b = data[i + 2] / 255;
+    const a = data[i + 3];
+
+    // RGB to CMYK conversion
+    const k = 1 - Math.max(r, g, b);
+    const c = k === 1 ? 0 : (1 - r - k) / (1 - k);
+    const m = k === 1 ? 0 : (1 - g - k) / (1 - k);
+    const y = k === 1 ? 0 : (1 - b - k) / (1 - k);
+
+    // Cyan layer (show cyan on white)
+    const cVal = Math.round((1 - c) * 255);
+    cyan.data[i] = cVal;
+    cyan.data[i + 1] = 255;
+    cyan.data[i + 2] = 255;
+    cyan.data[i + 3] = a;
+
+    // Magenta layer
+    const mVal = Math.round((1 - m) * 255);
+    magenta.data[i] = 255;
+    magenta.data[i + 1] = mVal;
+    magenta.data[i + 2] = 255;
+    magenta.data[i + 3] = a;
+
+    // Yellow layer
+    const yVal = Math.round((1 - y) * 255);
+    yellow.data[i] = 255;
+    yellow.data[i + 1] = 255;
+    yellow.data[i + 2] = yVal;
+    yellow.data[i + 3] = a;
+
+    // Black layer
+    const kVal = Math.round((1 - k) * 255);
+    black.data[i] = kVal;
+    black.data[i + 1] = kVal;
+    black.data[i + 2] = kVal;
+    black.data[i + 3] = a;
+  }
+
+  return { cyan, magenta, yellow, black };
+}
 
 /**
  * Scale ImageData to a specific DPI
@@ -109,6 +274,91 @@ export function exportAsWebP(
 }
 
 /**
+ * Export color-separated layers
+ * Exports each color as a separate file or as a ZIP
+ */
+export async function exportColorSeparation(
+  imageData: ImageData,
+  colors: Color[],
+  filename: string,
+  settings: ExportSettings
+): Promise<void> {
+  const layers = separateColors(imageData, colors);
+  const { format, dpi } = settings;
+
+  // Export each layer
+  for (let i = 0; i < layers.length; i++) {
+    const layer = layers[i];
+    const scaledLayer = scaleImageDataForDPI(layer, dpi);
+    const layerFilename = `${filename}_layer_${i + 1}.${format}`;
+
+    const canvas = document.createElement('canvas');
+    canvas.width = scaledLayer.width;
+    canvas.height = scaledLayer.height;
+    const ctx = canvas.getContext('2d')!;
+    ctx.putImageData(scaledLayer, 0, 0);
+
+    await new Promise<void>((resolve) => {
+      canvas.toBlob(
+        (blob) => {
+          if (blob) {
+            downloadBlob(blob, layerFilename);
+          }
+          // Add delay between downloads
+          setTimeout(resolve, 500);
+        },
+        `image/${format}`,
+        settings.quality
+      );
+    });
+  }
+}
+
+/**
+ * Export CMYK separation
+ * Exports cyan, magenta, yellow, and black layers
+ */
+export async function exportCMYKSeparation(
+  imageData: ImageData,
+  filename: string,
+  settings: ExportSettings
+): Promise<void> {
+  const { cyan, magenta, yellow, black } = separateToCMYK(imageData);
+  const { format, dpi } = settings;
+
+  const layers = [
+    { name: 'cyan', data: cyan },
+    { name: 'magenta', data: magenta },
+    { name: 'yellow', data: yellow },
+    { name: 'black', data: black },
+  ];
+
+  for (const layer of layers) {
+    const scaledLayer = scaleImageDataForDPI(layer.data, dpi);
+    const layerFilename = `${filename}_${layer.name}.${format}`;
+
+    const canvas = document.createElement('canvas');
+    canvas.width = scaledLayer.width;
+    canvas.height = scaledLayer.height;
+    const ctx = canvas.getContext('2d')!;
+    ctx.putImageData(scaledLayer, 0, 0);
+
+    await new Promise<void>((resolve) => {
+      canvas.toBlob(
+        (blob) => {
+          if (blob) {
+            downloadBlob(blob, layerFilename);
+          }
+          setTimeout(resolve, 500);
+        },
+        `image/${format}`,
+        settings.quality
+      );
+    });
+  }
+}
+
+/**
  * Export ImageData based on settings
  */
 export function exportImage(
@@ -116,7 +366,13 @@ export function exportImage(
   filename: string,
   settings: ExportSettings
 ): void {
-  const { format, dpi, quality = 0.95 } = settings;
+  const { format, dpi, quality = 0.95, halftoneAngle } = settings;
+
+  // Apply halftone if specified
+  let processedImage = imageData;
+  if (halftoneAngle !== undefined && halftoneAngle !== null) {
+    processedImage = applyHalftone(imageData, halftoneAngle);
+  }
 
   // Ensure filename has correct extension
   const baseFilename = filename.replace(/\.[^/.]+$/, '');
@@ -124,16 +380,16 @@ export function exportImage(
 
   switch (format) {
     case 'png':
-      exportAsPNG(imageData, fullFilename, dpi);
+      exportAsPNG(processedImage, fullFilename, dpi);
       break;
     case 'jpeg':
-      exportAsJPEG(imageData, fullFilename, quality, dpi);
+      exportAsJPEG(processedImage, fullFilename, quality, dpi);
       break;
     case 'webp':
-      exportAsWebP(imageData, fullFilename, quality, dpi);
+      exportAsWebP(processedImage, fullFilename, quality, dpi);
       break;
     default:
-      exportAsPNG(imageData, fullFilename, dpi);
+      exportAsPNG(processedImage, fullFilename, dpi);
   }
 }
 

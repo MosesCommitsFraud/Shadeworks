@@ -9,6 +9,7 @@ import { applyColorMode } from '@/lib/dither/color-modes';
 import { copyImageData, debounce } from '@/lib/dither/utils';
 import { CanvasPreview } from './canvas-preview';
 import { ControlSidebar } from './control-sidebar';
+import type { ExportOptions } from './sections/export-section';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
@@ -39,6 +40,7 @@ export function DitherEditor() {
     INITIAL_COLOR_MODE_SETTINGS
   );
   const [isProcessing, setIsProcessing] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
   const [zoom, setZoom] = useState<number>(100);
 
   // Process image with current settings
@@ -110,21 +112,56 @@ export function DitherEditor() {
     setColorModeSettings((prev) => ({ ...prev, ...newSettings }));
   }, []);
 
-  const handleExport = useCallback(() => {
+  const handleExport = useCallback(async (options: ExportOptions) => {
     if (!processedImage) return;
 
-    // Import export function dynamically to avoid issues
-    import('@/lib/dither/export').then(({ exportImage }) => {
-      exportImage(
-        processedImage,
-        'dithered-image',
-        {
-          format: 'png',
-          dpi: 72,
-        }
-      );
-    });
-  }, [processedImage]);
+    setIsExporting(true);
+
+    try {
+      const exportLib = await import('@/lib/dither/export');
+
+      if (options.colorSeparation) {
+        // Export color-separated layers
+        await exportLib.exportColorSeparation(
+          processedImage,
+          palette.colors,
+          options.filename,
+          {
+            format: options.format,
+            dpi: options.dpi,
+            quality: options.quality,
+          }
+        );
+      } else if (options.cmykSeparation) {
+        // Export CMYK separation
+        await exportLib.exportCMYKSeparation(
+          processedImage,
+          options.filename,
+          {
+            format: options.format,
+            dpi: options.dpi,
+            quality: options.quality,
+          }
+        );
+      } else {
+        // Regular export
+        exportLib.exportImage(
+          processedImage,
+          options.filename,
+          {
+            format: options.format,
+            dpi: options.dpi,
+            quality: options.quality,
+            halftoneAngle: options.halftoneAngle ?? undefined,
+          }
+        );
+      }
+    } catch (error) {
+      console.error('Error exporting image:', error);
+    } finally {
+      setIsExporting(false);
+    }
+  }, [processedImage, palette]);
 
   return (
     <div className="flex flex-col h-screen bg-background">
@@ -139,16 +176,11 @@ export function DitherEditor() {
           <div>
             <h1 className="text-lg font-semibold">Dither Editor</h1>
             <p className="text-xs text-muted-foreground">
-              Upload an image to get started
+              {processedImage
+                ? `${processedImage.width}×${processedImage.height}px • ${palette.name} palette`
+                : 'Upload an image to get started'}
             </p>
           </div>
-        </div>
-        <div className="flex items-center gap-2">
-          {processedImage && (
-            <Button onClick={handleExport} variant="default">
-              Export
-            </Button>
-          )}
         </div>
       </header>
 
@@ -157,6 +189,7 @@ export function DitherEditor() {
         {/* Sidebar */}
         <ControlSidebar
           originalImage={originalImage}
+          processedImage={processedImage}
           onImageUpload={handleImageUpload}
           palette={palette}
           onPaletteChange={handlePaletteChange}
@@ -166,6 +199,8 @@ export function DitherEditor() {
           onAdjustmentSettingsChange={handleAdjustmentSettingsChange}
           colorModeSettings={colorModeSettings}
           onColorModeSettingsChange={handleColorModeSettingsChange}
+          onExport={handleExport}
+          isExporting={isExporting}
         />
 
         {/* Canvas */}

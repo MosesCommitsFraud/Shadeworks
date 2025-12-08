@@ -9,9 +9,11 @@ import { DitheringSection } from './sections/dithering-section';
 import { PaletteSection } from './sections/palette-section';
 import { AdjustmentsSection } from './sections/adjustments-section';
 import { ColorModeSection } from './sections/color-mode-section';
+import { ExportSection, type ExportOptions } from './sections/export-section';
 
 interface ControlSidebarProps {
   originalImage: ImageData | null;
+  processedImage: ImageData | null;
   onImageUpload: (imageData: ImageData) => void;
   palette: Palette;
   onPaletteChange: (palette: Palette) => void;
@@ -21,10 +23,13 @@ interface ControlSidebarProps {
   onAdjustmentSettingsChange: (settings: Partial<AdjustmentSettings>) => void;
   colorModeSettings: ColorModeSettings;
   onColorModeSettingsChange: (settings: Partial<ColorModeSettings>) => void;
+  onExport: (options: ExportOptions) => void;
+  isExporting: boolean;
 }
 
 export function ControlSidebar({
   originalImage,
+  processedImage,
   onImageUpload,
   palette,
   onPaletteChange,
@@ -34,18 +39,21 @@ export function ControlSidebar({
   onAdjustmentSettingsChange,
   colorModeSettings,
   onColorModeSettingsChange,
+  onExport,
+  isExporting,
 }: ControlSidebarProps) {
   return (
     <aside className="w-80 border-r border-border bg-card flex flex-col">
       <ScrollArea className="flex-1">
         <div className="p-4">
           <Tabs defaultValue="upload" className="w-full">
-            <TabsList className="grid w-full grid-cols-5 text-xs">
+            <TabsList className="grid w-full grid-cols-6 text-xs">
               <TabsTrigger value="upload">Upload</TabsTrigger>
               <TabsTrigger value="adjust">Adjust</TabsTrigger>
               <TabsTrigger value="mode">Mode</TabsTrigger>
               <TabsTrigger value="dither">Dither</TabsTrigger>
               <TabsTrigger value="palette">Palette</TabsTrigger>
+              <TabsTrigger value="export">Export</TabsTrigger>
             </TabsList>
 
             <TabsContent value="upload" className="mt-4">
@@ -82,6 +90,15 @@ export function ControlSidebar({
                 onPaletteChange={onPaletteChange}
                 hasImage={!!originalImage}
                 originalImage={originalImage}
+              />
+            </TabsContent>
+
+            <TabsContent value="export" className="mt-4">
+              <ExportSection
+                processedImage={processedImage}
+                palette={palette}
+                onExport={onExport}
+                isExporting={isExporting}
               />
             </TabsContent>
           </Tabs>
