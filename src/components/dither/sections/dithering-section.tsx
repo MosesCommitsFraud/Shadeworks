@@ -20,6 +20,7 @@ interface DitheringSectionProps {
 }
 
 const ALGORITHMS: Array<{ value: DitheringAlgorithm; label: string; category: string }> = [
+  // Error Diffusion
   { value: 'floyd-steinberg', label: 'Floyd-Steinberg', category: 'Error Diffusion' },
   { value: 'atkinson', label: 'Atkinson', category: 'Error Diffusion' },
   { value: 'jarvis-judice-ninke', label: 'Jarvis-Judice-Ninke', category: 'Error Diffusion' },
@@ -28,10 +29,22 @@ const ALGORITHMS: Array<{ value: DitheringAlgorithm; label: string; category: st
   { value: 'sierra', label: 'Sierra', category: 'Error Diffusion' },
   { value: 'sierra-2row', label: 'Sierra Two-Row', category: 'Error Diffusion' },
   { value: 'sierra-lite', label: 'Sierra Lite', category: 'Error Diffusion' },
+  { value: 'false-floyd-steinberg', label: 'False Floyd-Steinberg', category: 'Error Diffusion' },
+  { value: 'fan', label: 'Fan', category: 'Error Diffusion' },
+  { value: 'shiau-fan', label: 'Shiau-Fan', category: 'Error Diffusion' },
+  // Ordered
   { value: 'bayer-2x2', label: 'Bayer 2×2', category: 'Ordered' },
   { value: 'bayer-4x4', label: 'Bayer 4×4', category: 'Ordered' },
   { value: 'bayer-8x8', label: 'Bayer 8×8', category: 'Ordered' },
   { value: 'bayer-16x16', label: 'Bayer 16×16', category: 'Ordered' },
+  { value: 'ordered-3x3', label: 'Ordered 3×3', category: 'Ordered' },
+  { value: 'simple-2x2', label: 'Simple 2×2', category: 'Ordered' },
+  // Noise-based
+  { value: 'random-threshold', label: 'Random Threshold', category: 'Noise' },
+  { value: 'blue-noise', label: 'Blue Noise', category: 'Noise' },
+  { value: 'white-noise', label: 'White Noise', category: 'Noise' },
+  // Halftone
+  { value: 'clustered-dot', label: 'Clustered Dot (Halftone)', category: 'Halftone' },
 ];
 
 const ERROR_DIFFUSION_ALGORITHMS: DitheringAlgorithm[] = [
@@ -43,6 +56,9 @@ const ERROR_DIFFUSION_ALGORITHMS: DitheringAlgorithm[] = [
   'sierra',
   'sierra-2row',
   'sierra-lite',
+  'false-floyd-steinberg',
+  'fan',
+  'shiau-fan',
 ];
 
 export function DitheringSection({
@@ -88,6 +104,24 @@ export function DitheringSection({
               Ordered Dithering
             </div>
             {ALGORITHMS.filter((a) => a.category === 'Ordered').map((algo) => (
+              <SelectItem key={algo.value} value={algo.value}>
+                {algo.label}
+              </SelectItem>
+            ))}
+            <Separator className="my-1" />
+            <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground">
+              Noise-Based
+            </div>
+            {ALGORITHMS.filter((a) => a.category === 'Noise').map((algo) => (
+              <SelectItem key={algo.value} value={algo.value}>
+                {algo.label}
+              </SelectItem>
+            ))}
+            <Separator className="my-1" />
+            <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground">
+              Halftone
+            </div>
+            {ALGORITHMS.filter((a) => a.category === 'Halftone').map((algo) => (
               <SelectItem key={algo.value} value={algo.value}>
                 {algo.label}
               </SelectItem>
@@ -192,8 +226,26 @@ export function DitheringSection({
             'Lighter Sierra variant with faster processing and less error spreading.'}
           {settings.algorithm === 'sierra-lite' &&
             'Simplest Sierra variant. Very fast with minimal error diffusion.'}
+          {settings.algorithm === 'false-floyd-steinberg' &&
+            'Simplified Floyd-Steinberg variant. Faster processing but less accurate.'}
+          {settings.algorithm === 'fan' &&
+            'Specialized error diffusion with focused pattern distribution.'}
+          {settings.algorithm === 'shiau-fan' &&
+            'Hybrid error diffusion combining multiple techniques.'}
           {settings.algorithm.startsWith('bayer') &&
             'Ordered dithering creates characteristic patterns. Fast and consistent.'}
+          {settings.algorithm === 'ordered-3x3' &&
+            'Alternative ordered pattern with 3×3 matrix. Creates unique texture.'}
+          {settings.algorithm === 'simple-2x2' &&
+            'Minimal 2×2 pattern. Very fast with simple, clean results.'}
+          {settings.algorithm === 'random-threshold' &&
+            'Adds random noise for organic, film-grain look. Reduces banding.'}
+          {settings.algorithm === 'blue-noise' &&
+            'High-frequency noise pattern for smooth, natural-looking results.'}
+          {settings.algorithm === 'white-noise' &&
+            'Uniform random noise. Creates grainy, textured appearance.'}
+          {settings.algorithm === 'clustered-dot' &&
+            'Creates halftone dots like traditional printing. Perfect for print reproduction.'}
         </p>
       </div>
     </div>

@@ -540,6 +540,423 @@ export function sierraLite(
 }
 
 /**
+ * False Floyd-Steinberg dithering
+ * Simplified variant, faster but less accurate
+ */
+export function falseFloydSteinberg(
+  imageData: ImageData,
+  palette: Palette,
+  settings: DitheringSettings
+): ImageData {
+  const { width, height, data } = imageData;
+  const output = new ImageData(width, height);
+  output.data.set(data);
+
+  const serpentine = settings.serpentine ?? true;
+  const errorAttenuation = settings.errorAttenuation ?? 1.0;
+
+  for (let y = 0; y < height; y++) {
+    const reverse = serpentine && y % 2 === 1;
+    const xStart = reverse ? width - 1 : 0;
+    const xEnd = reverse ? -1 : width;
+    const xDelta = reverse ? -1 : 1;
+
+    for (let x = xStart; x !== xEnd; x += xDelta) {
+      const idx = (y * width + x) * 4;
+
+      const oldColor: Color = {
+        r: output.data[idx],
+        g: output.data[idx + 1],
+        b: output.data[idx + 2],
+        a: output.data[idx + 3],
+      };
+
+      const newColor = findClosestColor(oldColor, palette.colors);
+
+      output.data[idx] = newColor.r;
+      output.data[idx + 1] = newColor.g;
+      output.data[idx + 2] = newColor.b;
+      output.data[idx + 3] = newColor.a ?? 255;
+
+      const errR = (oldColor.r - newColor.r) * errorAttenuation;
+      const errG = (oldColor.g - newColor.g) * errorAttenuation;
+      const errB = (oldColor.b - newColor.b) * errorAttenuation;
+
+      // False Floyd-Steinberg matrix:
+      //     X   3
+      // 3   2
+
+      distributeError(output, width, height, x + xDelta, y, errR, errG, errB, 3 / 8);
+      distributeError(output, width, height, x - xDelta, y + 1, errR, errG, errB, 3 / 8);
+      distributeError(output, width, height, x, y + 1, errR, errG, errB, 2 / 8);
+    }
+  }
+
+  return output;
+}
+
+/**
+ * Fan dithering
+ * Specialized error diffusion
+ */
+export function fan(
+  imageData: ImageData,
+  palette: Palette,
+  settings: DitheringSettings
+): ImageData {
+  const { width, height, data } = imageData;
+  const output = new ImageData(width, height);
+  output.data.set(data);
+
+  const serpentine = settings.serpentine ?? true;
+  const errorAttenuation = settings.errorAttenuation ?? 1.0;
+
+  for (let y = 0; y < height; y++) {
+    const reverse = serpentine && y % 2 === 1;
+    const xStart = reverse ? width - 1 : 0;
+    const xEnd = reverse ? -1 : width;
+    const xDelta = reverse ? -1 : 1;
+
+    for (let x = xStart; x !== xEnd; x += xDelta) {
+      const idx = (y * width + x) * 4;
+
+      const oldColor: Color = {
+        r: output.data[idx],
+        g: output.data[idx + 1],
+        b: output.data[idx + 2],
+        a: output.data[idx + 3],
+      };
+
+      const newColor = findClosestColor(oldColor, palette.colors);
+
+      output.data[idx] = newColor.r;
+      output.data[idx + 1] = newColor.g;
+      output.data[idx + 2] = newColor.b;
+      output.data[idx + 3] = newColor.a ?? 255;
+
+      const errR = (oldColor.r - newColor.r) * errorAttenuation;
+      const errG = (oldColor.g - newColor.g) * errorAttenuation;
+      const errB = (oldColor.b - newColor.b) * errorAttenuation;
+
+      // Fan matrix:
+      //         X   7
+      //     1   3   5
+
+      distributeError(output, width, height, x + xDelta, y, errR, errG, errB, 7 / 16);
+      distributeError(output, width, height, x - xDelta, y + 1, errR, errG, errB, 1 / 16);
+      distributeError(output, width, height, x, y + 1, errR, errG, errB, 3 / 16);
+      distributeError(output, width, height, x + xDelta, y + 1, errR, errG, errB, 5 / 16);
+    }
+  }
+
+  return output;
+}
+
+/**
+ * Shiau-Fan dithering
+ * Hybrid error diffusion
+ */
+export function shiauFan(
+  imageData: ImageData,
+  palette: Palette,
+  settings: DitheringSettings
+): ImageData {
+  const { width, height, data } = imageData;
+  const output = new ImageData(width, height);
+  output.data.set(data);
+
+  const serpentine = settings.serpentine ?? true;
+  const errorAttenuation = settings.errorAttenuation ?? 1.0;
+
+  for (let y = 0; y < height; y++) {
+    const reverse = serpentine && y % 2 === 1;
+    const xStart = reverse ? width - 1 : 0;
+    const xEnd = reverse ? -1 : width;
+    const xDelta = reverse ? -1 : 1;
+
+    for (let x = xStart; x !== xEnd; x += xDelta) {
+      const idx = (y * width + x) * 4;
+
+      const oldColor: Color = {
+        r: output.data[idx],
+        g: output.data[idx + 1],
+        b: output.data[idx + 2],
+        a: output.data[idx + 3],
+      };
+
+      const newColor = findClosestColor(oldColor, palette.colors);
+
+      output.data[idx] = newColor.r;
+      output.data[idx + 1] = newColor.g;
+      output.data[idx + 2] = newColor.b;
+      output.data[idx + 3] = newColor.a ?? 255;
+
+      const errR = (oldColor.r - newColor.r) * errorAttenuation;
+      const errG = (oldColor.g - newColor.g) * errorAttenuation;
+      const errB = (oldColor.b - newColor.b) * errorAttenuation;
+
+      // Shiau-Fan matrix:
+      //         X   4
+      // 1   1   2
+
+      distributeError(output, width, height, x + xDelta, y, errR, errG, errB, 4 / 8);
+      distributeError(output, width, height, x - xDelta, y + 1, errR, errG, errB, 1 / 8);
+      distributeError(output, width, height, x, y + 1, errR, errG, errB, 1 / 8);
+      distributeError(output, width, height, x + xDelta, y + 1, errR, errG, errB, 2 / 8);
+    }
+  }
+
+  return output;
+}
+
+/**
+ * Simple 2x2 threshold dithering
+ * Very simple pattern
+ */
+export function simple2x2(
+  imageData: ImageData,
+  palette: Palette,
+  settings: DitheringSettings
+): ImageData {
+  const { width, height, data } = imageData;
+  const output = new ImageData(width, height);
+
+  const matrix = [
+    [0, 2],
+    [3, 1]
+  ];
+
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      const idx = (y * width + x) * 4;
+
+      const threshold = (matrix[y % 2][x % 2] / 4 - 0.5) * 255;
+
+      const color: Color = {
+        r: clamp(data[idx] + threshold, 0, 255),
+        g: clamp(data[idx + 1] + threshold, 0, 255),
+        b: clamp(data[idx + 2] + threshold, 0, 255),
+        a: data[idx + 3],
+      };
+
+      const newColor = findClosestColor(color, palette.colors);
+
+      output.data[idx] = newColor.r;
+      output.data[idx + 1] = newColor.g;
+      output.data[idx + 2] = newColor.b;
+      output.data[idx + 3] = newColor.a ?? 255;
+    }
+  }
+
+  return output;
+}
+
+/**
+ * Random threshold dithering
+ * Adds random noise for organic look
+ */
+export function randomThreshold(
+  imageData: ImageData,
+  palette: Palette,
+  settings: DitheringSettings
+): ImageData {
+  const { width, height, data } = imageData;
+  const output = new ImageData(width, height);
+
+  const noiseLevel = (settings.randomNoise ?? 0) * 128;
+
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      const idx = (y * width + x) * 4;
+
+      const threshold = (Math.random() - 0.5) * noiseLevel;
+
+      const color: Color = {
+        r: clamp(data[idx] + threshold, 0, 255),
+        g: clamp(data[idx + 1] + threshold, 0, 255),
+        b: clamp(data[idx + 2] + threshold, 0, 255),
+        a: data[idx + 3],
+      };
+
+      const newColor = findClosestColor(color, palette.colors);
+
+      output.data[idx] = newColor.r;
+      output.data[idx + 1] = newColor.g;
+      output.data[idx + 2] = newColor.b;
+      output.data[idx + 3] = newColor.a ?? 255;
+    }
+  }
+
+  return output;
+}
+
+/**
+ * Blue noise dithering
+ * High-frequency noise pattern for smooth results
+ */
+export function blueNoise(
+  imageData: ImageData,
+  palette: Palette,
+  settings: DitheringSettings
+): ImageData {
+  const { width, height, data } = imageData;
+  const output = new ImageData(width, height);
+
+  // Generate blue noise using Mitchell's best-candidate algorithm
+  // Simplified version for performance
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      const idx = (y * width + x) * 4;
+
+      // Blue noise approximation using high-frequency pattern
+      const noise = (Math.sin(x * 12.9898 + y * 78.233) * 43758.5453123);
+      const threshold = ((noise - Math.floor(noise)) - 0.5) * 64;
+
+      const color: Color = {
+        r: clamp(data[idx] + threshold, 0, 255),
+        g: clamp(data[idx + 1] + threshold, 0, 255),
+        b: clamp(data[idx + 2] + threshold, 0, 255),
+        a: data[idx + 3],
+      };
+
+      const newColor = findClosestColor(color, palette.colors);
+
+      output.data[idx] = newColor.r;
+      output.data[idx + 1] = newColor.g;
+      output.data[idx + 2] = newColor.b;
+      output.data[idx + 3] = newColor.a ?? 255;
+    }
+  }
+
+  return output;
+}
+
+/**
+ * White noise dithering
+ * Random uniform noise
+ */
+export function whiteNoise(
+  imageData: ImageData,
+  palette: Palette,
+  settings: DitheringSettings
+): ImageData {
+  const { width, height, data } = imageData;
+  const output = new ImageData(width, height);
+
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      const idx = (y * width + x) * 4;
+
+      const threshold = (Math.random() - 0.5) * 128;
+
+      const color: Color = {
+        r: clamp(data[idx] + threshold, 0, 255),
+        g: clamp(data[idx + 1] + threshold, 0, 255),
+        b: clamp(data[idx + 2] + threshold, 0, 255),
+        a: data[idx + 3],
+      };
+
+      const newColor = findClosestColor(color, palette.colors);
+
+      output.data[idx] = newColor.r;
+      output.data[idx + 1] = newColor.g;
+      output.data[idx + 2] = newColor.b;
+      output.data[idx + 3] = newColor.a ?? 255;
+    }
+  }
+
+  return output;
+}
+
+/**
+ * Ordered 3x3 dithering
+ * Alternative to Bayer matrix
+ */
+export function ordered3x3(
+  imageData: ImageData,
+  palette: Palette,
+  settings: DitheringSettings
+): ImageData {
+  const { width, height, data } = imageData;
+  const output = new ImageData(width, height);
+
+  const matrix = [
+    [0, 7, 3],
+    [6, 5, 2],
+    [4, 1, 8]
+  ];
+
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      const idx = (y * width + x) * 4;
+
+      const threshold = ((matrix[y % 3][x % 3] / 9) - 0.5) * 128;
+
+      const color: Color = {
+        r: clamp(data[idx] + threshold, 0, 255),
+        g: clamp(data[idx + 1] + threshold, 0, 255),
+        b: clamp(data[idx + 2] + threshold, 0, 255),
+        a: data[idx + 3],
+      };
+
+      const newColor = findClosestColor(color, palette.colors);
+
+      output.data[idx] = newColor.r;
+      output.data[idx + 1] = newColor.g;
+      output.data[idx + 2] = newColor.b;
+      output.data[idx + 3] = newColor.a ?? 255;
+    }
+  }
+
+  return output;
+}
+
+/**
+ * Clustered dot (halftone) dithering
+ * Creates circular halftone dots
+ */
+export function clusteredDot(
+  imageData: ImageData,
+  palette: Palette,
+  settings: DitheringSettings
+): ImageData {
+  const { width, height, data } = imageData;
+  const output = new ImageData(width, height);
+
+  // Clustered dot matrix (4x4)
+  const matrix = [
+    [12, 5, 6, 13],
+    [4, 0, 1, 7],
+    [11, 3, 2, 8],
+    [15, 10, 9, 14]
+  ];
+
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      const idx = (y * width + x) * 4;
+
+      const threshold = ((matrix[y % 4][x % 4] / 16) - 0.5) * 255;
+
+      const color: Color = {
+        r: clamp(data[idx] + threshold, 0, 255),
+        g: clamp(data[idx + 1] + threshold, 0, 255),
+        b: clamp(data[idx + 2] + threshold, 0, 255),
+        a: data[idx + 3],
+      };
+
+      const newColor = findClosestColor(color, palette.colors);
+
+      output.data[idx] = newColor.r;
+      output.data[idx + 1] = newColor.g;
+      output.data[idx + 2] = newColor.b;
+      output.data[idx + 3] = newColor.a ?? 255;
+    }
+  }
+
+  return output;
+}
+
+/**
  * Helper function to distribute error to a neighboring pixel
  */
 function distributeError(
@@ -643,6 +1060,33 @@ export function applyDithering(
 
     case 'sierra-lite':
       return sierraLite(imageData, palette, settings);
+
+    case 'false-floyd-steinberg':
+      return falseFloydSteinberg(imageData, palette, settings);
+
+    case 'fan':
+      return fan(imageData, palette, settings);
+
+    case 'shiau-fan':
+      return shiauFan(imageData, palette, settings);
+
+    case 'simple-2x2':
+      return simple2x2(imageData, palette, settings);
+
+    case 'random-threshold':
+      return randomThreshold(imageData, palette, settings);
+
+    case 'blue-noise':
+      return blueNoise(imageData, palette, settings);
+
+    case 'white-noise':
+      return whiteNoise(imageData, palette, settings);
+
+    case 'ordered-3x3':
+      return ordered3x3(imageData, palette, settings);
+
+    case 'clustered-dot':
+      return clusteredDot(imageData, palette, settings);
 
     case 'bayer-2x2':
       return bayerDither(imageData, palette, 2);

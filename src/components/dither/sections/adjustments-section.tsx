@@ -52,6 +52,30 @@ export function AdjustmentsSection({
         </p>
       </div>
 
+      {/* Basic Adjustments */}
+      <div>
+        <h4 className="text-sm font-medium mb-3">Basic</h4>
+      </div>
+
+      {/* Exposure */}
+      <div className="space-y-2">
+        <div className="flex items-center justify-between">
+          <Label>Exposure</Label>
+          <span className="text-xs text-muted-foreground">{settings.exposure.toFixed(1)} stops</span>
+        </div>
+        <Slider
+          value={[settings.exposure * 50 + 100]}
+          onValueChange={([value]) => onSettingsChange({ exposure: (value - 100) / 50 })}
+          min={0}
+          max={200}
+          step={5}
+          disabled={!hasImage}
+        />
+        <p className="text-xs text-muted-foreground">
+          Overall image brightness (-2 to +2 stops)
+        </p>
+      </div>
+
       {/* Brightness */}
       <div className="space-y-2">
         <div className="flex items-center justify-between">
@@ -84,6 +108,32 @@ export function AdjustmentsSection({
         />
       </div>
 
+      <Separator />
+
+      {/* Color Adjustments */}
+      <div>
+        <h4 className="text-sm font-medium mb-3">Color</h4>
+      </div>
+
+      {/* Hue */}
+      <div className="space-y-2">
+        <div className="flex items-center justify-between">
+          <Label>Hue</Label>
+          <span className="text-xs text-muted-foreground">{settings.hue}°</span>
+        </div>
+        <Slider
+          value={[settings.hue]}
+          onValueChange={([value]) => onSettingsChange({ hue: value })}
+          min={-180}
+          max={180}
+          step={5}
+          disabled={!hasImage}
+        />
+        <p className="text-xs text-muted-foreground">
+          Shift color spectrum
+        </p>
+      </div>
+
       {/* Saturation */}
       <div className="space-y-2">
         <div className="flex items-center justify-between">
@@ -99,11 +149,111 @@ export function AdjustmentsSection({
           disabled={!hasImage}
         />
         <p className="text-xs text-muted-foreground">
-          Reduce to -100 for grayscale
+          -100 for grayscale
+        </p>
+      </div>
+
+      {/* Vibrance */}
+      <div className="space-y-2">
+        <div className="flex items-center justify-between">
+          <Label>Vibrance</Label>
+          <span className="text-xs text-muted-foreground">{settings.vibrance}</span>
+        </div>
+        <Slider
+          value={[settings.vibrance]}
+          onValueChange={([value]) => onSettingsChange({ vibrance: value })}
+          min={-100}
+          max={100}
+          step={5}
+          disabled={!hasImage}
+        />
+        <p className="text-xs text-muted-foreground">
+          Smart saturation (protects skin tones)
+        </p>
+      </div>
+
+      {/* Temperature */}
+      <div className="space-y-2">
+        <div className="flex items-center justify-between">
+          <Label>Temperature</Label>
+          <span className="text-xs text-muted-foreground">{settings.temperature}</span>
+        </div>
+        <Slider
+          value={[settings.temperature]}
+          onValueChange={([value]) => onSettingsChange({ temperature: value })}
+          min={-100}
+          max={100}
+          step={5}
+          disabled={!hasImage}
+        />
+        <p className="text-xs text-muted-foreground">
+          Cool (blue) ← → Warm (yellow)
+        </p>
+      </div>
+
+      {/* Tint */}
+      <div className="space-y-2">
+        <div className="flex items-center justify-between">
+          <Label>Tint</Label>
+          <span className="text-xs text-muted-foreground">{settings.tint}</span>
+        </div>
+        <Slider
+          value={[settings.tint]}
+          onValueChange={([value]) => onSettingsChange({ tint: value })}
+          min={-100}
+          max={100}
+          step={5}
+          disabled={!hasImage}
+        />
+        <p className="text-xs text-muted-foreground">
+          Green ← → Magenta
         </p>
       </div>
 
       <Separator />
+
+      {/* Tonal Adjustments */}
+      <div>
+        <h4 className="text-sm font-medium mb-3">Tonal</h4>
+      </div>
+
+      {/* Highlights */}
+      <div className="space-y-2">
+        <div className="flex items-center justify-between">
+          <Label>Highlights</Label>
+          <span className="text-xs text-muted-foreground">{settings.highlights}</span>
+        </div>
+        <Slider
+          value={[settings.highlights]}
+          onValueChange={([value]) => onSettingsChange({ highlights: value })}
+          min={-100}
+          max={100}
+          step={5}
+          disabled={!hasImage}
+        />
+        <p className="text-xs text-muted-foreground">
+          Adjust bright areas only
+        </p>
+      </div>
+
+      {/* Shadows */}
+      <div className="space-y-2">
+        <div className="flex items-center justify-between">
+          <Label>Shadows</Label>
+          <span className="text-xs text-muted-foreground">{settings.shadows}</span>
+        </div>
+        <Slider
+          value={[settings.shadows]}
+          onValueChange={([value]) => onSettingsChange({ shadows: value })}
+          min={-100}
+          max={100}
+          step={5}
+          disabled={!hasImage}
+        />
+        <p className="text-xs text-muted-foreground">
+          Adjust dark areas only
+        </p>
+      </div>
 
       {/* Gamma */}
       <div className="space-y-2">
@@ -120,11 +270,16 @@ export function AdjustmentsSection({
           disabled={!hasImage}
         />
         <p className="text-xs text-muted-foreground">
-          Adjust tonal response (1.0 = neutral)
+          Tonal response curve (1.0 = neutral)
         </p>
       </div>
 
       <Separator />
+
+      {/* Filters */}
+      <div>
+        <h4 className="text-sm font-medium mb-3">Filters</h4>
+      </div>
 
       {/* Blur */}
       <div className="space-y-2">
@@ -183,13 +338,35 @@ export function AdjustmentsSection({
         </p>
       </div>
 
+      {/* Vignette */}
+      <div className="space-y-2">
+        <div className="flex items-center justify-between">
+          <Label>Vignette</Label>
+          <span className="text-xs text-muted-foreground">{settings.vignette}%</span>
+        </div>
+        <Slider
+          value={[settings.vignette]}
+          onValueChange={([value]) => onSettingsChange({ vignette: value })}
+          min={0}
+          max={100}
+          step={5}
+          disabled={!hasImage}
+        />
+        <p className="text-xs text-muted-foreground">
+          Darken edges for focus effect
+        </p>
+      </div>
+
       {/* Tips */}
       <div className="rounded-lg bg-muted p-3 text-xs">
         <p className="font-medium mb-1">Adjustment Tips:</p>
         <ul className="text-muted-foreground space-y-1 list-disc list-inside">
           <li>Apply adjustments before dithering for best results</li>
+          <li>Use exposure and gamma for overall tonal balance</li>
+          <li>Adjust highlights/shadows for selective tonal control</li>
+          <li>Use vibrance to boost colors while protecting skin tones</li>
+          <li>Temperature and tint correct color casts</li>
           <li>Increase contrast for sharper dithering patterns</li>
-          <li>Reduce saturation for better grayscale conversion</li>
           <li>Use blur to smooth gradients before dithering</li>
         </ul>
       </div>

@@ -2,6 +2,7 @@
  * Dithering algorithm types
  */
 export type DitheringAlgorithm =
+  // Error diffusion algorithms
   | 'floyd-steinberg'
   | 'atkinson'
   | 'jarvis-judice-ninke'
@@ -10,10 +11,21 @@ export type DitheringAlgorithm =
   | 'sierra'
   | 'sierra-2row'
   | 'sierra-lite'
+  | 'false-floyd-steinberg'
+  | 'fan'
+  | 'shiau-fan'
+  // Ordered dithering
   | 'bayer-2x2'
   | 'bayer-4x4'
   | 'bayer-8x8'
   | 'bayer-16x16'
+  | 'ordered-3x3'
+  | 'simple-2x2'
+  // Noise-based
+  | 'random-threshold'
+  | 'blue-noise'
+  | 'white-noise'
+  // Halftone
   | 'clustered-dot';
 
 /**
@@ -105,13 +117,28 @@ export interface DitheringSettings {
  * Image adjustment settings
  */
 export interface AdjustmentSettings {
+  // Basic adjustments
   brightness: number; // -100 to 100
   contrast: number; // -100 to 100
   saturation: number; // -100 to 100
+  exposure: number; // -2 to 2 (stops)
+
+  // Color adjustments
+  hue: number; // -180 to 180 (degrees)
+  vibrance: number; // -100 to 100
+  temperature: number; // -100 to 100 (blue to yellow)
+  tint: number; // -100 to 100 (green to magenta)
+
+  // Tonal adjustments
+  highlights: number; // -100 to 100
+  shadows: number; // -100 to 100
+  gamma: number; // 0.5-2.0
+
+  // Filters
   blur: number; // 0-20px
   sharpen: number; // 0-100%
   denoise: number; // 0-100%
-  gamma: number; // 0.5-2.0
+  vignette: number; // 0-100%
 }
 
 /**

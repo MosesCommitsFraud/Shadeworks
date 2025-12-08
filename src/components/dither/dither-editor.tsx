@@ -9,6 +9,7 @@ import { applyColorMode } from '@/lib/dither/color-modes';
 import { copyImageData, debounce } from '@/lib/dither/utils';
 import { CanvasPreview } from './canvas-preview';
 import { ControlSidebar } from './control-sidebar';
+import { UnsavedChangesDialog } from './components/unsaved-changes-dialog';
 import type { ExportOptions } from './sections/export-section';
 import type { DitherPreset } from '@/lib/dither/presets';
 import { getPaletteByType } from '@/lib/dither/palettes';
@@ -19,6 +20,8 @@ import {
 import { Button } from '@/components/ui/button';
 import { ArrowLeft, Keyboard } from 'lucide-react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { createProject, saveProject } from '@/lib/dither/project';
 
 const INITIAL_DITHERING_SETTINGS: DitheringSettings = {
   algorithm: 'floyd-steinberg',
@@ -33,6 +36,7 @@ const INITIAL_COLOR_MODE_SETTINGS: ColorModeSettings = {
 };
 
 export function DitherEditor() {
+  const router = useRouter();
   const [originalImage, setOriginalImage] = useState<ImageData | null>(null);
   const [processedImage, setProcessedImage] = useState<ImageData | null>(null);
   const [palette, setPalette] = useState<Palette>(getDefaultPalette());
@@ -48,7 +52,13 @@ export function DitherEditor() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
   const [zoom, setZoom] = useState<number>(100);
+  const [pan, setPan] = useState({ x: 0, y: 0 });
   const [comparisonMode, setComparisonMode] = useState(false);
+  const [projectName, setProjectName] = useState('untitled');
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const [lastSavedState, setLastSavedState] = useState<string>('');
+  const [showUnsavedDialog, setShowUnsavedDialog] = useState(false);
+  const [pendingNavigation, setPendingNavigation] = useState<(() => void) | null>(null);
 
   // Ref to store zoom/fit handlers from CanvasPreview
   const zoomHandlers = useRef<{
@@ -120,14 +130,17 @@ export function DitherEditor() {
 
   const handleDitheringSettingsChange = useCallback((newSettings: Partial<DitheringSettings>) => {
     setDitheringSettings((prev) => ({ ...prev, ...newSettings }));
+    setHasUnsavedChanges(true);
   }, []);
 
   const handleAdjustmentSettingsChange = useCallback((newSettings: Partial<AdjustmentSettings>) => {
     setAdjustmentSettings((prev) => ({ ...prev, ...newSettings }));
+    setHasUnsavedChanges(true);
   }, []);
 
   const handleColorModeSettingsChange = useCallback((newSettings: Partial<ColorModeSettings>) => {
     setColorModeSettings((prev) => ({ ...prev, ...newSettings }));
+    setHasUnsavedChanges(true);
   }, []);
 
   const handleApplyPreset = useCallback((preset: DitherPreset) => {
@@ -141,7 +154,143 @@ export function DitherEditor() {
     if (presetPalette) {
       setPalette(presetPalette);
     }
+
+    setHasUnsavedChanges(true);
   }, []);
+
+  // Handle navigation with unsaved changes (must be declared before handleNewProject)
+  const handleNavigateAway = useCallback((navigationCallback: () => void) => {
+    if (hasUnsavedChanges) {
+      setPendingNavigation(() => navigationCallback);
+      setShowUnsavedDialog(true);
+    } else {
+      navigationCallback();
+    }
+  }, [hasUnsavedChanges]);
+
+  // Project management handlers
+  const handleProjectSave = useCallback(() => {
+    setHasUnsavedChanges(false);
+    // Store current state as last saved
+    const stateSnapshot = JSON.stringify({
+      dithering: ditheringSettings,
+      adjustments: adjustmentSettings,
+      colorMode: colorModeSettings,
+      palette,
+    });
+    setLastSavedState(stateSnapshot);
+  }, [ditheringSettings, adjustmentSettings, colorModeSettings, palette]);
+
+  // Dialog handlers
+  const handleDialogSave = useCallback(() => {
+    if (!originalImage) return;
+
+    // Save the project
+    const project = createProject(
+      projectName || 'untitled',
+      originalImage,
+      {
+        dithering: ditheringSettings,
+        adjustments: adjustmentSettings,
+        colorMode: colorModeSettings,
+        palette,
+      },
+      { zoom, pan }
+    );
+    saveProject(project);
+    handleProjectSave();
+
+    // Execute pending navigation
+    if (pendingNavigation) {
+      pendingNavigation();
+      setPendingNavigation(null);
+    }
+    setShowUnsavedDialog(false);
+  }, [originalImage, projectName, ditheringSettings, adjustmentSettings, colorModeSettings, palette, zoom, pan, handleProjectSave, pendingNavigation]);
+
+  const handleDialogDiscard = useCallback(() => {
+    // Execute pending navigation without saving
+    if (pendingNavigation) {
+      pendingNavigation();
+      setPendingNavigation(null);
+    }
+    setShowUnsavedDialog(false);
+  }, [pendingNavigation]);
+
+  const handleDialogCancel = useCallback(() => {
+    // Clear pending navigation
+    setPendingNavigation(null);
+    setShowUnsavedDialog(false);
+  }, []);
+
+  const handleNewProject = useCallback(() => {
+    const resetProject = () => {
+      setOriginalImage(null);
+      setProcessedImage(null);
+      setPalette(getDefaultPalette());
+      setDitheringSettings(INITIAL_DITHERING_SETTINGS);
+      setAdjustmentSettings(getDefaultAdjustmentSettings());
+      setColorModeSettings(INITIAL_COLOR_MODE_SETTINGS);
+      setZoom(100);
+      setPan({ x: 0, y: 0 });
+      setProjectName('untitled');
+      setHasUnsavedChanges(false);
+      setLastSavedState('');
+    };
+
+    handleNavigateAway(resetProject);
+  }, [handleNavigateAway]);
+
+  const handleProjectLoad = useCallback((
+    image: ImageData,
+    settings: {
+      dithering: DitheringSettings;
+      adjustments: AdjustmentSettings;
+      colorMode: ColorModeSettings;
+      palette: Palette;
+    },
+    ui?: { zoom: number; pan: { x: number; y: number } },
+    name?: string
+  ) => {
+    setOriginalImage(image);
+    setDitheringSettings(settings.dithering);
+    setAdjustmentSettings(settings.adjustments);
+    setColorModeSettings(settings.colorMode);
+    setPalette(settings.palette);
+
+    if (ui) {
+      setZoom(ui.zoom);
+      setPan(ui.pan);
+    }
+
+    if (name) {
+      setProjectName(name);
+    }
+
+    setHasUnsavedChanges(false);
+    // Store current state as last saved
+    const stateSnapshot = JSON.stringify({
+      dithering: settings.dithering,
+      adjustments: settings.adjustments,
+      colorMode: settings.colorMode,
+      palette: settings.palette,
+    });
+    setLastSavedState(stateSnapshot);
+  }, []);
+
+  // Intercept browser back button and beforeunload
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (hasUnsavedChanges) {
+        e.preventDefault();
+        e.returnValue = '';
+        return '';
+      }
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [hasUnsavedChanges]);
 
   const handleExport = useCallback(async (options: ExportOptions) => {
     if (!processedImage) return;
@@ -232,11 +381,16 @@ export function DitherEditor() {
       {/* Header */}
       <header className="border-b border-border px-4 py-3 flex items-center justify-between bg-card">
         <div className="flex items-center gap-4">
-          <Link href="/">
-            <Button variant="ghost" size="icon">
-              <ArrowLeft className="h-4 w-4" />
-            </Button>
-          </Link>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={(e) => {
+              e.preventDefault();
+              handleNavigateAway(() => router.push('/'));
+            }}
+          >
+            <ArrowLeft className="h-4 w-4" />
+          </Button>
           <div>
             <h1 className="text-lg font-semibold">Dither Editor</h1>
             <p className="text-xs text-muted-foreground">
@@ -266,6 +420,13 @@ export function DitherEditor() {
           onExport={handleExport}
           isExporting={isExporting}
           onApplyPreset={handleApplyPreset}
+          zoom={zoom}
+          pan={pan}
+          projectName={projectName}
+          hasUnsavedChanges={hasUnsavedChanges}
+          onNewProject={handleNewProject}
+          onProjectLoad={handleProjectLoad}
+          onProjectSave={handleProjectSave}
         />
 
         {/* Canvas */}
@@ -282,6 +443,15 @@ export function DitherEditor() {
           }}
         />
       </div>
+
+      {/* Unsaved Changes Dialog */}
+      <UnsavedChangesDialog
+        open={showUnsavedDialog}
+        onOpenChange={setShowUnsavedDialog}
+        onSave={handleDialogSave}
+        onDiscard={handleDialogDiscard}
+        onCancel={handleDialogCancel}
+      />
     </div>
   );
 }

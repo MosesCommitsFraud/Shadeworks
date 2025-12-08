@@ -10,7 +10,8 @@ import {
   Sparkles,
   Pipette,
   Star,
-  Download
+  Download,
+  FileText
 } from 'lucide-react';
 import type { Palette, DitheringSettings, AdjustmentSettings, ColorModeSettings } from '@/lib/dither/types';
 import { UploadSection } from './sections/upload-section';
@@ -20,11 +21,13 @@ import { AdjustmentsSection } from './sections/adjustments-section';
 import { ColorModeSection } from './sections/color-mode-section';
 import { ExportSection, type ExportOptions } from './sections/export-section';
 import { PresetSection } from './sections/preset-section';
+import { FileSection } from './sections/file-section';
 import type { DitherPreset } from '@/lib/dither/presets';
 
-type Section = 'upload' | 'adjust' | 'mode' | 'dither' | 'palette' | 'preset' | 'export';
+type Section = 'file' | 'upload' | 'adjust' | 'mode' | 'dither' | 'palette' | 'preset' | 'export';
 
 const SECTIONS: Array<{ id: Section; label: string; icon: typeof Upload }> = [
+  { id: 'file', label: 'File', icon: FileText },
   { id: 'upload', label: 'Upload', icon: Upload },
   { id: 'adjust', label: 'Adjust', icon: Sliders },
   { id: 'mode', label: 'Mode', icon: Pipette },
@@ -49,6 +52,23 @@ interface ControlSidebarProps {
   onExport: (options: ExportOptions) => void;
   isExporting: boolean;
   onApplyPreset: (preset: DitherPreset) => void;
+  zoom: number;
+  pan: { x: number; y: number };
+  projectName?: string;
+  hasUnsavedChanges: boolean;
+  onNewProject: () => void;
+  onProjectLoad: (
+    image: ImageData,
+    settings: {
+      dithering: DitheringSettings;
+      adjustments: AdjustmentSettings;
+      colorMode: ColorModeSettings;
+      palette: Palette;
+    },
+    ui?: { zoom: number; pan: { x: number; y: number } },
+    projectName?: string
+  ) => void;
+  onProjectSave: () => void;
 }
 
 export function ControlSidebar({
@@ -66,11 +86,35 @@ export function ControlSidebar({
   onExport,
   isExporting,
   onApplyPreset,
+  zoom,
+  pan,
+  projectName,
+  hasUnsavedChanges,
+  onNewProject,
+  onProjectLoad,
+  onProjectSave,
 }: ControlSidebarProps) {
-  const [activeSection, setActiveSection] = useState<Section>('upload');
+  const [activeSection, setActiveSection] = useState<Section>('file');
 
   const renderSection = () => {
     switch (activeSection) {
+      case 'file':
+        return (
+          <FileSection
+            originalImage={originalImage}
+            ditheringSettings={ditheringSettings}
+            adjustmentSettings={adjustmentSettings}
+            colorModeSettings={colorModeSettings}
+            palette={palette}
+            zoom={zoom}
+            pan={pan}
+            projectName={projectName}
+            hasUnsavedChanges={hasUnsavedChanges}
+            onNewProject={onNewProject}
+            onProjectLoad={onProjectLoad}
+            onProjectSave={onProjectSave}
+          />
+        );
       case 'upload':
         return <UploadSection onImageUpload={onImageUpload} />;
       case 'adjust':
