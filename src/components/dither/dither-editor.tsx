@@ -10,6 +10,8 @@ import { copyImageData, debounce } from '@/lib/dither/utils';
 import { CanvasPreview } from './canvas-preview';
 import { ControlSidebar } from './control-sidebar';
 import { UnsavedChangesDialog } from './components/unsaved-changes-dialog';
+import { HelpDialog } from './components/help-dialog';
+import { HotkeysDialog } from './components/hotkeys-dialog';
 import type { ExportOptions } from './sections/export-section';
 import type { DitherPreset } from '@/lib/dither/presets';
 import { getPaletteByType } from '@/lib/dither/palettes';
@@ -18,7 +20,7 @@ import {
   getDefaultShortcuts,
 } from '@/lib/dither/keyboard-shortcuts';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, Keyboard } from 'lucide-react';
+import { ArrowLeft, HelpCircle, Keyboard } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { createProject, saveProject } from '@/lib/dither/project';
@@ -59,6 +61,8 @@ export function DitherEditor() {
   const [lastSavedState, setLastSavedState] = useState<string>('');
   const [showUnsavedDialog, setShowUnsavedDialog] = useState(false);
   const [pendingNavigation, setPendingNavigation] = useState<(() => void) | null>(null);
+  const [showHelpDialog, setShowHelpDialog] = useState(false);
+  const [showHotkeysDialog, setShowHotkeysDialog] = useState(false);
 
   // Ref to store zoom/fit handlers from CanvasPreview
   const zoomHandlers = useRef<{
@@ -400,6 +404,26 @@ export function DitherEditor() {
             </p>
           </div>
         </div>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setShowHotkeysDialog(true)}
+            className="gap-2"
+          >
+            <Keyboard className="h-4 w-4" />
+            Hotkeys
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setShowHelpDialog(true)}
+            className="gap-2"
+          >
+            <HelpCircle className="h-4 w-4" />
+            Help
+          </Button>
+        </div>
       </header>
 
       {/* Main content */}
@@ -451,6 +475,18 @@ export function DitherEditor() {
         onSave={handleDialogSave}
         onDiscard={handleDialogDiscard}
         onCancel={handleDialogCancel}
+      />
+
+      {/* Help Dialog */}
+      <HelpDialog
+        open={showHelpDialog}
+        onOpenChange={setShowHelpDialog}
+      />
+
+      {/* Hotkeys Dialog */}
+      <HotkeysDialog
+        open={showHotkeysDialog}
+        onOpenChange={setShowHotkeysDialog}
       />
     </div>
   );

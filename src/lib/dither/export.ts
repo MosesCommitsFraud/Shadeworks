@@ -1,4 +1,5 @@
 import type { ExportSettings, DPI, HalftoneAngle, Color } from './types';
+import JSZip from 'jszip';
 
 /**
  * Generate halftone pattern
@@ -198,6 +199,35 @@ export function scaleImageDataForDPI(
 }
 
 /**
+ * Convert ImageData to Blob
+ */
+async function imageDataToBlob(
+  imageData: ImageData,
+  format: 'png' | 'jpeg' | 'webp',
+  quality?: number
+): Promise<Blob> {
+  const canvas = document.createElement('canvas');
+  canvas.width = imageData.width;
+  canvas.height = imageData.height;
+  const ctx = canvas.getContext('2d')!;
+  ctx.putImageData(imageData, 0, 0);
+
+  return new Promise<Blob>((resolve, reject) => {
+    canvas.toBlob(
+      (blob) => {
+        if (blob) {
+          resolve(blob);
+        } else {
+          reject(new Error('Failed to create blob'));
+        }
+      },
+      `image/${format}`,
+      quality
+    );
+  });
+}
+
+/**
  * Export ImageData as PNG
  */
 export function exportAsPNG(
@@ -274,8 +304,8 @@ export function exportAsWebP(
 }
 
 /**
- * Export color-separated layers
- * Exports each color as a separate file or as a ZIP
+ * Export color-separated layers as ZIP
+ * Bundles each color layer into a single ZIP file
  */
 export async function exportColorSeparation(
   imageData: ImageData,
@@ -284,39 +314,39 @@ export async function exportColorSeparation(
   settings: ExportSettings
 ): Promise<void> {
   const layers = separateColors(imageData, colors);
-  const { format, dpi } = settings;
+  const { format, dpi, quality } = settings;
 
-  // Export each layer
+  // Create ZIP file
+  const zip = new JSZip();
+
+  // Add each layer to ZIP
   for (let i = 0; i < layers.length; i++) {
     const layer = layers[i];
     const scaledLayer = scaleImageDataForDPI(layer, dpi);
-    const layerFilename = `${filename}_layer_${i + 1}.${format}`;
+    const layerFilename = `layer_${i + 1}.${format}`;
 
-    const canvas = document.createElement('canvas');
-    canvas.width = scaledLayer.width;
-    canvas.height = scaledLayer.height;
-    const ctx = canvas.getContext('2d')!;
-    ctx.putImageData(scaledLayer, 0, 0);
+    try {
+      const blob = await imageDataToBlob(scaledLayer, format, quality);
+      zip.file(layerFilename, blob);
+    } catch (error) {
+      console.error(`Failed to add layer ${i + 1} to ZIP:`, error);
+    }
+  }
 
-    await new Promise<void>((resolve) => {
-      canvas.toBlob(
-        (blob) => {
-          if (blob) {
-            downloadBlob(blob, layerFilename);
-          }
-          // Add delay between downloads
-          setTimeout(resolve, 500);
-        },
-        `image/${format}`,
-        settings.quality
-      );
-    });
+  // Generate and download ZIP
+  try {
+    const zipBlob = await zip.generateAsync({ type: 'blob' });
+    const zipFilename = `${filename}_color_separation.zip`;
+    downloadBlob(zipBlob, zipFilename);
+  } catch (error) {
+    console.error('Failed to generate ZIP file:', error);
+    throw error;
   }
 }
 
 /**
- * Export CMYK separation
- * Exports cyan, magenta, yellow, and black layers
+ * Export CMYK separation as ZIP
+ * Bundles cyan, magenta, yellow, and black layers into a single ZIP file
  */
 export async function exportCMYKSeparation(
   imageData: ImageData,
@@ -324,7 +354,7 @@ export async function exportCMYKSeparation(
   settings: ExportSettings
 ): Promise<void> {
   const { cyan, magenta, yellow, black } = separateToCMYK(imageData);
-  const { format, dpi } = settings;
+  const { format, dpi, quality } = settings;
 
   const layers = [
     { name: 'cyan', data: cyan },
@@ -333,28 +363,30 @@ export async function exportCMYKSeparation(
     { name: 'black', data: black },
   ];
 
+  // Create ZIP file
+  const zip = new JSZip();
+
+  // Add each layer to ZIP
   for (const layer of layers) {
     const scaledLayer = scaleImageDataForDPI(layer.data, dpi);
-    const layerFilename = `${filename}_${layer.name}.${format}`;
+    const layerFilename = `${layer.name}.${format}`;
 
-    const canvas = document.createElement('canvas');
-    canvas.width = scaledLayer.width;
-    canvas.height = scaledLayer.height;
-    const ctx = canvas.getContext('2d')!;
-    ctx.putImageData(scaledLayer, 0, 0);
+    try {
+      const blob = await imageDataToBlob(scaledLayer, format, quality);
+      zip.file(layerFilename, blob);
+    } catch (error) {
+      console.error(`Failed to add ${layer.name} layer to ZIP:`, error);
+    }
+  }
 
-    await new Promise<void>((resolve) => {
-      canvas.toBlob(
-        (blob) => {
-          if (blob) {
-            downloadBlob(blob, layerFilename);
-          }
-          setTimeout(resolve, 500);
-        },
-        `image/${format}`,
-        settings.quality
-      );
-    });
+  // Generate and download ZIP
+  try {
+    const zipBlob = await zip.generateAsync({ type: 'blob' });
+    const zipFilename = `${filename}_cmyk_separation.zip`;
+    downloadBlob(zipBlob, zipFilename);
+  } catch (error) {
+    console.error('Failed to generate ZIP file:', error);
+    throw error;
   }
 }
 

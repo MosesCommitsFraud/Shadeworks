@@ -205,49 +205,6 @@ export function DitheringSection({
           </div>
         </>
       )}
-
-      {/* Algorithm info */}
-      <div className="rounded-lg bg-muted p-3 text-xs">
-        <p className="font-medium mb-1">About this algorithm:</p>
-        <p className="text-muted-foreground">
-          {settings.algorithm === 'floyd-steinberg' &&
-            'Classic error diffusion with excellent quality. Best for most images.'}
-          {settings.algorithm === 'atkinson' &&
-            'Mac-style algorithm with softer, more artistic results.'}
-          {settings.algorithm === 'jarvis-judice-ninke' &&
-            'Wider error diffusion pattern for smoother gradients and better detail preservation.'}
-          {settings.algorithm === 'stucki' &&
-            'Balanced error diffusion with good quality and moderate processing speed.'}
-          {settings.algorithm === 'burkes' &&
-            'Fast error diffusion with good quality. Efficient for large images.'}
-          {settings.algorithm === 'sierra' &&
-            'Three-row error diffusion for excellent gradient rendering.'}
-          {settings.algorithm === 'sierra-2row' &&
-            'Lighter Sierra variant with faster processing and less error spreading.'}
-          {settings.algorithm === 'sierra-lite' &&
-            'Simplest Sierra variant. Very fast with minimal error diffusion.'}
-          {settings.algorithm === 'false-floyd-steinberg' &&
-            'Simplified Floyd-Steinberg variant. Faster processing but less accurate.'}
-          {settings.algorithm === 'fan' &&
-            'Specialized error diffusion with focused pattern distribution.'}
-          {settings.algorithm === 'shiau-fan' &&
-            'Hybrid error diffusion combining multiple techniques.'}
-          {settings.algorithm.startsWith('bayer') &&
-            'Ordered dithering creates characteristic patterns. Fast and consistent.'}
-          {settings.algorithm === 'ordered-3x3' &&
-            'Alternative ordered pattern with 3×3 matrix. Creates unique texture.'}
-          {settings.algorithm === 'simple-2x2' &&
-            'Minimal 2×2 pattern. Very fast with simple, clean results.'}
-          {settings.algorithm === 'random-threshold' &&
-            'Adds random noise for organic, film-grain look. Reduces banding.'}
-          {settings.algorithm === 'blue-noise' &&
-            'High-frequency noise pattern for smooth, natural-looking results.'}
-          {settings.algorithm === 'white-noise' &&
-            'Uniform random noise. Creates grainy, textured appearance.'}
-          {settings.algorithm === 'clustered-dot' &&
-            'Creates halftone dots like traditional printing. Perfect for print reproduction.'}
-        </p>
-      </div>
     </div>
   );
 }

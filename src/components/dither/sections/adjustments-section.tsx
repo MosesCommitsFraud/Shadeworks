@@ -356,20 +356,6 @@ export function AdjustmentsSection({
           Darken edges for focus effect
         </p>
       </div>
-
-      {/* Tips */}
-      <div className="rounded-lg bg-muted p-3 text-xs">
-        <p className="font-medium mb-1">Adjustment Tips:</p>
-        <ul className="text-muted-foreground space-y-1 list-disc list-inside">
-          <li>Apply adjustments before dithering for best results</li>
-          <li>Use exposure and gamma for overall tonal balance</li>
-          <li>Adjust highlights/shadows for selective tonal control</li>
-          <li>Use vibrance to boost colors while protecting skin tones</li>
-          <li>Temperature and tint correct color casts</li>
-          <li>Increase contrast for sharper dithering patterns</li>
-          <li>Use blur to smooth gradients before dithering</li>
-        </ul>
-      </div>
     </div>
   );
 }
