@@ -7,6 +7,7 @@ import { Progress } from '@/components/ui/progress';
 import { Kbd, KbdGroup } from '@/components/ui/kbd';
 import { BeforeAfterSlider } from './components/before-after-slider';
 import { getModifierKey } from '@/lib/utils/platform';
+import type { MediaType } from '@/lib/dither/types';
 
 interface CanvasPreviewProps {
   originalImage: ImageData | null;
@@ -21,6 +22,11 @@ interface CanvasPreviewProps {
     zoomOut: () => void;
     zoomFit: () => void;
   }) => void;
+  // Video mode props
+  mediaType?: MediaType;
+  videoFrames?: ImageData[];
+  processedFrames?: ImageData[];
+  currentFrame?: number;
 }
 
 export function CanvasPreview({
@@ -32,6 +38,10 @@ export function CanvasPreview({
   comparisonMode: externalComparisonMode,
   onComparisonModeChange,
   onRegisterZoomHandlers,
+  mediaType = 'image',
+  videoFrames = [],
+  processedFrames = [],
+  currentFrame = 0,
 }: CanvasPreviewProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -46,9 +56,35 @@ export function CanvasPreview({
   // Get OS-appropriate modifier key
   const modKey = useMemo(() => getModifierKey(), []);
 
-  // Derived values
-  const displayImage = processedImage || originalImage;
-  const canCompare = originalImage && processedImage;
+  // Derived values for image or video
+  const displayImage = useMemo(() => {
+    if (mediaType === 'video') {
+      // For video mode, use current frame from processed or original frames
+      return processedFrames[currentFrame] || videoFrames[currentFrame] || null;
+    }
+    return processedImage || originalImage;
+  }, [mediaType, processedImage, originalImage, processedFrames, videoFrames, currentFrame]);
+
+  const originalFrameForComparison = useMemo(() => {
+    if (mediaType === 'video') {
+      return videoFrames[currentFrame] || null;
+    }
+    return originalImage;
+  }, [mediaType, videoFrames, currentFrame, originalImage]);
+
+  const processedFrameForComparison = useMemo(() => {
+    if (mediaType === 'video') {
+      return processedFrames[currentFrame] || null;
+    }
+    return processedImage;
+  }, [mediaType, processedFrames, currentFrame, processedImage]);
+
+  const canCompare = useMemo(() => {
+    if (mediaType === 'video') {
+      return originalFrameForComparison && processedFrameForComparison;
+    }
+    return originalImage && processedImage;
+  }, [mediaType, originalFrameForComparison, processedFrameForComparison, originalImage, processedImage]);
 
   // Wheel zoom handler with native event listener to prevent browser zoom
   useEffect(() => {
@@ -265,8 +301,8 @@ export function CanvasPreview({
             }}
           >
             <BeforeAfterSlider
-              originalImage={originalImage}
-              processedImage={processedImage}
+              originalImage={originalFrameForComparison!}
+              processedImage={processedFrameForComparison!}
               zoom={zoom}
             />
           </div>
