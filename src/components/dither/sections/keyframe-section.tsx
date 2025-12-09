@@ -3,6 +3,14 @@
 import { useCallback, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import { Label } from '@/components/ui/label';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { Info, Plus, Trash2, KeySquare } from 'lucide-react';
 import type {
   AnimatedSettings,
@@ -10,12 +18,16 @@ import type {
   DitheringSettings,
   ColorModeSettings,
   TimelineState,
+  EasingFunction,
+  TransitionMode,
 } from '@/lib/dither/types';
 import {
   addKeyframe,
   removeKeyframe,
   hasKeyframeAtFrame,
   getKeyframeAtFrame,
+  updateKeyframeEasing,
+  updateKeyframeTransitionMode,
 } from '@/lib/dither/keyframes';
 
 interface KeyframeSectionProps {
@@ -184,6 +196,30 @@ export function KeyframeSection({
     onAnimatedColorModeChange,
   ]);
 
+  // Update easing for adjustments
+  const handleAdjustmentEasingChange = useCallback((easing: EasingFunction) => {
+    const updated = updateKeyframeEasing(animatedAdjustments, currentFrame, easing);
+    onAnimatedAdjustmentsChange(updated);
+  }, [animatedAdjustments, currentFrame, onAnimatedAdjustmentsChange]);
+
+  // Update easing for dithering
+  const handleDitheringEasingChange = useCallback((easing: EasingFunction) => {
+    const updated = updateKeyframeEasing(animatedDithering, currentFrame, easing);
+    onAnimatedDitheringChange(updated);
+  }, [animatedDithering, currentFrame, onAnimatedDitheringChange]);
+
+  // Update easing for color mode
+  const handleColorModeEasingChange = useCallback((easing: EasingFunction) => {
+    const updated = updateKeyframeEasing(animatedColorMode, currentFrame, easing);
+    onAnimatedColorModeChange(updated);
+  }, [animatedColorMode, currentFrame, onAnimatedColorModeChange]);
+
+  // Update transition mode for dithering
+  const handleDitheringTransitionModeChange = useCallback((mode: TransitionMode) => {
+    const updated = updateKeyframeTransitionMode(animatedDithering, currentFrame, mode);
+    onAnimatedDitheringChange(updated);
+  }, [animatedDithering, currentFrame, onAnimatedDitheringChange]);
+
   if (!hasVideo) {
     return (
       <Card className="p-4 bg-muted/50 border-muted">
@@ -204,7 +240,7 @@ export function KeyframeSection({
         <h3 className="text-sm font-medium">Keyframe Animation</h3>
         <p className="text-xs text-muted-foreground">
           Add keyframes to capture settings at specific frames. Press{' '}
-          <kbd className="px-1.5 py-0.5 text-xs font-mono bg-muted border border-border rounded">
+          <kbd className="px-1.5 py-0.5 text-[10px] font-mono bg-muted border border-border rounded">
             {navigator.platform.includes('Mac') ? 'Cmd' : 'Ctrl'}+K
           </kbd>{' '}
           to add/update a keyframe.
@@ -233,29 +269,86 @@ export function KeyframeSection({
             </div>
 
             {/* Show what's keyframed */}
-            <div className="space-y-1 text-xs">
+            <div className="space-y-2 text-xs">
               {hasAdjustmentKeyframe && (
-                <div className="px-2 py-1 bg-muted/50 rounded flex items-center justify-between">
-                  <span>Adjustments</span>
-                  <span className="text-muted-foreground text-[10px]">
-                    {adjustmentKeyframe?.easing || 'linear'}
-                  </span>
+                <div className="px-2 py-1.5 bg-muted/50 rounded space-y-1.5">
+                  <div className="font-medium">Adjustments</div>
+                  <div className="flex items-center gap-2">
+                    <Label className="text-[10px] text-muted-foreground flex-shrink-0">Easing:</Label>
+                    <Select
+                      value={adjustmentKeyframe?.easing || 'linear'}
+                      onValueChange={(value) => handleAdjustmentEasingChange(value as EasingFunction)}
+                    >
+                      <SelectTrigger className="h-6 text-[10px]">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="linear">Linear</SelectItem>
+                        <SelectItem value="ease-in">Ease In</SelectItem>
+                        <SelectItem value="ease-out">Ease Out</SelectItem>
+                        <SelectItem value="ease-in-out">Ease In-Out</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
                 </div>
               )}
               {hasDitheringKeyframe && (
-                <div className="px-2 py-1 bg-muted/50 rounded flex items-center justify-between">
-                  <span>Dithering</span>
-                  <span className="text-muted-foreground text-[10px]">
-                    {ditheringKeyframe?.easing || 'linear'}
-                  </span>
+                <div className="px-2 py-1.5 bg-muted/50 rounded space-y-1.5">
+                  <div className="font-medium">Dithering</div>
+                  <div className="flex items-center gap-2">
+                    <Label className="text-[10px] text-muted-foreground flex-shrink-0">Easing:</Label>
+                    <Select
+                      value={ditheringKeyframe?.easing || 'linear'}
+                      onValueChange={(value) => handleDitheringEasingChange(value as EasingFunction)}
+                    >
+                      <SelectTrigger className="h-6 text-[10px]">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="linear">Linear</SelectItem>
+                        <SelectItem value="ease-in">Ease In</SelectItem>
+                        <SelectItem value="ease-out">Ease Out</SelectItem>
+                        <SelectItem value="ease-in-out">Ease In-Out</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Label className="text-[10px] text-muted-foreground flex-shrink-0">Mode:</Label>
+                    <Select
+                      value={ditheringKeyframe?.transitionMode || 'blend'}
+                      onValueChange={(value) => handleDitheringTransitionModeChange(value as TransitionMode)}
+                    >
+                      <SelectTrigger className="h-6 text-[10px]">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="blend">Blend</SelectItem>
+                        <SelectItem value="step">Step</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
                 </div>
               )}
               {hasColorModeKeyframe && (
-                <div className="px-2 py-1 bg-muted/50 rounded flex items-center justify-between">
-                  <span>Color Mode</span>
-                  <span className="text-muted-foreground text-[10px]">
-                    {colorModeKeyframe?.easing || 'linear'}
-                  </span>
+                <div className="px-2 py-1.5 bg-muted/50 rounded space-y-1.5">
+                  <div className="font-medium">Color Mode</div>
+                  <div className="flex items-center gap-2">
+                    <Label className="text-[10px] text-muted-foreground flex-shrink-0">Easing:</Label>
+                    <Select
+                      value={colorModeKeyframe?.easing || 'linear'}
+                      onValueChange={(value) => handleColorModeEasingChange(value as EasingFunction)}
+                    >
+                      <SelectTrigger className="h-6 text-[10px]">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="linear">Linear</SelectItem>
+                        <SelectItem value="ease-in">Ease In</SelectItem>
+                        <SelectItem value="ease-out">Ease Out</SelectItem>
+                        <SelectItem value="ease-in-out">Ease In-Out</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
                 </div>
               )}
             </div>
