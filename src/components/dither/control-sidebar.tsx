@@ -106,6 +106,9 @@ export function ControlSidebar({
 }: ControlSidebarProps) {
   const [activeSection, setActiveSection] = useState<Section>('file');
 
+  // Check if we have any media loaded (image or video)
+  const hasMedia = !!originalImage || (mediaType === 'video' && !!processedFrames && processedFrames.length > 0);
+
   const renderSection = () => {
     switch (activeSection) {
       case 'file':
@@ -132,7 +135,7 @@ export function ControlSidebar({
           <AdjustmentsSection
             settings={adjustmentSettings}
             onSettingsChange={onAdjustmentSettingsChange}
-            hasImage={!!originalImage}
+            hasImage={hasMedia}
           />
         );
       case 'mode':
@@ -140,7 +143,7 @@ export function ControlSidebar({
           <ColorModeSection
             settings={colorModeSettings}
             onSettingsChange={onColorModeSettingsChange}
-            hasImage={!!originalImage}
+            hasImage={hasMedia}
           />
         );
       case 'dither':
@@ -148,7 +151,7 @@ export function ControlSidebar({
           <DitheringSection
             settings={ditheringSettings}
             onSettingsChange={onDitheringSettingsChange}
-            hasImage={!!originalImage}
+            hasImage={hasMedia}
           />
         );
       case 'palette':
@@ -156,7 +159,7 @@ export function ControlSidebar({
           <PaletteSection
             palette={palette}
             onPaletteChange={onPaletteChange}
-            hasImage={!!originalImage}
+            hasImage={hasMedia}
             originalImage={originalImage}
           />
         );
@@ -168,7 +171,7 @@ export function ControlSidebar({
             colorModeSettings={colorModeSettings}
             palette={palette}
             onApplyPreset={onApplyPreset}
-            hasImage={!!originalImage}
+            hasImage={hasMedia}
           />
         );
       case 'export':

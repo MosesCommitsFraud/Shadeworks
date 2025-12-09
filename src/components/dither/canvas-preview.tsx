@@ -105,7 +105,7 @@ export function CanvasPreview({
         // Zoom delta
         const delta = e.deltaY > 0 ? 0.9 : 1.1;
         const prevZoom = zoom;
-        const newZoom = Math.max(25, Math.min(400, prevZoom * delta));
+        const newZoom = Math.max(25, Math.min(1000, prevZoom * delta));
 
         // Calculate canvas center position before zoom
         const canvasElement = canvasRef.current;
@@ -166,7 +166,7 @@ export function CanvasPreview({
   }, [displayImage, comparisonMode, canCompare]);
 
   const handleZoomIn = () => {
-    onZoomChange(Math.min(zoom * 1.25, 400));
+    onZoomChange(Math.min(zoom * 1.25, 1000));
   };
 
   const handleZoomOut = () => {
@@ -250,7 +250,7 @@ export function CanvasPreview({
           variant="outline"
           size="icon"
           onClick={handleZoomIn}
-          disabled={zoom >= 400}
+          disabled={zoom >= 1000}
         >
           <ZoomIn className="h-4 w-4" />
         </Button>
