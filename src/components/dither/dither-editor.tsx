@@ -698,15 +698,152 @@ export function DitherEditor() {
     }
   }, [originalImage, processedImage]);
 
+  // Add/update keyframe handler
+  const handleAddOrUpdateKeyframe = useCallback(() => {
+    if (mediaType !== 'video') return;
+
+    const currentFrame = timelineState.currentFrame;
+
+    // Check if keyframes exist at current frame
+    const hasAdjustmentKeyframe = animatedAdjustments.keyframes.some(kf => kf.frame === currentFrame);
+    const hasDitheringKeyframe = animatedDithering.keyframes.some(kf => kf.frame === currentFrame);
+    const hasColorModeKeyframe = animatedColorMode.keyframes.some(kf => kf.frame === currentFrame);
+
+    // Update or add keyframes for all three types
+    const updatedAdjustments = hasAdjustmentKeyframe
+      ? {
+          ...animatedAdjustments,
+          keyframes: animatedAdjustments.keyframes.map(kf =>
+            kf.frame === currentFrame ? { ...kf, settings: adjustmentSettings } : kf
+          ),
+        }
+      : {
+          ...animatedAdjustments,
+          enabled: true,
+          keyframes: [
+            ...animatedAdjustments.keyframes,
+            { frame: currentFrame, settings: adjustmentSettings, easing: 'linear' as const }
+          ].sort((a, b) => a.frame - b.frame),
+        };
+
+    const updatedDithering = hasDitheringKeyframe
+      ? {
+          ...animatedDithering,
+          keyframes: animatedDithering.keyframes.map(kf =>
+            kf.frame === currentFrame ? { ...kf, settings: ditheringSettings } : kf
+          ),
+        }
+      : {
+          ...animatedDithering,
+          enabled: true,
+          keyframes: [
+            ...animatedDithering.keyframes,
+            { frame: currentFrame, settings: ditheringSettings, easing: 'linear' as const }
+          ].sort((a, b) => a.frame - b.frame),
+        };
+
+    const updatedColorMode = hasColorModeKeyframe
+      ? {
+          ...animatedColorMode,
+          keyframes: animatedColorMode.keyframes.map(kf =>
+            kf.frame === currentFrame ? { ...kf, settings: colorModeSettings } : kf
+          ),
+        }
+      : {
+          ...animatedColorMode,
+          enabled: true,
+          keyframes: [
+            ...animatedColorMode.keyframes,
+            { frame: currentFrame, settings: colorModeSettings, easing: 'linear' as const }
+          ].sort((a, b) => a.frame - b.frame),
+        };
+
+    setAnimatedAdjustments(updatedAdjustments);
+    setAnimatedDithering(updatedDithering);
+    setAnimatedColorMode(updatedColorMode);
+  }, [
+    mediaType,
+    timelineState.currentFrame,
+    animatedAdjustments,
+    animatedDithering,
+    animatedColorMode,
+    adjustmentSettings,
+    ditheringSettings,
+    colorModeSettings,
+  ]);
+
+  // Video playback shortcuts
+  const togglePlayback = useCallback(() => {
+    if (mediaType === 'video') {
+      setTimelineState((prev) => ({ ...prev, isPlaying: !prev.isPlaying }));
+    }
+  }, [mediaType]);
+
+  const previousFrame = useCallback(() => {
+    if (mediaType === 'video' && videoSettings) {
+      const newFrame = Math.max(0, timelineState.currentFrame - 1);
+      setTimelineState({
+        currentFrame: newFrame,
+        currentTime: newFrame / videoSettings.fps,
+        isPlaying: false,
+        playbackSpeed: timelineState.playbackSpeed,
+      });
+    }
+  }, [mediaType, videoSettings, timelineState]);
+
+  const nextFrame = useCallback(() => {
+    if (mediaType === 'video' && videoSettings) {
+      const newFrame = Math.min(videoSettings.totalFrames - 1, timelineState.currentFrame + 1);
+      setTimelineState({
+        currentFrame: newFrame,
+        currentTime: newFrame / videoSettings.fps,
+        isPlaying: false,
+        playbackSpeed: timelineState.playbackSpeed,
+      });
+    }
+  }, [mediaType, videoSettings, timelineState]);
+
   // Keyboard shortcuts
   useKeyboardShortcuts(
-    getDefaultShortcuts({
-      onExport: processedImage ? quickExport : undefined,
-      onToggleComparison: originalImage && processedImage ? toggleComparison : undefined,
-      onZoomIn: () => zoomHandlers.current.zoomIn(),
-      onZoomOut: () => zoomHandlers.current.zoomOut(),
-      onZoomFit: () => zoomHandlers.current.zoomFit(),
-    }),
+    [
+      ...getDefaultShortcuts({
+        onExport: processedImage ? quickExport : undefined,
+        onToggleComparison: originalImage && processedImage ? toggleComparison : undefined,
+        onZoomIn: () => zoomHandlers.current.zoomIn(),
+        onZoomOut: () => zoomHandlers.current.zoomOut(),
+        onZoomFit: () => zoomHandlers.current.zoomFit(),
+      }),
+      // Video controls
+      ...(mediaType === 'video'
+        ? [
+            {
+              key: ' ',
+              action: togglePlayback,
+              description: 'Play/Pause video',
+              preventDefault: true,
+            },
+            {
+              key: 'ArrowLeft',
+              action: previousFrame,
+              description: 'Previous frame',
+              preventDefault: true,
+            },
+            {
+              key: 'ArrowRight',
+              action: nextFrame,
+              description: 'Next frame',
+              preventDefault: true,
+            },
+            {
+              key: 'k',
+              ctrl: true,
+              action: handleAddOrUpdateKeyframe,
+              description: 'Add/update keyframe',
+              preventDefault: true,
+            },
+          ]
+        : []),
+    ],
     !isProcessing && !isExporting
   );
 
@@ -863,6 +1000,7 @@ export function DitherEditor() {
       <HotkeysDialog
         open={showHotkeysDialog}
         onOpenChange={setShowHotkeysDialog}
+        mediaType={mediaType}
       />
     </div>
   );

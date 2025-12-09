@@ -12,53 +12,73 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 import { Kbd, KbdGroup } from '@/components/ui/kbd';
 import { getModifierKey, getShiftKey, isMac } from '@/lib/utils/platform';
+import type { MediaType } from '@/lib/dither/types';
 
 interface HotkeysDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  mediaType?: MediaType;
 }
 
-export function HotkeysDialog({ open, onOpenChange }: HotkeysDialogProps) {
+export function HotkeysDialog({ open, onOpenChange, mediaType = 'image' }: HotkeysDialogProps) {
   const modKey = useMemo(() => getModifierKey(), []);
   const shiftKey = useMemo(() => getShiftKey(), []);
 
-  const shortcuts = useMemo(() => [
-    {
-      category: 'General',
-      items: [
-        { keys: [modKey, 'S'], description: 'Save project (quick save)' },
-        { keys: [modKey, 'E'], description: 'Export image (PNG, 72 DPI)' },
-        { keys: [modKey, 'Z'], description: 'Undo (if available)' },
-        { keys: [modKey, 'Y'], description: 'Redo (if available)' },
-        { keys: ['?'], description: 'Show keyboard shortcuts' },
-      ],
-    },
-    {
-      category: 'View',
-      items: [
-        { keys: ['C'], description: 'Toggle comparison mode (before/after)' },
-        { keys: ['+'], description: 'Zoom in' },
-        { keys: ['-'], description: 'Zoom out' },
-        { keys: ['0'], description: 'Zoom to fit' },
-        { keys: ['1'], description: 'Zoom to 100%' },
-      ],
-    },
-    {
-      category: 'Navigation',
-      items: [
-        { keys: ['Space', '+', 'Drag'], description: 'Pan around canvas' },
-        { keys: ['Esc'], description: 'Close dialogs / Cancel actions' },
-      ],
-    },
-    {
+  const shortcuts = useMemo(() => {
+    const baseShortcuts = [
+      {
+        category: 'General',
+        items: [
+          { keys: [modKey, 'S'], description: 'Save project (quick save)' },
+          { keys: [modKey, 'E'], description: 'Export image (PNG, 72 DPI)' },
+          { keys: [modKey, 'Z'], description: 'Undo (if available)' },
+          { keys: [modKey, 'Y'], description: 'Redo (if available)' },
+          { keys: ['?'], description: 'Show keyboard shortcuts' },
+        ],
+      },
+      {
+        category: 'View',
+        items: [
+          { keys: ['C'], description: 'Toggle comparison mode (before/after)' },
+          { keys: ['+'], description: 'Zoom in' },
+          { keys: ['-'], description: 'Zoom out' },
+          { keys: ['0'], description: 'Zoom to fit' },
+          { keys: ['1'], description: 'Zoom to 100%' },
+        ],
+      },
+      {
+        category: 'Navigation',
+        items: [
+          { keys: ['Space', '+', 'Drag'], description: 'Pan around canvas' },
+          { keys: ['Esc'], description: 'Close dialogs / Cancel actions' },
+        ],
+      },
+    ];
+
+    // Add video controls if in video mode
+    if (mediaType === 'video') {
+      baseShortcuts.push({
+        category: 'Video Controls',
+        items: [
+          { keys: ['Space'], description: 'Play/Pause video' },
+          { keys: ['←'], description: 'Previous frame' },
+          { keys: ['→'], description: 'Next frame' },
+          { keys: [modKey, 'K'], description: 'Add/update keyframe' },
+        ],
+      });
+    }
+
+    baseShortcuts.push({
       category: 'File Management',
       items: [
         { keys: [modKey, 'N'], description: 'New project' },
         { keys: [modKey, 'O'], description: 'Open project (.swdither)' },
         { keys: [modKey, shiftKey, 'S'], description: 'Save As...' },
       ],
-    },
-  ], [modKey, shiftKey]);
+    });
+
+    return baseShortcuts;
+  }, [modKey, shiftKey, mediaType]);
 
   // Don't render dialog content if not open to avoid performance issues
   if (!open) {

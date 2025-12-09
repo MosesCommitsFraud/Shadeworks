@@ -343,37 +343,63 @@ export function CanvasPreview({
 
       {/* Keyboard shortcuts hint */}
       <div className="absolute bottom-4 right-4 z-10 bg-card/90 backdrop-blur-sm border border-border rounded-lg px-3 py-2 text-xs text-muted-foreground flex flex-col gap-1.5">
-        <div className="flex items-center gap-2">
-          <KbdGroup>
-            <Kbd>{modKey}</Kbd>
-            <span>+</span>
-            <Kbd>S</Kbd>
-          </KbdGroup>
-          <span>Export</span>
-        </div>
-        <div className="flex items-center gap-2">
-          <Kbd>C</Kbd>
-          <span>Compare</span>
-        </div>
-        <div className="flex items-center gap-2">
-          <KbdGroup>
-            <Kbd>+</Kbd>
-            <span>/</span>
-            <Kbd>-</Kbd>
-          </KbdGroup>
-          <span>Zoom</span>
-        </div>
-        <div className="flex items-center gap-2">
-          <Kbd>0</Kbd>
-          <span>Fit</span>
-        </div>
-        <div className="border-t border-border pt-1.5 mt-0.5">
-          <KbdGroup>
-            <Kbd>{modKey}</Kbd>
-            <span className="mx-1">+</span>
-            <span>Scroll to zoom</span>
-          </KbdGroup>
-        </div>
+        {mediaType === 'video' ? (
+          <>
+            <div className="flex items-center gap-2">
+              <Kbd>Space</Kbd>
+              <span>Play/Pause</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <KbdGroup>
+                <Kbd>←</Kbd>
+                <span>/</span>
+                <Kbd>→</Kbd>
+              </KbdGroup>
+              <span>Frame</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <KbdGroup>
+                <Kbd>{modKey}</Kbd>
+                <span>+</span>
+                <Kbd>K</Kbd>
+              </KbdGroup>
+              <span>Keyframe</span>
+            </div>
+            <div className="border-t border-border pt-1.5 mt-0.5">
+              <div className="flex items-center gap-2">
+                <Kbd>C</Kbd>
+                <span>Compare</span>
+              </div>
+            </div>
+          </>
+        ) : (
+          <>
+            <div className="flex items-center gap-2">
+              <KbdGroup>
+                <Kbd>{modKey}</Kbd>
+                <span>+</span>
+                <Kbd>S</Kbd>
+              </KbdGroup>
+              <span>Export</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <Kbd>C</Kbd>
+              <span>Compare</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <KbdGroup>
+                <Kbd>+</Kbd>
+                <span>/</span>
+                <Kbd>-</Kbd>
+              </KbdGroup>
+              <span>Zoom</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <Kbd>0</Kbd>
+              <span>Fit</span>
+            </div>
+          </>
+        )}
       </div>
     </div>
   );
