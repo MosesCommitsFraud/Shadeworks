@@ -6,11 +6,11 @@ import type {
   ColorModeSettings,
   Palette,
 } from './types';
-import { interpolateSettings } from './keyframes';
+import { interpolateSettings, interpolateSettingsWithBlend } from './keyframes';
 import { applyAllAdjustments, getDefaultAdjustmentSettings } from './adjustments';
 import { applyColorMode } from './color-modes';
 import { applyDithering } from './algorithms';
-import { copyImageData } from './utils';
+import { copyImageData, blendImageData } from './utils';
 
 export interface VideoProcessingOptions {
   frames: ImageData[];
@@ -64,9 +64,9 @@ export async function processVideoFrames(
       ? { ...getDefaultAdjustmentSettings(), ...interpolateSettings(animatedAdjustments, frameIndex) }
       : staticAdjustments || getDefaultAdjustmentSettings();
 
-    const ditheringSettings = animatedDithering.enabled
-      ? interpolateSettings(animatedDithering, frameIndex)
-      : staticDithering || { algorithm: 'floyd-steinberg' as const, serpentine: true, errorAttenuation: 1.0, randomNoise: 0 };
+    const ditheringResult = animatedDithering.enabled
+      ? interpolateSettingsWithBlend(animatedDithering, frameIndex)
+      : { settings: staticDithering || { algorithm: 'floyd-steinberg' as const, serpentine: true, errorAttenuation: 1.0, randomNoise: 0 } };
 
     const colorModeSettings = animatedColorMode.enabled
       ? interpolateSettings(animatedColorMode, frameIndex)
@@ -89,8 +89,17 @@ export async function processVideoFrames(
         }
       );
 
-      // 3. Apply dithering
-      processed = applyDithering(processed, palette, ditheringSettings);
+      // 3. Apply dithering (with blending if needed)
+      if (ditheringResult.blend) {
+        // We're transitioning between two different dither algorithms
+        // Process the frame with both algorithms and blend the results
+        const processed1 = applyDithering(copyImageData(processed), palette, ditheringResult.blend.beforeSettings);
+        const processed2 = applyDithering(copyImageData(processed), palette, ditheringResult.blend.afterSettings);
+        processed = blendImageData(processed1, processed2, ditheringResult.blend.progress);
+      } else {
+        // Normal processing with single algorithm
+        processed = applyDithering(processed, palette, ditheringResult.settings);
+      }
 
       processedFrames.push(processed);
     } catch (error) {

@@ -153,6 +153,35 @@ export function copyImageData(imageData: ImageData): ImageData {
 }
 
 /**
+ * Blend two ImageData objects with a given weight
+ * @param imageData1 First image
+ * @param imageData2 Second image
+ * @param weight Weight of second image (0-1). 0 = all first image, 1 = all second image
+ */
+export function blendImageData(
+  imageData1: ImageData,
+  imageData2: ImageData,
+  weight: number
+): ImageData {
+  if (imageData1.width !== imageData2.width || imageData1.height !== imageData2.height) {
+    throw new Error('Images must have the same dimensions for blending');
+  }
+
+  const blended = new ImageData(imageData1.width, imageData1.height);
+  const w = clamp(weight, 0, 1);
+  const w1 = 1 - w;
+
+  for (let i = 0; i < imageData1.data.length; i += 4) {
+    blended.data[i] = Math.round(imageData1.data[i] * w1 + imageData2.data[i] * w);
+    blended.data[i + 1] = Math.round(imageData1.data[i + 1] * w1 + imageData2.data[i + 1] * w);
+    blended.data[i + 2] = Math.round(imageData1.data[i + 2] * w1 + imageData2.data[i + 2] * w);
+    blended.data[i + 3] = Math.round(imageData1.data[i + 3] * w1 + imageData2.data[i + 3] * w);
+  }
+
+  return blended;
+}
+
+/**
  * Debounce function for performance
  */
 export function debounce<T extends (...args: unknown[]) => unknown>(

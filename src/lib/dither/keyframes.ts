@@ -1,4 +1,4 @@
-import type { Keyframe, AnimatedSettings, EasingFunction } from './types';
+import type { Keyframe, AnimatedSettings, EasingFunction, TransitionMode } from './types';
 
 /**
  * Easing functions for smooth interpolation
@@ -31,7 +31,8 @@ export function addKeyframe<T>(
   animation: AnimatedSettings<T>,
   frame: number,
   settings: T,
-  easing: EasingFunction = 'linear'
+  easing: EasingFunction = 'linear',
+  transitionMode: TransitionMode = 'blend'
 ): AnimatedSettings<T> {
   const fps = 30; // Default FPS for time calculation
   const time = frame / fps;
@@ -41,6 +42,7 @@ export function addKeyframe<T>(
     time,
     settings: { ...settings },
     easing,
+    transitionMode,
   };
 
   // Find insertion point to keep keyframes sorted by frame
@@ -96,6 +98,22 @@ export function updateKeyframeEasing<T>(
 }
 
 /**
+ * Update a keyframe's transition mode
+ */
+export function updateKeyframeTransitionMode<T>(
+  animation: AnimatedSettings<T>,
+  frame: number,
+  transitionMode: TransitionMode
+): AnimatedSettings<T> {
+  return {
+    ...animation,
+    keyframes: animation.keyframes.map((kf) =>
+      kf.frame === frame ? { ...kf, transitionMode } : kf
+    ),
+  };
+}
+
+/**
  * Get keyframes before and after a given frame
  */
 function getKeyframeBounds<T>(
@@ -130,20 +148,43 @@ function interpolateNumber(start: number, end: number, progress: number): number
 }
 
 /**
+ * Interpolation result with blend info
+ */
+export interface InterpolationResult<T> {
+  settings: T;
+  blend?: {
+    beforeSettings: T;
+    afterSettings: T;
+    progress: number; // 0-1, after easing
+  };
+}
+
+/**
  * Interpolate settings between two keyframes
  */
 export function interpolateSettings<T extends Record<string, any>>(
   animation: AnimatedSettings<T>,
   frame: number
 ): T {
+  const result = interpolateSettingsWithBlend(animation, frame);
+  return result.settings;
+}
+
+/**
+ * Interpolate settings with blend information for smooth algorithm transitions
+ */
+export function interpolateSettingsWithBlend<T extends Record<string, any>>(
+  animation: AnimatedSettings<T>,
+  frame: number
+): InterpolationResult<T> {
   if (!animation.enabled || animation.keyframes.length === 0) {
     // Return default/empty settings if animation disabled or no keyframes
-    return {} as T;
+    return { settings: {} as T };
   }
 
   if (animation.keyframes.length === 1) {
     // Only one keyframe, use its settings
-    return { ...animation.keyframes[0].settings };
+    return { settings: { ...animation.keyframes[0].settings } };
   }
 
   // Find surrounding keyframes
@@ -151,17 +192,17 @@ export function interpolateSettings<T extends Record<string, any>>(
 
   // Before first keyframe - use first keyframe settings
   if (!before && after) {
-    return { ...after.settings };
+    return { settings: { ...after.settings } };
   }
 
   // After last keyframe - use last keyframe settings
   if (before && !after) {
-    return { ...before.settings };
+    return { settings: { ...before.settings } };
   }
 
   // Exactly on a keyframe
   if (before && before.frame === frame) {
-    return { ...before.settings };
+    return { settings: { ...before.settings } };
   }
 
   // Between two keyframes - interpolate
@@ -172,8 +213,12 @@ export function interpolateSettings<T extends Record<string, any>>(
     // Apply easing (use the "before" keyframe's easing)
     const easedProgress = applyEasing(frameProgress, before.easing);
 
+    // Check if we should blend (for non-numeric transitions like algorithm changes)
+    const shouldBlend = before.transitionMode === 'blend';
+
     // Interpolate each property
     const result: any = {};
+    let hasNonNumericDiff = false;
 
     for (const key in before.settings) {
       const startValue = before.settings[key];
@@ -183,17 +228,33 @@ export function interpolateSettings<T extends Record<string, any>>(
       if (typeof startValue === 'number' && typeof endValue === 'number') {
         result[key] = interpolateNumber(startValue, endValue, easedProgress);
       }
-      // For non-numeric values, use step interpolation (use before value)
+      // For non-numeric values, check if they differ
       else {
-        result[key] = startValue;
+        if (startValue !== endValue) {
+          hasNonNumericDiff = true;
+        }
+        // Use step interpolation - switch at 50% progress
+        result[key] = easedProgress < 0.5 ? startValue : endValue;
       }
     }
 
-    return result as T;
+    // If blending is enabled and there are non-numeric differences, return blend info
+    if (shouldBlend && hasNonNumericDiff) {
+      return {
+        settings: result as T,
+        blend: {
+          beforeSettings: { ...before.settings },
+          afterSettings: { ...after.settings },
+          progress: easedProgress,
+        },
+      };
+    }
+
+    return { settings: result as T };
   }
 
   // Fallback - shouldn't reach here
-  return {} as T;
+  return { settings: {} as T };
 }
 
 /**

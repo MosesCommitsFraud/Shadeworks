@@ -694,6 +694,21 @@ export function DitherEditor() {
           videoSettings={videoSettings}
           processedFrames={processedFrames}
           onVideoExport={handleVideoExport}
+          animatedAdjustments={animatedAdjustments}
+          animatedDithering={animatedDithering}
+          animatedColorMode={animatedColorMode}
+          timelineState={timelineState}
+          onAnimatedAdjustmentsChange={setAnimatedAdjustments}
+          onAnimatedDitheringChange={setAnimatedDithering}
+          onAnimatedColorModeChange={setAnimatedColorMode}
+          onJumpToFrame={(frame) => {
+            setTimelineState({
+              currentFrame: frame,
+              currentTime: frame / (videoSettings?.fps || 30),
+              isPlaying: false,
+              playbackSpeed: timelineState.playbackSpeed,
+            });
+          }}
         />
 
         {/* Canvas */}
@@ -722,7 +737,11 @@ export function DitherEditor() {
           videoSettings={videoSettings}
           timelineState={timelineState}
           onTimelineStateChange={handleTimelineStateChange}
-          keyframeMarkers={[]}
+          keyframeMarkers={[
+            ...animatedAdjustments.keyframes.map(kf => kf.frame),
+            ...animatedDithering.keyframes.map(kf => kf.frame),
+            ...animatedColorMode.keyframes.map(kf => kf.frame),
+          ].filter((frame, index, self) => self.indexOf(frame) === index).sort((a, b) => a - b)}
         />
       )}
 

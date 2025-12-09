@@ -11,9 +11,10 @@ import {
   Pipette,
   Star,
   Download,
-  FileText
+  FileText,
+  KeySquare,
 } from 'lucide-react';
-import type { Palette, DitheringSettings, AdjustmentSettings, ColorModeSettings, VideoSettings, MediaType } from '@/lib/dither/types';
+import type { Palette, DitheringSettings, AdjustmentSettings, ColorModeSettings, VideoSettings, MediaType, AnimatedSettings, TimelineState } from '@/lib/dither/types';
 import { UploadSection } from './sections/upload-section';
 import { DitheringSection } from './sections/dithering-section';
 import { PaletteSection } from './sections/palette-section';
@@ -22,9 +23,10 @@ import { ColorModeSection } from './sections/color-mode-section';
 import { ExportSection, type ExportOptions, type VideoExportOptions } from './sections/export-section';
 import { PresetSection } from './sections/preset-section';
 import { FileSection } from './sections/file-section';
+import { KeyframeSection } from './sections/keyframe-section';
 import type { DitherPreset } from '@/lib/dither/presets';
 
-type Section = 'file' | 'upload' | 'adjust' | 'mode' | 'dither' | 'palette' | 'preset' | 'export';
+type Section = 'file' | 'upload' | 'adjust' | 'mode' | 'dither' | 'palette' | 'preset' | 'export' | 'keyframes';
 
 const SECTIONS: Array<{ id: Section; label: string; icon: typeof Upload }> = [
   { id: 'file', label: 'File', icon: FileText },
@@ -33,6 +35,7 @@ const SECTIONS: Array<{ id: Section; label: string; icon: typeof Upload }> = [
   { id: 'mode', label: 'Mode', icon: Pipette },
   { id: 'dither', label: 'Dither', icon: Grip },
   { id: 'palette', label: 'Palette', icon: PaletteIcon },
+  { id: 'keyframes', label: 'Keyframes', icon: KeySquare },
   { id: 'preset', label: 'Preset', icon: Star },
   { id: 'export', label: 'Export', icon: Download },
 ];
@@ -74,6 +77,16 @@ interface ControlSidebarProps {
   videoSettings?: VideoSettings | null;
   processedFrames?: ImageData[];
   onVideoExport?: (format: 'mp4' | 'webm' | 'gif', options: VideoExportOptions) => void;
+
+  // Keyframe/animation props
+  animatedAdjustments?: AnimatedSettings<AdjustmentSettings>;
+  animatedDithering?: AnimatedSettings<DitheringSettings>;
+  animatedColorMode?: AnimatedSettings<ColorModeSettings>;
+  timelineState?: TimelineState;
+  onAnimatedAdjustmentsChange?: (settings: AnimatedSettings<AdjustmentSettings>) => void;
+  onAnimatedDitheringChange?: (settings: AnimatedSettings<DitheringSettings>) => void;
+  onAnimatedColorModeChange?: (settings: AnimatedSettings<ColorModeSettings>) => void;
+  onJumpToFrame?: (frame: number) => void;
 }
 
 export function ControlSidebar({
@@ -103,6 +116,14 @@ export function ControlSidebar({
   videoSettings,
   processedFrames,
   onVideoExport,
+  animatedAdjustments,
+  animatedDithering,
+  animatedColorMode,
+  timelineState,
+  onAnimatedAdjustmentsChange,
+  onAnimatedDitheringChange,
+  onAnimatedColorModeChange,
+  onJumpToFrame,
 }: ControlSidebarProps) {
   const [activeSection, setActiveSection] = useState<Section>('file');
 
@@ -174,6 +195,24 @@ export function ControlSidebar({
             hasImage={hasMedia}
           />
         );
+      case 'keyframes':
+        return (
+          <KeyframeSection
+            animatedAdjustments={animatedAdjustments || { keyframes: [], enabled: false }}
+            animatedDithering={animatedDithering || { keyframes: [], enabled: false }}
+            animatedColorMode={animatedColorMode || { keyframes: [], enabled: false }}
+            adjustmentSettings={adjustmentSettings}
+            ditheringSettings={ditheringSettings}
+            colorModeSettings={colorModeSettings}
+            timelineState={timelineState || { currentFrame: 0, currentTime: 0, isPlaying: false, playbackSpeed: 1 }}
+            totalFrames={videoSettings?.totalFrames || 0}
+            onAnimatedAdjustmentsChange={onAnimatedAdjustmentsChange || (() => {})}
+            onAnimatedDitheringChange={onAnimatedDitheringChange || (() => {})}
+            onAnimatedColorModeChange={onAnimatedColorModeChange || (() => {})}
+            onJumpToFrame={onJumpToFrame}
+            hasVideo={mediaType === 'video' && !!videoSettings}
+          />
+        );
       case 'export':
         return (
           <ExportSection
@@ -230,7 +269,7 @@ export function ControlSidebar({
         </div>
 
         {/* Scrollable Content */}
-        <ScrollArea className="flex-1">
+        <ScrollArea className="flex-1" style={{ scrollbarGutter: 'stable' }}>
           <div className="p-4">{renderSection()}</div>
         </ScrollArea>
       </div>

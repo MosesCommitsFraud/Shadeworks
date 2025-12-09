@@ -273,6 +273,11 @@ export interface VideoSettings {
 export type EasingFunction = 'linear' | 'ease-in' | 'ease-out' | 'ease-in-out';
 
 /**
+ * Transition mode for keyframes
+ */
+export type TransitionMode = 'step' | 'blend';
+
+/**
  * Keyframe for animation
  */
 export interface Keyframe<T> {
@@ -280,6 +285,7 @@ export interface Keyframe<T> {
   time: number; // in seconds
   settings: T;
   easing?: EasingFunction;
+  transitionMode?: TransitionMode; // How to transition to next keyframe
 }
 
 /**

@@ -25,6 +25,7 @@ interface TimelineProps {
   timelineState: TimelineState;
   onTimelineStateChange: (state: Partial<TimelineState>) => void;
   keyframeMarkers?: number[]; // Frame numbers where keyframes exist
+  onKeyframeClick?: (frame: number) => void; // Callback when clicking on a keyframe marker
   disabled?: boolean;
 }
 
@@ -33,6 +34,7 @@ export function Timeline({
   timelineState,
   onTimelineStateChange,
   keyframeMarkers = [],
+  onKeyframeClick,
   disabled = false,
 }: TimelineProps) {
   const scrubberRef = useRef<HTMLDivElement>(null);
@@ -244,13 +246,38 @@ export function Timeline({
           {/* Keyframe markers */}
           {keyframeMarkers.map((frame) => {
             const percentage = (frame / (videoSettings.totalFrames - 1)) * 100;
+            const isCurrentFrame = frame === timelineState.currentFrame;
             return (
               <div
                 key={frame}
-                className="absolute top-0 bottom-0 w-0.5 bg-accent"
-                style={{ left: `${percentage}%` }}
-                title={`Keyframe at frame ${frame}`}
-              />
+                className={`absolute top-0 bottom-0 w-1 transition-colors cursor-pointer hover:bg-accent group ${
+                  isCurrentFrame ? 'bg-primary' : 'bg-accent/60'
+                }`}
+                style={{ left: `${percentage}%`, transform: 'translateX(-50%)' }}
+                title={`Keyframe at frame ${frame + 1}`}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (onKeyframeClick) {
+                    onKeyframeClick(frame);
+                  } else {
+                    // Default behavior: jump to keyframe
+                    onTimelineStateChange({
+                      currentFrame: frame,
+                      currentTime: frame / videoSettings.fps,
+                      isPlaying: false,
+                    });
+                  }
+                }}
+              >
+                {/* Keyframe diamond marker at top */}
+                <div
+                  className={`absolute -top-1 left-1/2 -translate-x-1/2 w-2 h-2 rotate-45 transition-all ${
+                    isCurrentFrame
+                      ? 'bg-primary scale-125'
+                      : 'bg-accent/80 group-hover:bg-accent group-hover:scale-110'
+                  }`}
+                />
+              </div>
             );
           })}
 
