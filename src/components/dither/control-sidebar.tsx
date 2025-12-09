@@ -13,13 +13,13 @@ import {
   Download,
   FileText
 } from 'lucide-react';
-import type { Palette, DitheringSettings, AdjustmentSettings, ColorModeSettings, VideoSettings } from '@/lib/dither/types';
+import type { Palette, DitheringSettings, AdjustmentSettings, ColorModeSettings, VideoSettings, MediaType } from '@/lib/dither/types';
 import { UploadSection } from './sections/upload-section';
 import { DitheringSection } from './sections/dithering-section';
 import { PaletteSection } from './sections/palette-section';
 import { AdjustmentsSection } from './sections/adjustments-section';
 import { ColorModeSection } from './sections/color-mode-section';
-import { ExportSection, type ExportOptions } from './sections/export-section';
+import { ExportSection, type ExportOptions, type VideoExportOptions } from './sections/export-section';
 import { PresetSection } from './sections/preset-section';
 import { FileSection } from './sections/file-section';
 import type { DitherPreset } from '@/lib/dither/presets';
@@ -70,6 +70,10 @@ interface ControlSidebarProps {
     projectName?: string
   ) => void;
   onProjectSave: () => void;
+  mediaType?: MediaType;
+  videoSettings?: VideoSettings | null;
+  processedFrames?: ImageData[];
+  onVideoExport?: (format: 'mp4' | 'webm' | 'gif', options: VideoExportOptions) => void;
 }
 
 export function ControlSidebar({
@@ -95,6 +99,10 @@ export function ControlSidebar({
   onNewProject,
   onProjectLoad,
   onProjectSave,
+  mediaType,
+  videoSettings,
+  processedFrames,
+  onVideoExport,
 }: ControlSidebarProps) {
   const [activeSection, setActiveSection] = useState<Section>('file');
 
@@ -170,6 +178,10 @@ export function ControlSidebar({
             palette={palette}
             onExport={onExport}
             isExporting={isExporting}
+            mediaType={mediaType}
+            videoSettings={videoSettings}
+            processedFrames={processedFrames}
+            onVideoExport={onVideoExport}
           />
         );
       default:

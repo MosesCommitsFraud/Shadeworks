@@ -34,8 +34,10 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { createProject, saveProject } from '@/lib/dither/project';
 import { processVideoFrames } from '@/lib/dither/video-processor';
+import { exportVideoMP4, exportVideoAsGIF } from '@/lib/dither/video-export';
 import { Timeline } from './timeline';
 import { VideoPlaybackController } from '@/lib/dither/video-playback';
+import type { VideoExportOptions } from './sections/export-section';
 
 const INITIAL_DITHERING_SETTINGS: DitheringSettings = {
   algorithm: 'floyd-steinberg',
@@ -513,6 +515,47 @@ export function DitherEditor() {
     }
   }, [processedImage, palette]);
 
+  // Video export handler
+  const handleVideoExport = useCallback(async (
+    format: 'mp4' | 'webm' | 'gif',
+    options: VideoExportOptions
+  ) => {
+    if (!processedFrames || processedFrames.length === 0 || !videoSettings) return;
+
+    setIsExporting(true);
+
+    try {
+      const fps = options.fps || videoSettings.fps;
+
+      if (format === 'gif') {
+        await exportVideoAsGIF(
+          processedFrames,
+          fps,
+          options.filename,
+          options.gifOptions,
+          (progress) => {
+            console.log(`GIF export progress: ${Math.round(progress * 100)}%`);
+          }
+        );
+      } else {
+        // MP4 or WebM
+        await exportVideoMP4(
+          processedFrames,
+          fps,
+          options.filename,
+          (progress) => {
+            console.log(`Video export progress: ${Math.round(progress * 100)}%`);
+          }
+        );
+      }
+    } catch (error) {
+      console.error('Error exporting video:', error);
+      alert('Failed to export video: ' + (error instanceof Error ? error.message : 'Unknown error'));
+    } finally {
+      setIsExporting(false);
+    }
+  }, [processedFrames, videoSettings]);
+
   // Quick export function for keyboard shortcut
   const quickExport = useCallback(() => {
     if (!processedImage) return;
@@ -625,6 +668,10 @@ export function DitherEditor() {
           onNewProject={handleNewProject}
           onProjectLoad={handleProjectLoad}
           onProjectSave={handleProjectSave}
+          mediaType={mediaType}
+          videoSettings={videoSettings}
+          processedFrames={processedFrames}
+          onVideoExport={handleVideoExport}
         />
 
         {/* Canvas */}
