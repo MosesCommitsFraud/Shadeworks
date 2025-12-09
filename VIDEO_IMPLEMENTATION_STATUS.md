@@ -26,7 +26,7 @@
   - `extractFramesFromVideo()`: Extract frames at specified FPS with progress
   - `getVideoMetadata()`: Get fps, duration, dimensions
   - `seekVideoToTime()`: Accurate frame seeking
-  - Frame limit: 600 frames max (~20 seconds at 30fps)
+  - Frame limit: 1200 frames max (~40 seconds at 30fps)
   - Helper functions: formatTime, frameToTime, timeToFrame
   - `getSuggestedFPS()` for long videos
   - Validation: `isVideoFile()`, `isVideoTooLong()`
@@ -241,9 +241,9 @@ Create `src/components/dither/sections/keyframe-controls.tsx`:
 ## Technical Specifications
 
 ### Frame Storage:
-- Max frames: 600 (~20 seconds at 30fps)
+- Max frames: 1200 (~40 seconds at 30fps)
 - Storage: `ImageData[]` arrays in memory
-- Memory estimate: ~30MB for 640x480 at 600 frames
+- Memory estimate: ~60MB for 640x480 at 1200 frames
 
 ### Processing:
 - Pipeline: Adjustments → Color Mode → Dithering
@@ -295,4 +295,4 @@ The application is **fully functional** and ready for testing:
 - ✅ GIF options: quality, loop count, resolution downsampling
 
 **Build Status**: ✅ Compiles successfully with no errors
-**FPS Support**: ✅ Default 30fps, supports up to 600 frames (~20 seconds)
+**FPS Support**: ✅ Default 30fps, supports up to 1200 frames (~40 seconds at 30fps)

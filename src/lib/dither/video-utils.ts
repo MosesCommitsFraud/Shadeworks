@@ -2,8 +2,9 @@ import type { VideoSettings } from './types';
 
 /**
  * Maximum number of frames to extract (to prevent memory issues)
+ * ~60MB for 640x480 @ 1200 frames
  */
-const MAX_FRAMES = 600;
+const MAX_FRAMES = 1200;
 
 /**
  * Load video from file

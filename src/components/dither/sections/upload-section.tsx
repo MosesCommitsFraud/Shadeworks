@@ -208,7 +208,7 @@ export function UploadSection({ onImageUpload, onVideoUpload }: UploadSectionPro
       <div className="text-xs text-muted-foreground">
         <p className="font-medium mb-1">Supported formats:</p>
         <p className="mb-1">Images: PNG, JPEG, WebP, GIF, BMP</p>
-        {onVideoUpload && <p>Videos: MP4, WebM, MOV (max 600 frames)</p>}
+        {onVideoUpload && <p>Videos: MP4, WebM, MOV (max 1200 frames)</p>}
       </div>
     </div>
   );
