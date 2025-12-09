@@ -612,7 +612,7 @@ export function DitherEditor() {
   );
 
   return (
-    <div className="flex flex-col h-screen bg-background">
+    <div className="flex flex-col h-screen bg-background select-none">
       {/* Header */}
       <header className="border-b border-border px-4 py-3 flex items-center justify-between bg-card">
         <div className="flex items-center gap-4">

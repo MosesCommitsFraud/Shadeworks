@@ -93,6 +93,7 @@ export function Timeline({
   // Handle scrubber interaction
   const handleScrubberMouseDown = useCallback((e: React.MouseEvent) => {
     if (disabled) return;
+    e.preventDefault(); // Prevent text selection
     setIsDragging(true);
     updateFrameFromMousePosition(e);
   }, [disabled]);
@@ -144,7 +145,7 @@ export function Timeline({
     : 0;
 
   return (
-    <div className="border-t border-border bg-card p-4 space-y-3">
+    <div className="border-t border-border bg-card p-4 space-y-3 select-none">
       {/* Playback controls */}
       <div className="flex items-center gap-2">
         {/* Go to first frame */}
@@ -240,7 +241,7 @@ export function Timeline({
       <div className="space-y-1">
         <div
           ref={scrubberRef}
-          className={`relative h-12 bg-muted rounded-md ${disabled ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'}`}
+          className={`relative h-12 bg-muted rounded-md select-none ${disabled ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'}`}
           onMouseDown={handleScrubberMouseDown}
         >
           {/* Keyframe markers */}

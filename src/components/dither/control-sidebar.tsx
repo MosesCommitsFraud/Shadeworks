@@ -232,7 +232,7 @@ export function ControlSidebar({
   };
 
   return (
-    <aside className="w-80 border-r border-border bg-card flex">
+    <aside className="w-80 border-r border-border bg-card flex select-none">
       {/* Vertical Navigation */}
       <nav className="w-16 border-r border-border bg-muted/30 flex flex-col items-center py-4 gap-2">
         {SECTIONS.map((section) => {

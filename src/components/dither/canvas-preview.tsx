@@ -226,7 +226,7 @@ export function CanvasPreview({
   };
 
   return (
-    <div className="flex-1 flex flex-col bg-background relative overflow-hidden">
+    <div className="flex-1 flex flex-col bg-background relative overflow-hidden select-none">
       {/* Zoom controls */}
       <div className="absolute top-4 right-4 z-10 flex gap-2">
         <Button
