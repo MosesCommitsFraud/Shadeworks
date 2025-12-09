@@ -274,12 +274,12 @@ export function KeyframeSection({
                 <div className="px-2 py-1.5 bg-muted/50 rounded space-y-1.5">
                   <div className="font-medium">Adjustments</div>
                   <div className="flex items-center gap-2">
-                    <Label className="text-[10px] text-muted-foreground flex-shrink-0">Easing:</Label>
+                    <Label className="text-[10px] text-muted-foreground flex-shrink-0 w-10">Easing:</Label>
                     <Select
                       value={adjustmentKeyframe?.easing || 'linear'}
                       onValueChange={(value) => handleAdjustmentEasingChange(value as EasingFunction)}
                     >
-                      <SelectTrigger className="h-6 text-[10px]">
+                      <SelectTrigger className="h-6 text-[10px] flex-1">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
@@ -296,12 +296,12 @@ export function KeyframeSection({
                 <div className="px-2 py-1.5 bg-muted/50 rounded space-y-1.5">
                   <div className="font-medium">Dithering</div>
                   <div className="flex items-center gap-2">
-                    <Label className="text-[10px] text-muted-foreground flex-shrink-0">Easing:</Label>
+                    <Label className="text-[10px] text-muted-foreground flex-shrink-0 w-10">Easing:</Label>
                     <Select
                       value={ditheringKeyframe?.easing || 'linear'}
                       onValueChange={(value) => handleDitheringEasingChange(value as EasingFunction)}
                     >
-                      <SelectTrigger className="h-6 text-[10px]">
+                      <SelectTrigger className="h-6 text-[10px] flex-1">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
@@ -313,12 +313,12 @@ export function KeyframeSection({
                     </Select>
                   </div>
                   <div className="flex items-center gap-2">
-                    <Label className="text-[10px] text-muted-foreground flex-shrink-0">Mode:</Label>
+                    <Label className="text-[10px] text-muted-foreground flex-shrink-0 w-10">Mode:</Label>
                     <Select
                       value={ditheringKeyframe?.transitionMode || 'blend'}
                       onValueChange={(value) => handleDitheringTransitionModeChange(value as TransitionMode)}
                     >
-                      <SelectTrigger className="h-6 text-[10px]">
+                      <SelectTrigger className="h-6 text-[10px] flex-1">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
@@ -333,12 +333,12 @@ export function KeyframeSection({
                 <div className="px-2 py-1.5 bg-muted/50 rounded space-y-1.5">
                   <div className="font-medium">Color Mode</div>
                   <div className="flex items-center gap-2">
-                    <Label className="text-[10px] text-muted-foreground flex-shrink-0">Easing:</Label>
+                    <Label className="text-[10px] text-muted-foreground flex-shrink-0 w-10">Easing:</Label>
                     <Select
                       value={colorModeKeyframe?.easing || 'linear'}
                       onValueChange={(value) => handleColorModeEasingChange(value as EasingFunction)}
                     >
-                      <SelectTrigger className="h-6 text-[10px]">
+                      <SelectTrigger className="h-6 text-[10px] flex-1">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
