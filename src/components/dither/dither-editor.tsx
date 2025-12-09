@@ -119,6 +119,7 @@ export function DitherEditor() {
   const playbackControllerRef = useRef<VideoPlaybackController | null>(null);
   const timelineStateRef = useRef<TimelineState>(timelineState);
   const [videoProcessingProgress, setVideoProcessingProgress] = useState(0);
+  const processingCancelRef = useRef<boolean>(false);
 
   // Keep timelineStateRef in sync with timelineState
   useEffect(() => {
@@ -254,6 +255,24 @@ export function DitherEditor() {
     frames: ImageData[],
     settings: VideoSettings
   ) => {
+    // Cancel any ongoing processing
+    processingCancelRef.current = true;
+
+    // Wait a brief moment for previous processing to stop
+    await new Promise(resolve => setTimeout(resolve, 50));
+
+    // Create a local cancel check for this specific processing run
+    let isCancelled = false;
+    const checkCancel = () => {
+      if (processingCancelRef.current) {
+        isCancelled = true;
+        return true;
+      }
+      return false;
+    };
+
+    // Reset cancel flag and start new processing
+    processingCancelRef.current = false;
     setIsProcessing(true);
     setVideoProcessingProgress(0);
 
@@ -269,16 +288,25 @@ export function DitherEditor() {
         staticDithering: ditheringSettings,
         staticColorMode: colorModeSettings,
         onProgress: (current, total) => {
-          setVideoProcessingProgress((current / total) * 100);
+          if (!checkCancel()) {
+            setVideoProcessingProgress((current / total) * 100);
+          }
         },
+        onCancel: checkCancel,
       });
 
-      setProcessedFrames(processed);
+      // Only update if not cancelled
+      if (!isCancelled) {
+        setProcessedFrames(processed);
+        setIsProcessing(false);
+        setVideoProcessingProgress(0);
+      }
     } catch (error) {
       console.error('Error processing video:', error);
-    } finally {
-      setIsProcessing(false);
-      setVideoProcessingProgress(0);
+      if (!isCancelled) {
+        setIsProcessing(false);
+        setVideoProcessingProgress(0);
+      }
     }
   }, [
     animatedAdjustments,
@@ -293,11 +321,16 @@ export function DitherEditor() {
   // Reprocess video when settings change (debounced)
   useEffect(() => {
     if (mediaType === 'video' && videoFrames.length > 0 && videoSettings) {
+      // Use shorter debounce time (150ms) for faster preview updates
       const timeoutId = setTimeout(() => {
         processVideoAsync(videoFrames, videoSettings);
-      }, 500); // 500ms debounce for video processing
+      }, 150);
 
-      return () => clearTimeout(timeoutId);
+      return () => {
+        clearTimeout(timeoutId);
+        // Cancel any pending processing when settings change
+        processingCancelRef.current = true;
+      };
     }
   }, [
     mediaType,
@@ -318,19 +351,85 @@ export function DitherEditor() {
   }, []);
 
   const handleDitheringSettingsChange = useCallback((newSettings: Partial<DitheringSettings>) => {
-    setDitheringSettings((prev) => ({ ...prev, ...newSettings }));
+    setDitheringSettings((prev) => {
+      const updated = { ...prev, ...newSettings };
+
+      // Auto-update keyframe if we're at a keyframe position and animation is enabled
+      if (mediaType === 'video' && animatedDithering.enabled) {
+        const currentFrame = timelineState.currentFrame;
+        const existingKeyframe = animatedDithering.keyframes.find(kf => kf.frame === currentFrame);
+
+        if (existingKeyframe) {
+          // Update the keyframe with new settings
+          setAnimatedDithering(prev => ({
+            ...prev,
+            keyframes: prev.keyframes.map(kf =>
+              kf.frame === currentFrame
+                ? { ...kf, settings: updated }
+                : kf
+            ),
+          }));
+        }
+      }
+
+      return updated;
+    });
     setHasUnsavedChanges(true);
-  }, []);
+  }, [mediaType, animatedDithering, timelineState.currentFrame]);
 
   const handleAdjustmentSettingsChange = useCallback((newSettings: Partial<AdjustmentSettings>) => {
-    setAdjustmentSettings((prev) => ({ ...prev, ...newSettings }));
+    setAdjustmentSettings((prev) => {
+      const updated = { ...prev, ...newSettings };
+
+      // Auto-update keyframe if we're at a keyframe position and animation is enabled
+      if (mediaType === 'video' && animatedAdjustments.enabled) {
+        const currentFrame = timelineState.currentFrame;
+        const existingKeyframe = animatedAdjustments.keyframes.find(kf => kf.frame === currentFrame);
+
+        if (existingKeyframe) {
+          // Update the keyframe with new settings
+          setAnimatedAdjustments(prev => ({
+            ...prev,
+            keyframes: prev.keyframes.map(kf =>
+              kf.frame === currentFrame
+                ? { ...kf, settings: updated }
+                : kf
+            ),
+          }));
+        }
+      }
+
+      return updated;
+    });
     setHasUnsavedChanges(true);
-  }, []);
+  }, [mediaType, animatedAdjustments, timelineState.currentFrame]);
 
   const handleColorModeSettingsChange = useCallback((newSettings: Partial<ColorModeSettings>) => {
-    setColorModeSettings((prev) => ({ ...prev, ...newSettings }));
+    setColorModeSettings((prev) => {
+      const updated = { ...prev, ...newSettings };
+
+      // Auto-update keyframe if we're at a keyframe position and animation is enabled
+      if (mediaType === 'video' && animatedColorMode.enabled) {
+        const currentFrame = timelineState.currentFrame;
+        const existingKeyframe = animatedColorMode.keyframes.find(kf => kf.frame === currentFrame);
+
+        if (existingKeyframe) {
+          // Update the keyframe with new settings
+          setAnimatedColorMode(prev => ({
+            ...prev,
+            keyframes: prev.keyframes.map(kf =>
+              kf.frame === currentFrame
+                ? { ...kf, settings: updated }
+                : kf
+            ),
+          }));
+        }
+      }
+
+      return updated;
+    });
     setHasUnsavedChanges(true);
-  }, []);
+  }, [mediaType, animatedColorMode, timelineState.currentFrame]);
 
   const handleApplyPreset = useCallback((preset: DitherPreset) => {
     // Apply all settings from the preset
