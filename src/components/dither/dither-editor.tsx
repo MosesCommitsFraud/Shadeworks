@@ -693,10 +693,15 @@ export function DitherEditor() {
 
   // Toggle comparison mode
   const toggleComparison = useCallback(() => {
-    if (originalImage && processedImage) {
+    // For image mode, check if both original and processed images exist
+    if (mediaType === 'image' && originalImage && processedImage) {
       setComparisonMode((prev) => !prev);
     }
-  }, [originalImage, processedImage]);
+    // For video mode, check if we have both original and processed frames
+    else if (mediaType === 'video' && videoFrames.length > 0 && processedFrames.length > 0) {
+      setComparisonMode((prev) => !prev);
+    }
+  }, [mediaType, originalImage, processedImage, videoFrames, processedFrames]);
 
   // Add/update keyframe handler
   const handleAddOrUpdateKeyframe = useCallback(() => {
@@ -808,7 +813,9 @@ export function DitherEditor() {
     [
       ...getDefaultShortcuts({
         onExport: processedImage ? quickExport : undefined,
-        onToggleComparison: originalImage && processedImage ? toggleComparison : undefined,
+        onToggleComparison: (mediaType === 'image' && originalImage && processedImage) ||
+                           (mediaType === 'video' && videoFrames.length > 0 && processedFrames.length > 0)
+                           ? toggleComparison : undefined,
         onZoomIn: () => zoomHandlers.current.zoomIn(),
         onZoomOut: () => zoomHandlers.current.zoomOut(),
         onZoomFit: () => zoomHandlers.current.zoomFit(),
