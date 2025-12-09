@@ -38,9 +38,10 @@ export function HelpDialog({ open, onOpenChange }: HelpDialogProps) {
               <h3 className="text-lg font-semibold mb-3">Getting Started</h3>
               <div className="space-y-2 text-sm text-muted-foreground">
                 <p>
-                  The Dither Editor is a professional tool for applying dithering effects to images.
+                  The Dither Editor is a professional tool for applying dithering effects to images and videos.
                   Dithering creates the illusion of color depth in images with limited color palettes.
                 </p>
+                <p className="font-medium">For Images:</p>
                 <ol className="list-decimal list-inside space-y-1 ml-2">
                   <li>Upload an image using the Upload section</li>
                   <li>Adjust image properties in the Adjust section</li>
@@ -48,6 +49,14 @@ export function HelpDialog({ open, onOpenChange }: HelpDialogProps) {
                   <li>Select a dithering algorithm in the Dither section</li>
                   <li>Pick or create a color palette in the Palette section</li>
                   <li>Export your dithered image</li>
+                </ol>
+                <p className="font-medium mt-3">For Videos:</p>
+                <ol className="list-decimal list-inside space-y-1 ml-2">
+                  <li>Upload a video file (MP4, WebM, MOV)</li>
+                  <li>Navigate through frames using the timeline or arrow keys</li>
+                  <li>Add keyframes (Cmd/Ctrl+K) to animate settings over time</li>
+                  <li>Adjust easing and transition modes for smooth animations</li>
+                  <li>Export your processed video or GIF</li>
                 </ol>
               </div>
             </section>
@@ -262,6 +271,62 @@ export function HelpDialog({ open, onOpenChange }: HelpDialogProps) {
 
             <Separator />
 
+            {/* Video Mode & Keyframes */}
+            <section>
+              <h3 className="text-lg font-semibold mb-3">Video Mode & Keyframe Animation</h3>
+              <div className="space-y-3 text-sm">
+                <div>
+                  <h4 className="font-medium mb-1">Video Upload</h4>
+                  <p className="text-muted-foreground">
+                    Upload video files (MP4, WebM, MOV) to enter video mode. The editor will extract frames
+                    and allow you to animate settings over time using keyframes.
+                  </p>
+                </div>
+                <div>
+                  <h4 className="font-medium mb-1">Keyframes</h4>
+                  <p className="text-muted-foreground mb-2">
+                    Keyframes capture all settings at a specific frame. The editor interpolates between keyframes
+                    to create smooth transitions.
+                  </p>
+                  <ul className="space-y-1 text-muted-foreground ml-2">
+                    <li><strong>Add Keyframe:</strong> Press Cmd/Ctrl+K at any frame to save current settings</li>
+                    <li><strong>Update Keyframe:</strong> Adjust settings and press Cmd/Ctrl+K again to update</li>
+                    <li><strong>Delete Keyframe:</strong> Click the trash icon on a keyframe</li>
+                  </ul>
+                </div>
+                <div>
+                  <h4 className="font-medium mb-1">Easing Functions</h4>
+                  <p className="text-muted-foreground mb-2">
+                    Control how values transition between keyframes:
+                  </p>
+                  <ul className="space-y-1 text-muted-foreground ml-2">
+                    <li><strong>Linear:</strong> Constant speed from start to end</li>
+                    <li><strong>Ease In:</strong> Start slow, accelerate toward end</li>
+                    <li><strong>Ease Out:</strong> Start fast, decelerate toward end</li>
+                    <li><strong>Ease In-Out:</strong> Start slow, speed up, then slow down at end</li>
+                  </ul>
+                </div>
+                <div>
+                  <h4 className="font-medium mb-1">Transition Modes (Dithering Only)</h4>
+                  <p className="text-muted-foreground mb-2">
+                    Special transition handling for dithering algorithm changes:
+                  </p>
+                  <ul className="space-y-1 text-muted-foreground ml-2">
+                    <li><strong>Blend:</strong> Smooth crossfade between different algorithms</li>
+                    <li><strong>Step:</strong> Instant switch at 50% progress between keyframes</li>
+                  </ul>
+                </div>
+                <div>
+                  <h4 className="font-medium mb-1">Video Export</h4>
+                  <p className="text-muted-foreground">
+                    Export processed videos in MP4, WebM, or GIF format with quality and framerate options.
+                  </p>
+                </div>
+              </div>
+            </section>
+
+            <Separator />
+
             {/* Tips */}
             <section>
               <h3 className="text-lg font-semibold mb-3">Tips & Best Practices</h3>
@@ -277,6 +342,8 @@ export function HelpDialog({ open, onOpenChange }: HelpDialogProps) {
                 <li>Error diffusion works best for photographs and natural images</li>
                 <li>Ordered dithering creates retro, stylized looks</li>
                 <li>Reduce saturation (-100) for better grayscale conversion</li>
+                <li>For videos, use keyframes to animate settings smoothly over time</li>
+                <li>Ease In-Out creates the most natural-looking animations</li>
                 <li>Save your work as a .swdither project to preserve everything</li>
               </ul>
             </section>

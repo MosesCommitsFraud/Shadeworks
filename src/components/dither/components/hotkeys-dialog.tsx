@@ -63,7 +63,7 @@ export function HotkeysDialog({ open, onOpenChange, mediaType = 'image' }: Hotke
           { keys: ['Space'], description: 'Play/Pause video' },
           { keys: ['←'], description: 'Previous frame' },
           { keys: ['→'], description: 'Next frame' },
-          { keys: [modKey, 'K'], description: 'Add/update keyframe' },
+          { keys: [modKey, 'K'], description: 'Add/update keyframe at current frame' },
         ],
       });
     }

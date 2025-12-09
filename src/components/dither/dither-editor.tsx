@@ -38,6 +38,7 @@ import { exportVideoMP4, exportVideoAsGIF } from '@/lib/dither/video-export';
 import { Timeline } from './timeline';
 import { VideoPlaybackController } from '@/lib/dither/video-playback';
 import type { VideoExportOptions } from './sections/export-section';
+import { addKeyframe } from '@/lib/dither/keyframes';
 
 const INITIAL_DITHERING_SETTINGS: DitheringSettings = {
   algorithm: 'floyd-steinberg',
@@ -709,59 +710,28 @@ export function DitherEditor() {
 
     const currentFrame = timelineState.currentFrame;
 
-    // Check if keyframes exist at current frame
-    const hasAdjustmentKeyframe = animatedAdjustments.keyframes.some(kf => kf.frame === currentFrame);
-    const hasDitheringKeyframe = animatedDithering.keyframes.some(kf => kf.frame === currentFrame);
-    const hasColorModeKeyframe = animatedColorMode.keyframes.some(kf => kf.frame === currentFrame);
+    // Use the addKeyframe helper which handles adding/updating and includes the time property
+    const updatedAdjustments = addKeyframe(
+      { ...animatedAdjustments, enabled: true },
+      currentFrame,
+      adjustmentSettings,
+      'linear'
+    );
 
-    // Update or add keyframes for all three types
-    const updatedAdjustments = hasAdjustmentKeyframe
-      ? {
-          ...animatedAdjustments,
-          keyframes: animatedAdjustments.keyframes.map(kf =>
-            kf.frame === currentFrame ? { ...kf, settings: adjustmentSettings } : kf
-          ),
-        }
-      : {
-          ...animatedAdjustments,
-          enabled: true,
-          keyframes: [
-            ...animatedAdjustments.keyframes,
-            { frame: currentFrame, settings: adjustmentSettings, easing: 'linear' as const }
-          ].sort((a, b) => a.frame - b.frame),
-        };
+    const updatedDithering = addKeyframe(
+      { ...animatedDithering, enabled: true },
+      currentFrame,
+      ditheringSettings,
+      'linear',
+      'blend'
+    );
 
-    const updatedDithering = hasDitheringKeyframe
-      ? {
-          ...animatedDithering,
-          keyframes: animatedDithering.keyframes.map(kf =>
-            kf.frame === currentFrame ? { ...kf, settings: ditheringSettings } : kf
-          ),
-        }
-      : {
-          ...animatedDithering,
-          enabled: true,
-          keyframes: [
-            ...animatedDithering.keyframes,
-            { frame: currentFrame, settings: ditheringSettings, easing: 'linear' as const }
-          ].sort((a, b) => a.frame - b.frame),
-        };
-
-    const updatedColorMode = hasColorModeKeyframe
-      ? {
-          ...animatedColorMode,
-          keyframes: animatedColorMode.keyframes.map(kf =>
-            kf.frame === currentFrame ? { ...kf, settings: colorModeSettings } : kf
-          ),
-        }
-      : {
-          ...animatedColorMode,
-          enabled: true,
-          keyframes: [
-            ...animatedColorMode.keyframes,
-            { frame: currentFrame, settings: colorModeSettings, easing: 'linear' as const }
-          ].sort((a, b) => a.frame - b.frame),
-        };
+    const updatedColorMode = addKeyframe(
+      { ...animatedColorMode, enabled: true },
+      currentFrame,
+      colorModeSettings,
+      'linear'
+    );
 
     setAnimatedAdjustments(updatedAdjustments);
     setAnimatedDithering(updatedDithering);
