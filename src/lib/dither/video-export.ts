@@ -194,8 +194,9 @@ export async function exportVideoAsGIF(
     // Get the GIF as a Uint8Array
     const gifData = gif.bytes();
 
-    // Create blob and download
-    const blob = new Blob([gifData], { type: 'image/gif' });
+    // Create blob and download (convert to standard Uint8Array to avoid type issues)
+    const standardGifData = new Uint8Array(gifData);
+    const blob = new Blob([standardGifData], { type: 'image/gif' });
     const finalFilename = filename.endsWith('.gif') ? filename : `${filename}.gif`;
     downloadBlob(blob, finalFilename);
   } catch (error) {

@@ -13,7 +13,7 @@ import {
   Download,
   FileText
 } from 'lucide-react';
-import type { Palette, DitheringSettings, AdjustmentSettings, ColorModeSettings } from '@/lib/dither/types';
+import type { Palette, DitheringSettings, AdjustmentSettings, ColorModeSettings, VideoSettings } from '@/lib/dither/types';
 import { UploadSection } from './sections/upload-section';
 import { DitheringSection } from './sections/dithering-section';
 import { PaletteSection } from './sections/palette-section';
@@ -41,6 +41,7 @@ interface ControlSidebarProps {
   originalImage: ImageData | null;
   processedImage: ImageData | null;
   onImageUpload: (imageData: ImageData) => void;
+  onVideoUpload?: (frames: ImageData[], videoSettings: VideoSettings) => void;
   palette: Palette;
   onPaletteChange: (palette: Palette) => void;
   ditheringSettings: DitheringSettings;
@@ -75,6 +76,7 @@ export function ControlSidebar({
   originalImage,
   processedImage,
   onImageUpload,
+  onVideoUpload,
   palette,
   onPaletteChange,
   ditheringSettings,
@@ -116,7 +118,7 @@ export function ControlSidebar({
           />
         );
       case 'upload':
-        return <UploadSection onImageUpload={onImageUpload} />;
+        return <UploadSection onImageUpload={onImageUpload} onVideoUpload={onVideoUpload} />;
       case 'adjust':
         return (
           <AdjustmentsSection

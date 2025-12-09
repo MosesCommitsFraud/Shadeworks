@@ -29,10 +29,13 @@ import {
   getDefaultShortcuts,
 } from '@/lib/dither/keyboard-shortcuts';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, HelpCircle, Keyboard } from 'lucide-react';
+import { ArrowLeft, HelpCircle, Keyboard, Film } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { createProject, saveProject } from '@/lib/dither/project';
+import { processVideoFrames } from '@/lib/dither/video-processor';
+import { Timeline } from './timeline';
+import { VideoPlaybackController } from '@/lib/dither/video-playback';
 
 const INITIAL_DITHERING_SETTINGS: DitheringSettings = {
   algorithm: 'floyd-steinberg',
@@ -110,6 +113,10 @@ export function DitherEditor() {
     zoomFit: () => {},
   });
 
+  // Video playback controller
+  const playbackControllerRef = useRef<VideoPlaybackController | null>(null);
+  const [videoProcessingProgress, setVideoProcessingProgress] = useState(0);
+
   // Process image with current settings
   const processImage = useCallback(() => {
     if (!originalImage) return;
@@ -159,9 +166,128 @@ export function DitherEditor() {
     }
   }, [originalImage, palette, ditheringSettings, adjustmentSettings, colorModeSettings, debouncedProcessImage]);
 
+  // Video playback controller
+  useEffect(() => {
+    if (mediaType === 'video' && videoSettings) {
+      // Create playback controller if it doesn't exist or if video settings changed
+      if (!playbackControllerRef.current) {
+        playbackControllerRef.current = new VideoPlaybackController(
+          videoSettings,
+          () => timelineState,
+          (partialState) => {
+            setTimelineState((prev) => ({ ...prev, ...partialState }));
+          }
+        );
+      } else {
+        // Update video settings if they changed
+        playbackControllerRef.current.updateVideoSettings(videoSettings);
+      }
+
+      // Start or stop playback based on state
+      if (timelineState.isPlaying) {
+        playbackControllerRef.current.start();
+      } else {
+        playbackControllerRef.current.stop();
+      }
+
+      // Cleanup function
+      return () => {
+        playbackControllerRef.current?.stop();
+      };
+    }
+  }, [mediaType, videoSettings, timelineState]);
+
+  // Cleanup playback controller on unmount
+  useEffect(() => {
+    return () => {
+      playbackControllerRef.current?.destroy();
+    };
+  }, []);
+
   const handleImageUpload = useCallback((imageData: ImageData) => {
     setOriginalImage(imageData);
+    setMediaType('image');
   }, []);
+
+  // Handle video upload
+  const handleVideoUpload = useCallback((frames: ImageData[], settings: VideoSettings) => {
+    setVideoFrames(frames);
+    setVideoSettings(settings);
+    setMediaType('video');
+    setTimelineState({
+      currentFrame: 0,
+      currentTime: 0,
+      isPlaying: false,
+      playbackSpeed: 1,
+    });
+
+    // Trigger initial processing
+    processVideoAsync(frames, settings);
+  }, []);
+
+  // Process video frames asynchronously
+  const processVideoAsync = useCallback(async (
+    frames: ImageData[],
+    settings: VideoSettings
+  ) => {
+    setIsProcessing(true);
+    setVideoProcessingProgress(0);
+
+    try {
+      const processed = await processVideoFrames({
+        frames,
+        videoSettings: settings,
+        animatedAdjustments,
+        animatedDithering,
+        animatedColorMode,
+        palette,
+        staticAdjustments: adjustmentSettings,
+        staticDithering: ditheringSettings,
+        staticColorMode: colorModeSettings,
+        onProgress: (current, total) => {
+          setVideoProcessingProgress((current / total) * 100);
+        },
+      });
+
+      setProcessedFrames(processed);
+    } catch (error) {
+      console.error('Error processing video:', error);
+    } finally {
+      setIsProcessing(false);
+      setVideoProcessingProgress(0);
+    }
+  }, [
+    animatedAdjustments,
+    animatedDithering,
+    animatedColorMode,
+    palette,
+    adjustmentSettings,
+    ditheringSettings,
+    colorModeSettings,
+  ]);
+
+  // Reprocess video when settings change (debounced)
+  useEffect(() => {
+    if (mediaType === 'video' && videoFrames.length > 0 && videoSettings) {
+      const timeoutId = setTimeout(() => {
+        processVideoAsync(videoFrames, videoSettings);
+      }, 500); // 500ms debounce for video processing
+
+      return () => clearTimeout(timeoutId);
+    }
+  }, [
+    mediaType,
+    videoFrames,
+    videoSettings,
+    palette,
+    ditheringSettings,
+    adjustmentSettings,
+    colorModeSettings,
+    animatedAdjustments,
+    animatedDithering,
+    animatedColorMode,
+    processVideoAsync,
+  ]);
 
   const handlePaletteChange = useCallback((newPalette: Palette) => {
     setPalette(newPalette);
@@ -195,6 +321,11 @@ export function DitherEditor() {
     }
 
     setHasUnsavedChanges(true);
+  }, []);
+
+  // Handle timeline state changes
+  const handleTimelineStateChange = useCallback((partialState: Partial<TimelineState>) => {
+    setTimelineState((prev) => ({ ...prev, ...partialState }));
   }, []);
 
   // Handle navigation with unsaved changes (must be declared before handleNewProject)
@@ -431,11 +562,18 @@ export function DitherEditor() {
             <ArrowLeft className="h-4 w-4" />
           </Button>
           <div>
-            <h1 className="text-lg font-semibold">Dither Editor</h1>
+            <div className="flex items-center gap-2">
+              <h1 className="text-lg font-semibold">Dither Editor</h1>
+              <span className="px-2 py-0.5 text-xs font-medium rounded-md bg-primary/10 text-primary">
+                {mediaType === 'video' ? 'Video Mode' : 'Image Mode'}
+              </span>
+            </div>
             <p className="text-xs text-muted-foreground">
               {processedImage
                 ? `${processedImage.width}×${processedImage.height}px • ${palette.name} palette`
-                : 'Upload an image to get started'}
+                : mediaType === 'video' && videoSettings
+                ? `${videoSettings.width}×${videoSettings.height}px • ${videoSettings.fps}fps • ${videoSettings.totalFrames} frames`
+                : 'Upload an image or video to get started'}
             </p>
           </div>
         </div>
@@ -468,6 +606,7 @@ export function DitherEditor() {
           originalImage={originalImage}
           processedImage={processedImage}
           onImageUpload={handleImageUpload}
+          onVideoUpload={handleVideoUpload}
           palette={palette}
           onPaletteChange={handlePaletteChange}
           ditheringSettings={ditheringSettings}
@@ -500,8 +639,22 @@ export function DitherEditor() {
           onRegisterZoomHandlers={(handlers) => {
             zoomHandlers.current = handlers;
           }}
+          mediaType={mediaType}
+          videoFrames={videoFrames}
+          processedFrames={processedFrames}
+          currentFrame={timelineState.currentFrame}
         />
       </div>
+
+      {/* Timeline (only visible in video mode) */}
+      {mediaType === 'video' && videoSettings && (
+        <Timeline
+          videoSettings={videoSettings}
+          timelineState={timelineState}
+          onTimelineStateChange={handleTimelineStateChange}
+          keyframeMarkers={[]}
+        />
+      )}
 
       {/* Unsaved Changes Dialog */}
       <UnsavedChangesDialog

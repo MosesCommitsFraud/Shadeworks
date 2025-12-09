@@ -316,6 +316,10 @@ export async function exportColorSeparation(
   const layers = separateColors(imageData, colors);
   const { format, dpi, quality } = settings;
 
+  // Only support image formats for color separation
+  const imageFormat: 'png' | 'jpeg' | 'webp' =
+    format === 'png' || format === 'jpeg' || format === 'webp' ? format : 'png';
+
   // Create ZIP file
   const zip = new JSZip();
 
@@ -323,10 +327,10 @@ export async function exportColorSeparation(
   for (let i = 0; i < layers.length; i++) {
     const layer = layers[i];
     const scaledLayer = scaleImageDataForDPI(layer, dpi);
-    const layerFilename = `layer_${i + 1}.${format}`;
+    const layerFilename = `layer_${i + 1}.${imageFormat}`;
 
     try {
-      const blob = await imageDataToBlob(scaledLayer, format, quality);
+      const blob = await imageDataToBlob(scaledLayer, imageFormat, quality);
       zip.file(layerFilename, blob);
     } catch (error) {
       console.error(`Failed to add layer ${i + 1} to ZIP:`, error);
@@ -356,6 +360,10 @@ export async function exportCMYKSeparation(
   const { cyan, magenta, yellow, black } = separateToCMYK(imageData);
   const { format, dpi, quality } = settings;
 
+  // Only support image formats for CMYK separation
+  const imageFormat: 'png' | 'jpeg' | 'webp' =
+    format === 'png' || format === 'jpeg' || format === 'webp' ? format : 'png';
+
   const layers = [
     { name: 'cyan', data: cyan },
     { name: 'magenta', data: magenta },
@@ -369,10 +377,10 @@ export async function exportCMYKSeparation(
   // Add each layer to ZIP
   for (const layer of layers) {
     const scaledLayer = scaleImageDataForDPI(layer.data, dpi);
-    const layerFilename = `${layer.name}.${format}`;
+    const layerFilename = `${layer.name}.${imageFormat}`;
 
     try {
-      const blob = await imageDataToBlob(scaledLayer, format, quality);
+      const blob = await imageDataToBlob(scaledLayer, imageFormat, quality);
       zip.file(layerFilename, blob);
     } catch (error) {
       console.error(`Failed to add ${layer.name} layer to ZIP:`, error);
