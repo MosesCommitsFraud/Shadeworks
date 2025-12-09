@@ -27,6 +27,7 @@ interface CanvasPreviewProps {
   videoFrames?: ImageData[];
   processedFrames?: ImageData[];
   currentFrame?: number;
+  processingProgress?: number;
 }
 
 export function CanvasPreview({
@@ -42,6 +43,7 @@ export function CanvasPreview({
   videoFrames = [],
   processedFrames = [],
   currentFrame = 0,
+  processingProgress = 0,
 }: CanvasPreviewProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -149,21 +151,19 @@ export function CanvasPreview({
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    const imageToDisplay = processedImage || originalImage;
-
-    if (!imageToDisplay) {
+    if (!displayImage) {
       // Clear canvas and show placeholder
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       return;
     }
 
     // Set canvas size
-    canvas.width = imageToDisplay.width;
-    canvas.height = imageToDisplay.height;
+    canvas.width = displayImage.width;
+    canvas.height = displayImage.height;
 
     // Draw image
-    ctx.putImageData(imageToDisplay, 0, 0);
-  }, [originalImage, processedImage, comparisonMode, canCompare]);
+    ctx.putImageData(displayImage, 0, 0);
+  }, [displayImage, comparisonMode, canCompare]);
 
   const handleZoomIn = () => {
     onZoomChange(Math.min(zoom * 1.25, 400));
@@ -271,9 +271,16 @@ export function CanvasPreview({
 
       {/* Processing indicator */}
       {isProcessing && (
-        <div className="absolute top-20 right-4 z-10 bg-card border border-border rounded-lg p-4 shadow-lg">
-          <p className="text-sm mb-2">Processing...</p>
-          <Progress value={undefined} className="w-32" />
+        <div className="absolute top-20 right-4 z-10 bg-card border border-border rounded-lg p-4 shadow-lg min-w-[200px]">
+          <p className="text-sm mb-2">
+            {mediaType === 'video' ? 'Processing video frames...' : 'Processing...'}
+          </p>
+          <Progress value={processingProgress || undefined} className="w-full mb-1" />
+          {mediaType === 'video' && processingProgress > 0 && (
+            <p className="text-xs text-muted-foreground text-right">
+              {Math.round(processingProgress)}%
+            </p>
+          )}
         </div>
       )}
 

@@ -117,7 +117,13 @@ export function DitherEditor() {
 
   // Video playback controller
   const playbackControllerRef = useRef<VideoPlaybackController | null>(null);
+  const timelineStateRef = useRef<TimelineState>(timelineState);
   const [videoProcessingProgress, setVideoProcessingProgress] = useState(0);
+
+  // Keep timelineStateRef in sync with timelineState
+  useEffect(() => {
+    timelineStateRef.current = timelineState;
+  }, [timelineState]);
 
   // Process image with current settings
   const processImage = useCallback(() => {
@@ -168,14 +174,14 @@ export function DitherEditor() {
     }
   }, [originalImage, palette, ditheringSettings, adjustmentSettings, colorModeSettings, debouncedProcessImage]);
 
-  // Video playback controller
+  // Video playback controller - create/update controller
   useEffect(() => {
     if (mediaType === 'video' && videoSettings) {
-      // Create playback controller if it doesn't exist or if video settings changed
+      // Create playback controller if it doesn't exist
       if (!playbackControllerRef.current) {
         playbackControllerRef.current = new VideoPlaybackController(
           videoSettings,
-          () => timelineState,
+          () => timelineStateRef.current, // Use ref to always get latest state
           (partialState) => {
             setTimelineState((prev) => ({ ...prev, ...partialState }));
           }
@@ -184,20 +190,27 @@ export function DitherEditor() {
         // Update video settings if they changed
         playbackControllerRef.current.updateVideoSettings(videoSettings);
       }
+    }
 
-      // Start or stop playback based on state
+    return () => {
+      // Only destroy when media type changes away from video
+      if (mediaType !== 'video') {
+        playbackControllerRef.current?.destroy();
+        playbackControllerRef.current = null;
+      }
+    };
+  }, [mediaType, videoSettings]);
+
+  // Separate effect to handle play/pause state changes
+  useEffect(() => {
+    if (mediaType === 'video' && playbackControllerRef.current) {
       if (timelineState.isPlaying) {
         playbackControllerRef.current.start();
       } else {
         playbackControllerRef.current.stop();
       }
-
-      // Cleanup function
-      return () => {
-        playbackControllerRef.current?.stop();
-      };
     }
-  }, [mediaType, videoSettings, timelineState]);
+  }, [mediaType, timelineState.isPlaying]);
 
   // Cleanup playback controller on unmount
   useEffect(() => {
@@ -222,6 +235,15 @@ export function DitherEditor() {
       isPlaying: false,
       playbackSpeed: 1,
     });
+
+    // Reset zoom and pan for video
+    setZoom(100);
+    setPan({ x: 0, y: 0 });
+
+    // Auto-fit after a brief delay to ensure canvas is sized
+    setTimeout(() => {
+      zoomHandlers.current.zoomFit();
+    }, 100);
 
     // Trigger initial processing
     processVideoAsync(frames, settings);
@@ -690,6 +712,7 @@ export function DitherEditor() {
           videoFrames={videoFrames}
           processedFrames={processedFrames}
           currentFrame={timelineState.currentFrame}
+          processingProgress={videoProcessingProgress}
         />
       </div>
 
