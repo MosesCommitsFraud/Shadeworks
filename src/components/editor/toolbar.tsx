@@ -20,6 +20,7 @@ interface ToolbarProps {
   onZoomOut: () => void;
   onZoomFit: () => void;
   onExport: () => void;
+  onShowShortcuts: () => void;
 }
 
 export function Toolbar({
@@ -30,6 +31,7 @@ export function Toolbar({
   onZoomOut,
   onZoomFit,
   onExport,
+  onShowShortcuts,
 }: ToolbarProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -107,13 +109,9 @@ export function Toolbar({
 
       {/* Help */}
       <div className="flex items-center gap-1 border-l pl-2 ml-1">
-        <Button variant="ghost" size="sm" className="gap-2">
+        <Button variant="ghost" size="sm" className="gap-2" onClick={onShowShortcuts}>
           <Keyboard className="h-4 w-4" />
-          Hotkeys
-        </Button>
-        <Button variant="ghost" size="sm" className="gap-2">
-          <HelpCircle className="h-4 w-4" />
-          Help
+          Shortcuts
         </Button>
       </div>
     </div>

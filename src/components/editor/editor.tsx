@@ -11,9 +11,11 @@ import { ToolsPanel } from './tools-panel';
 import { AdjustmentsPanel } from './adjustments-panel';
 import { Toolbar } from './toolbar';
 import { ExportDialog } from './export-dialog';
+import { ShortcutsDialog } from './shortcuts-dialog';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
+import { registerShortcuts, type ShortcutAction } from '@/lib/editor/keyboard-shortcuts';
 
 export function Editor() {
   const canvasRef = useRef<Canvas | null>(null);
@@ -31,8 +33,9 @@ export function Editor() {
   const [showAdjustmentsPanel, setShowAdjustmentsPanel] = useState(true);
   const [showToolsPanel, setShowToolsPanel] = useState(true);
 
-  // Export dialog
+  // Dialogs
   const [showExportDialog, setShowExportDialog] = useState(false);
+  const [showShortcutsDialog, setShowShortcutsDialog] = useState(false);
 
   // Initialize Fabric.js canvas
   const initializeCanvas = useCallback((element: HTMLCanvasElement) => {
@@ -195,6 +198,37 @@ export function Editor() {
     }
   }, [originalImage, adjustments, debouncedProcessImage]);
 
+  // Keyboard shortcuts
+  useEffect(() => {
+    const handleShortcut = (action: ShortcutAction) => {
+      switch (action) {
+        case 'export':
+          if (originalImage) setShowExportDialog(true);
+          break;
+        case 'fit':
+          handleZoomFit();
+          break;
+        case 'zoom100':
+          setZoom(100);
+          break;
+        case 'zoomIn':
+          handleZoomIn();
+          break;
+        case 'zoomOut':
+          handleZoomOut();
+          break;
+        case 'toggleAdjustmentsPanel':
+          setShowAdjustmentsPanel(prev => !prev);
+          break;
+        case 'toggleToolsPanel':
+          setShowToolsPanel(prev => !prev);
+          break;
+      }
+    };
+
+    return registerShortcuts(handleShortcut);
+  }, [originalImage, handleZoomFit, handleZoomIn, handleZoomOut]);
+
   return (
     <div className="flex flex-col h-screen bg-background select-none">
       {/* Header */}
@@ -228,6 +262,7 @@ export function Editor() {
           onZoomOut={handleZoomOut}
           onZoomFit={handleZoomFit}
           onExport={() => setShowExportDialog(true)}
+          onShowShortcuts={() => setShowShortcutsDialog(true)}
         />
       </header>
 
@@ -270,6 +305,12 @@ export function Editor() {
         open={showExportDialog}
         onOpenChange={setShowExportDialog}
         imageData={processedImage || originalImage}
+      />
+
+      {/* Shortcuts Dialog */}
+      <ShortcutsDialog
+        open={showShortcutsDialog}
+        onOpenChange={setShowShortcutsDialog}
       />
     </div>
   );
