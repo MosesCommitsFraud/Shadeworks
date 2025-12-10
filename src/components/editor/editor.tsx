@@ -7,7 +7,6 @@ import { DEFAULT_ADJUSTMENT_SETTINGS } from '@/lib/editor/types';
 import { createLayer } from '@/lib/editor/layer-manager';
 import { applyBasicAdjustments, debounce } from '@/lib/editor/adjustment-processor';
 import { CanvasArea } from './canvas-area';
-import { LayersPanel } from './layers-panel';
 import { ToolsPanel } from './tools-panel';
 import { AdjustmentsPanel } from './adjustments-panel';
 import { Toolbar } from './toolbar';
@@ -28,7 +27,6 @@ export function Editor() {
   const [isProcessing, setIsProcessing] = useState(false);
 
   // Panel visibility
-  const [showLayersPanel, setShowLayersPanel] = useState(true);
   const [showAdjustmentsPanel, setShowAdjustmentsPanel] = useState(true);
   const [showToolsPanel, setShowToolsPanel] = useState(true);
 
@@ -254,19 +252,13 @@ export function Editor() {
             adjustments={adjustments}
             onAdjustmentsChange={setAdjustments}
             hasImage={!!originalImage}
+            layers={layers}
+            activeLayerId={activeLayerId}
+            onLayerSelect={setActiveLayerId}
+            onLayersChange={setLayers}
           />
         )}
       </div>
-
-      {/* Layers Panel */}
-      {showLayersPanel && (
-        <LayersPanel
-          layers={layers}
-          activeLayerId={activeLayerId}
-          onLayerSelect={setActiveLayerId}
-          onLayersChange={setLayers}
-        />
-      )}
     </div>
   );
 }

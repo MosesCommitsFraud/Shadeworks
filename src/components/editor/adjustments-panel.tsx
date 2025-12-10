@@ -1,21 +1,49 @@
 'use client';
 
-import type { AdjustmentSettings } from '@/lib/editor/types';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import type { AdjustmentSettings, Layer } from '@/lib/editor/types';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Slider } from '@/components/ui/slider';
 import { Label } from '@/components/ui/label';
+import { Button } from '@/components/ui/button';
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from '@/components/ui/accordion';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { Eye, EyeOff, Lock, Unlock, Plus, Trash2, Copy } from 'lucide-react';
+import {
+  createLayer,
+  duplicateLayer,
+  deleteLayer,
+  updateLayer,
+} from '@/lib/editor/layer-manager';
 
 interface AdjustmentsPanelProps {
   adjustments: AdjustmentSettings;
   onAdjustmentsChange: (adjustments: AdjustmentSettings) => void;
   hasImage: boolean;
+  layers: Layer[];
+  activeLayerId: string | null;
+  onLayerSelect: (layerId: string) => void;
+  onLayersChange: (layers: Layer[]) => void;
 }
 
 export function AdjustmentsPanel({
   adjustments,
   onAdjustmentsChange,
   hasImage,
+  layers,
+  activeLayerId,
+  onLayerSelect,
+  onLayersChange,
 }: AdjustmentsPanelProps) {
   const handleBasicChange = (key: keyof typeof adjustments.basic, value: number) => {
     onAdjustmentsChange({
@@ -27,198 +55,390 @@ export function AdjustmentsPanel({
     });
   };
 
+  const handleAddLayer = () => {
+    const newLayer = createLayer('image', `Layer ${layers.length + 1}`);
+    onLayersChange([...layers, newLayer]);
+    onLayerSelect(newLayer.id);
+  };
+
+  const handleDuplicateLayer = (layer: Layer) => {
+    const duplicated = duplicateLayer(layer);
+    const index = layers.findIndex((l) => l.id === layer.id);
+    const newLayers = [...layers];
+    newLayers.splice(index + 1, 0, duplicated);
+    onLayersChange(newLayers);
+  };
+
+  const handleDeleteLayer = (layerId: string) => {
+    onLayersChange(deleteLayer(layers, layerId));
+    if (activeLayerId === layerId && layers.length > 1) {
+      const index = layers.findIndex((l) => l.id === layerId);
+      const nextLayer = layers[Math.max(0, index - 1)];
+      if (nextLayer) onLayerSelect(nextLayer.id);
+    }
+  };
+
+  const handleToggleVisibility = (layerId: string) => {
+    const layer = layers.find((l) => l.id === layerId);
+    if (layer) {
+      onLayersChange(
+        updateLayer(layers, layerId, { visible: !layer.visible })
+      );
+    }
+  };
+
+  const handleToggleLock = (layerId: string) => {
+    const layer = layers.find((l) => l.id === layerId);
+    if (layer) {
+      onLayersChange(updateLayer(layers, layerId, { locked: !layer.locked }));
+    }
+  };
+
+  const handleOpacityChange = (layerId: string, opacity: number) => {
+    onLayersChange(updateLayer(layers, layerId, { opacity }));
+  };
+
+  const handleBlendModeChange = (layerId: string, blendMode: Layer['blendMode']) => {
+    onLayersChange(updateLayer(layers, layerId, { blendMode }));
+  };
+
   return (
-    <div className="w-80 border-l border-border bg-card flex flex-col">
-      <div className="px-4 py-3 border-b border-border">
-        <h2 className="text-sm font-semibold">Adjustments</h2>
-      </div>
+    <div className="w-96 border-l border-border bg-card flex flex-col">
+      <ScrollArea className="flex-1">
+        <Accordion type="multiple" defaultValue={['layers', 'basic']} className="w-full">
+          {/* Layers Section */}
+          <AccordionItem value="layers" className="border-b border-border">
+            <AccordionTrigger className="px-4 hover:no-underline">
+              <div className="flex items-center justify-between w-full pr-4">
+                <h2 className="text-sm font-semibold">Layers</h2>
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  className="h-6 w-6"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleAddLayer();
+                  }}
+                >
+                  <Plus className="h-4 w-4" />
+                </Button>
+              </div>
+            </AccordionTrigger>
+            <AccordionContent className="px-4">
+              {layers.length === 0 ? (
+                <div className="text-sm text-muted-foreground text-center py-4">
+                  No layers
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {[...layers].reverse().map((layer) => (
+                    <div
+                      key={layer.id}
+                      className={`rounded-md border p-3 cursor-pointer hover:bg-accent/50 transition-colors ${
+                        activeLayerId === layer.id ? 'bg-accent border-accent-foreground/20' : 'border-border'
+                      }`}
+                      onClick={() => onLayerSelect(layer.id)}
+                    >
+                      <div className="flex items-start gap-3">
+                        {/* Thumbnail */}
+                        <div className="w-12 h-12 rounded bg-muted border border-border flex items-center justify-center text-xs font-medium flex-shrink-0">
+                          {layer.type[0].toUpperCase()}
+                        </div>
 
-      <Tabs defaultValue="basic" className="flex-1 flex flex-col">
-        <TabsList className="w-full justify-start rounded-none border-b">
-          <TabsTrigger value="basic">Basic</TabsTrigger>
-          <TabsTrigger value="tone-curve">Tone Curve</TabsTrigger>
-          <TabsTrigger value="hsl">HSL</TabsTrigger>
-          <TabsTrigger value="filters">Filters</TabsTrigger>
-        </TabsList>
+                        {/* Layer info */}
+                        <div className="flex-1 min-w-0 space-y-2">
+                          <div className="flex items-center justify-between gap-2">
+                            <p className="text-sm font-medium truncate">{layer.name}</p>
+                            <div className="flex items-center gap-0.5 flex-shrink-0">
+                              <Button
+                                size="icon"
+                                variant="ghost"
+                                className="h-6 w-6"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleToggleVisibility(layer.id);
+                                }}
+                              >
+                                {layer.visible ? (
+                                  <Eye className="h-3.5 w-3.5" />
+                                ) : (
+                                  <EyeOff className="h-3.5 w-3.5" />
+                                )}
+                              </Button>
+                              <Button
+                                size="icon"
+                                variant="ghost"
+                                className="h-6 w-6"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleToggleLock(layer.id);
+                                }}
+                              >
+                                {layer.locked ? (
+                                  <Lock className="h-3.5 w-3.5" />
+                                ) : (
+                                  <Unlock className="h-3.5 w-3.5" />
+                                )}
+                              </Button>
+                              <Button
+                                size="icon"
+                                variant="ghost"
+                                className="h-6 w-6"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleDuplicateLayer(layer);
+                                }}
+                              >
+                                <Copy className="h-3.5 w-3.5" />
+                              </Button>
+                              <Button
+                                size="icon"
+                                variant="ghost"
+                                className="h-6 w-6"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleDeleteLayer(layer.id);
+                                }}
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </Button>
+                            </div>
+                          </div>
 
-        <ScrollArea className="flex-1">
+                          {/* Opacity */}
+                          <div className="space-y-1">
+                            <div className="flex items-center gap-2">
+                              <Label className="text-xs text-muted-foreground">Opacity</Label>
+                              <span className="text-xs text-muted-foreground ml-auto">{layer.opacity}%</span>
+                            </div>
+                            <Slider
+                              value={[layer.opacity]}
+                              onValueChange={([value]) =>
+                                handleOpacityChange(layer.id, value)
+                              }
+                              max={100}
+                              step={1}
+                              onClick={(e) => e.stopPropagation()}
+                            />
+                          </div>
+
+                          {/* Blend mode */}
+                          <Select
+                            value={layer.blendMode}
+                            onValueChange={(value) =>
+                              handleBlendModeChange(layer.id, value as Layer['blendMode'])
+                            }
+                          >
+                            <SelectTrigger className="h-7 text-xs" onClick={(e) => e.stopPropagation()}>
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="normal">Normal</SelectItem>
+                              <SelectItem value="multiply">Multiply</SelectItem>
+                              <SelectItem value="screen">Screen</SelectItem>
+                              <SelectItem value="overlay">Overlay</SelectItem>
+                              <SelectItem value="darken">Darken</SelectItem>
+                              <SelectItem value="lighten">Lighten</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </AccordionContent>
+          </AccordionItem>
+
           {/* Basic Adjustments */}
-          <TabsContent value="basic" className="px-4 py-4 space-y-4 mt-0">
-            {!hasImage ? (
-              <p className="text-sm text-muted-foreground text-center py-8">
-                Load an image to adjust
-              </p>
-            ) : (
-              <>
-                {/* Exposure */}
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <Label className="text-xs">Exposure</Label>
-                    <span className="text-xs text-muted-foreground">
-                      {adjustments.basic.exposure.toFixed(2)}
-                    </span>
+          <AccordionItem value="basic" className="border-b border-border">
+            <AccordionTrigger className="px-4 hover:no-underline">
+              <h2 className="text-sm font-semibold">Basic Adjustments</h2>
+            </AccordionTrigger>
+            <AccordionContent className="px-4">
+              {!hasImage ? (
+                <p className="text-sm text-muted-foreground text-center py-4">
+                  Load an image to adjust
+                </p>
+              ) : (
+                <div className="space-y-4">
+                  {/* Exposure */}
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <Label className="text-xs">Exposure</Label>
+                      <span className="text-xs text-muted-foreground">
+                        {adjustments.basic.exposure.toFixed(2)}
+                      </span>
+                    </div>
+                    <Slider
+                      value={[adjustments.basic.exposure]}
+                      onValueChange={([value]) => handleBasicChange('exposure', value)}
+                      min={-5}
+                      max={5}
+                      step={0.01}
+                    />
                   </div>
-                  <Slider
-                    value={[adjustments.basic.exposure]}
-                    onValueChange={([value]) => handleBasicChange('exposure', value)}
-                    min={-5}
-                    max={5}
-                    step={0.01}
-                    disabled={!hasImage}
-                  />
-                </div>
 
-                {/* Contrast */}
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <Label className="text-xs">Contrast</Label>
-                    <span className="text-xs text-muted-foreground">
-                      {adjustments.basic.contrast}
-                    </span>
+                  {/* Contrast */}
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <Label className="text-xs">Contrast</Label>
+                      <span className="text-xs text-muted-foreground">
+                        {adjustments.basic.contrast}
+                      </span>
+                    </div>
+                    <Slider
+                      value={[adjustments.basic.contrast]}
+                      onValueChange={([value]) => handleBasicChange('contrast', value)}
+                      min={-100}
+                      max={100}
+                      step={1}
+                    />
                   </div>
-                  <Slider
-                    value={[adjustments.basic.contrast]}
-                    onValueChange={([value]) => handleBasicChange('contrast', value)}
-                    min={-100}
-                    max={100}
-                    step={1}
-                    disabled={!hasImage}
-                  />
-                </div>
 
-                {/* Highlights */}
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <Label className="text-xs">Highlights</Label>
-                    <span className="text-xs text-muted-foreground">
-                      {adjustments.basic.highlights}
-                    </span>
+                  {/* Highlights */}
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <Label className="text-xs">Highlights</Label>
+                      <span className="text-xs text-muted-foreground">
+                        {adjustments.basic.highlights}
+                      </span>
+                    </div>
+                    <Slider
+                      value={[adjustments.basic.highlights]}
+                      onValueChange={([value]) => handleBasicChange('highlights', value)}
+                      min={-100}
+                      max={100}
+                      step={1}
+                    />
                   </div>
-                  <Slider
-                    value={[adjustments.basic.highlights]}
-                    onValueChange={([value]) => handleBasicChange('highlights', value)}
-                    min={-100}
-                    max={100}
-                    step={1}
-                    disabled={!hasImage}
-                  />
-                </div>
 
-                {/* Shadows */}
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <Label className="text-xs">Shadows</Label>
-                    <span className="text-xs text-muted-foreground">
-                      {adjustments.basic.shadows}
-                    </span>
+                  {/* Shadows */}
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <Label className="text-xs">Shadows</Label>
+                      <span className="text-xs text-muted-foreground">
+                        {adjustments.basic.shadows}
+                      </span>
+                    </div>
+                    <Slider
+                      value={[adjustments.basic.shadows]}
+                      onValueChange={([value]) => handleBasicChange('shadows', value)}
+                      min={-100}
+                      max={100}
+                      step={1}
+                    />
                   </div>
-                  <Slider
-                    value={[adjustments.basic.shadows]}
-                    onValueChange={([value]) => handleBasicChange('shadows', value)}
-                    min={-100}
-                    max={100}
-                    step={1}
-                    disabled={!hasImage}
-                  />
-                </div>
 
-                {/* Whites */}
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <Label className="text-xs">Whites</Label>
-                    <span className="text-xs text-muted-foreground">
-                      {adjustments.basic.whites}
-                    </span>
+                  {/* Whites */}
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <Label className="text-xs">Whites</Label>
+                      <span className="text-xs text-muted-foreground">
+                        {adjustments.basic.whites}
+                      </span>
+                    </div>
+                    <Slider
+                      value={[adjustments.basic.whites]}
+                      onValueChange={([value]) => handleBasicChange('whites', value)}
+                      min={-100}
+                      max={100}
+                      step={1}
+                    />
                   </div>
-                  <Slider
-                    value={[adjustments.basic.whites]}
-                    onValueChange={([value]) => handleBasicChange('whites', value)}
-                    min={-100}
-                    max={100}
-                    step={1}
-                    disabled={!hasImage}
-                  />
-                </div>
 
-                {/* Blacks */}
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <Label className="text-xs">Blacks</Label>
-                    <span className="text-xs text-muted-foreground">
-                      {adjustments.basic.blacks}
-                    </span>
+                  {/* Blacks */}
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <Label className="text-xs">Blacks</Label>
+                      <span className="text-xs text-muted-foreground">
+                        {adjustments.basic.blacks}
+                      </span>
+                    </div>
+                    <Slider
+                      value={[adjustments.basic.blacks]}
+                      onValueChange={([value]) => handleBasicChange('blacks', value)}
+                      min={-100}
+                      max={100}
+                      step={1}
+                    />
                   </div>
-                  <Slider
-                    value={[adjustments.basic.blacks]}
-                    onValueChange={([value]) => handleBasicChange('blacks', value)}
-                    min={-100}
-                    max={100}
-                    step={1}
-                    disabled={!hasImage}
-                  />
-                </div>
 
-                {/* Vibrance */}
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <Label className="text-xs">Vibrance</Label>
-                    <span className="text-xs text-muted-foreground">
-                      {adjustments.basic.vibrance}
-                    </span>
+                  {/* Vibrance */}
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <Label className="text-xs">Vibrance</Label>
+                      <span className="text-xs text-muted-foreground">
+                        {adjustments.basic.vibrance}
+                      </span>
+                    </div>
+                    <Slider
+                      value={[adjustments.basic.vibrance]}
+                      onValueChange={([value]) => handleBasicChange('vibrance', value)}
+                      min={-100}
+                      max={100}
+                      step={1}
+                    />
                   </div>
-                  <Slider
-                    value={[adjustments.basic.vibrance]}
-                    onValueChange={([value]) => handleBasicChange('vibrance', value)}
-                    min={-100}
-                    max={100}
-                    step={1}
-                    disabled={!hasImage}
-                  />
-                </div>
 
-                {/* Saturation */}
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <Label className="text-xs">Saturation</Label>
-                    <span className="text-xs text-muted-foreground">
-                      {adjustments.basic.saturation}
-                    </span>
+                  {/* Saturation */}
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <Label className="text-xs">Saturation</Label>
+                      <span className="text-xs text-muted-foreground">
+                        {adjustments.basic.saturation}
+                      </span>
+                    </div>
+                    <Slider
+                      value={[adjustments.basic.saturation]}
+                      onValueChange={([value]) => handleBasicChange('saturation', value)}
+                      min={-100}
+                      max={100}
+                      step={1}
+                    />
                   </div>
-                  <Slider
-                    value={[adjustments.basic.saturation]}
-                    onValueChange={([value]) => handleBasicChange('saturation', value)}
-                    min={-100}
-                    max={100}
-                    step={1}
-                    disabled={!hasImage}
-                  />
                 </div>
-              </>
-            )}
-          </TabsContent>
+              )}
+            </AccordionContent>
+          </AccordionItem>
 
           {/* Tone Curve - Placeholder */}
-          <TabsContent value="tone-curve" className="px-4 py-4 mt-0">
-            <p className="text-sm text-muted-foreground text-center py-8">
-              Tone curve coming soon
-            </p>
-          </TabsContent>
+          <AccordionItem value="tone-curve" className="border-b border-border">
+            <AccordionTrigger className="px-4 hover:no-underline">
+              <h2 className="text-sm font-semibold">Tone Curve</h2>
+            </AccordionTrigger>
+            <AccordionContent className="px-4">
+              <p className="text-sm text-muted-foreground text-center py-4">
+                Tone curve coming soon
+              </p>
+            </AccordionContent>
+          </AccordionItem>
 
           {/* HSL - Placeholder */}
-          <TabsContent value="hsl" className="px-4 py-4 mt-0">
-            <p className="text-sm text-muted-foreground text-center py-8">
-              HSL adjustments coming soon
-            </p>
-          </TabsContent>
+          <AccordionItem value="hsl" className="border-b border-border">
+            <AccordionTrigger className="px-4 hover:no-underline">
+              <h2 className="text-sm font-semibold">HSL / Color</h2>
+            </AccordionTrigger>
+            <AccordionContent className="px-4">
+              <p className="text-sm text-muted-foreground text-center py-4">
+                HSL adjustments coming soon
+              </p>
+            </AccordionContent>
+          </AccordionItem>
 
           {/* Filters - Placeholder */}
-          <TabsContent value="filters" className="px-4 py-4 mt-0">
-            <p className="text-sm text-muted-foreground text-center py-8">
-              Filters coming soon
-            </p>
-          </TabsContent>
-        </ScrollArea>
-      </Tabs>
+          <AccordionItem value="filters">
+            <AccordionTrigger className="px-4 hover:no-underline">
+              <h2 className="text-sm font-semibold">Filters & Effects</h2>
+            </AccordionTrigger>
+            <AccordionContent className="px-4">
+              <p className="text-sm text-muted-foreground text-center py-4">
+                Filters coming soon
+              </p>
+            </AccordionContent>
+          </AccordionItem>
+        </Accordion>
+      </ScrollArea>
     </div>
   );
 }
