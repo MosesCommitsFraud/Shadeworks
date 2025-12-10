@@ -18,13 +18,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Eye, EyeOff, Lock, Unlock, Plus, Trash2, Copy } from 'lucide-react';
+import { Eye, EyeOff, Lock, Unlock, Plus, Trash2, Copy, RotateCcw } from 'lucide-react';
 import {
   createLayer,
   duplicateLayer,
   deleteLayer,
   updateLayer,
 } from '@/lib/editor/layer-manager';
+import { DEFAULT_BASIC_ADJUSTMENTS } from '@/lib/editor/types';
 
 interface AdjustmentsPanelProps {
   adjustments: AdjustmentSettings;
@@ -100,6 +101,13 @@ export function AdjustmentsPanel({
 
   const handleBlendModeChange = (layerId: string, blendMode: Layer['blendMode']) => {
     onLayersChange(updateLayer(layers, layerId, { blendMode }));
+  };
+
+  const handleResetAdjustments = () => {
+    onAdjustmentsChange({
+      ...adjustments,
+      basic: DEFAULT_BASIC_ADJUSTMENTS,
+    });
   };
 
   return (
@@ -253,7 +261,22 @@ export function AdjustmentsPanel({
           {/* Basic Adjustments */}
           <AccordionItem value="basic" className="border-b border-border">
             <AccordionTrigger className="px-4 hover:no-underline">
-              <h2 className="text-sm font-semibold">Basic Adjustments</h2>
+              <div className="flex items-center justify-between w-full pr-4">
+                <h2 className="text-sm font-semibold">Basic Adjustments</h2>
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  className="h-6 w-6"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleResetAdjustments();
+                  }}
+                  disabled={!hasImage}
+                  title="Reset to defaults"
+                >
+                  <RotateCcw className="h-3.5 w-3.5" />
+                </Button>
+              </div>
             </AccordionTrigger>
             <AccordionContent className="px-4">
               {!hasImage ? (

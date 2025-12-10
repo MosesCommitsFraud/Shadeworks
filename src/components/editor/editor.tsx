@@ -10,6 +10,7 @@ import { CanvasArea } from './canvas-area';
 import { ToolsPanel } from './tools-panel';
 import { AdjustmentsPanel } from './adjustments-panel';
 import { Toolbar } from './toolbar';
+import { ExportDialog } from './export-dialog';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
@@ -29,6 +30,9 @@ export function Editor() {
   // Panel visibility
   const [showAdjustmentsPanel, setShowAdjustmentsPanel] = useState(true);
   const [showToolsPanel, setShowToolsPanel] = useState(true);
+
+  // Export dialog
+  const [showExportDialog, setShowExportDialog] = useState(false);
 
   // Initialize Fabric.js canvas
   const initializeCanvas = useCallback((element: HTMLCanvasElement) => {
@@ -223,6 +227,7 @@ export function Editor() {
           onZoomIn={handleZoomIn}
           onZoomOut={handleZoomOut}
           onZoomFit={handleZoomFit}
+          onExport={() => setShowExportDialog(true)}
         />
       </header>
 
@@ -259,6 +264,13 @@ export function Editor() {
           />
         )}
       </div>
+
+      {/* Export Dialog */}
+      <ExportDialog
+        open={showExportDialog}
+        onOpenChange={setShowExportDialog}
+        imageData={processedImage || originalImage}
+      />
     </div>
   );
 }

@@ -19,6 +19,7 @@ interface ToolbarProps {
   onZoomIn: () => void;
   onZoomOut: () => void;
   onZoomFit: () => void;
+  onExport: () => void;
 }
 
 export function Toolbar({
@@ -28,6 +29,7 @@ export function Toolbar({
   onZoomIn,
   onZoomOut,
   onZoomFit,
+  onExport,
 }: ToolbarProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -97,6 +99,7 @@ export function Toolbar({
         size="sm"
         disabled={!hasImage}
         className="gap-2 ml-2"
+        onClick={onExport}
       >
         <Download className="h-4 w-4" />
         Export
