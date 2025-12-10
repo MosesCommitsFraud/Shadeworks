@@ -1,6 +1,7 @@
 'use client';
 
 import type { AdjustmentSettings, Layer } from '@/lib/editor/types';
+import type { FilterType } from '@/lib/editor/filters';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Slider } from '@/components/ui/slider';
 import { Label } from '@/components/ui/label';
@@ -35,6 +36,7 @@ interface AdjustmentsPanelProps {
   activeLayerId: string | null;
   onLayerSelect: (layerId: string) => void;
   onLayersChange: (layers: Layer[]) => void;
+  onApplyFilter: (filterType: FilterType, intensity?: number) => void;
 }
 
 export function AdjustmentsPanel({
@@ -45,6 +47,7 @@ export function AdjustmentsPanel({
   activeLayerId,
   onLayerSelect,
   onLayersChange,
+  onApplyFilter,
 }: AdjustmentsPanelProps) {
   const handleBasicChange = (key: keyof typeof adjustments.basic, value: number) => {
     onAdjustmentsChange({
@@ -449,15 +452,119 @@ export function AdjustmentsPanel({
             </AccordionContent>
           </AccordionItem>
 
-          {/* Filters - Placeholder */}
+          {/* Filters & Effects */}
           <AccordionItem value="filters">
             <AccordionTrigger className="px-4 hover:no-underline">
               <h2 className="text-sm font-semibold">Filters & Effects</h2>
             </AccordionTrigger>
             <AccordionContent className="px-4">
-              <p className="text-sm text-muted-foreground text-center py-4">
-                Filters coming soon
-              </p>
+              {!hasImage ? (
+                <p className="text-sm text-muted-foreground text-center py-4">
+                  Load an image to apply filters
+                </p>
+              ) : (
+                <div className="space-y-3">
+                  {/* Blur Filters */}
+                  <div className="space-y-2">
+                    <Label className="text-xs font-semibold">Blur</Label>
+                    <div className="grid grid-cols-2 gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="text-xs"
+                        onClick={() => onApplyFilter('blur', 3)}
+                      >
+                        Blur
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="text-xs"
+                        onClick={() => onApplyFilter('gaussianBlur', 5)}
+                      >
+                        Gaussian Blur
+                      </Button>
+                    </div>
+                  </div>
+
+                  {/* Sharpen */}
+                  <div className="space-y-2">
+                    <Label className="text-xs font-semibold">Sharpen</Label>
+                    <div className="grid grid-cols-2 gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="text-xs"
+                        onClick={() => onApplyFilter('sharpen', 0.5)}
+                      >
+                        Sharpen
+                      </Button>
+                    </div>
+                  </div>
+
+                  {/* Artistic */}
+                  <div className="space-y-2">
+                    <Label className="text-xs font-semibold">Artistic</Label>
+                    <div className="grid grid-cols-2 gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="text-xs"
+                        onClick={() => onApplyFilter('grayscale')}
+                      >
+                        Grayscale
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="text-xs"
+                        onClick={() => onApplyFilter('sepia', 100)}
+                      >
+                        Sepia
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="text-xs"
+                        onClick={() => onApplyFilter('invert')}
+                      >
+                        Invert
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="text-xs"
+                        onClick={() => onApplyFilter('pixelate', 10)}
+                      >
+                        Pixelate
+                      </Button>
+                    </div>
+                  </div>
+
+                  {/* Stylize */}
+                  <div className="space-y-2">
+                    <Label className="text-xs font-semibold">Stylize</Label>
+                    <div className="grid grid-cols-2 gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="text-xs"
+                        onClick={() => onApplyFilter('emboss')}
+                      >
+                        Emboss
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="text-xs"
+                        onClick={() => onApplyFilter('edgeDetect')}
+                      >
+                        Edge Detect
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              )}
             </AccordionContent>
           </AccordionItem>
         </Accordion>

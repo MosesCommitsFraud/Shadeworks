@@ -6,6 +6,17 @@ import type { Tool, Layer, AdjustmentSettings } from '@/lib/editor/types';
 import { DEFAULT_ADJUSTMENT_SETTINGS } from '@/lib/editor/types';
 import { createLayer } from '@/lib/editor/layer-manager';
 import { applyBasicAdjustments, debounce } from '@/lib/editor/adjustment-processor';
+import {
+  type FilterType,
+  applyBlur,
+  applySharpen,
+  applyGrayscale,
+  applySepia,
+  applyInvert,
+  applyPixelate,
+  applyEmboss,
+  applyEdgeDetect,
+} from '@/lib/editor/filters';
 import { CanvasArea } from './canvas-area';
 import { ToolsPanel } from './tools-panel';
 import { AdjustmentsPanel } from './adjustments-panel';
@@ -198,6 +209,85 @@ export function Editor() {
     }
   }, [originalImage, adjustments, debouncedProcessImage]);
 
+  // Apply filter to current image
+  const handleApplyFilter = useCallback((filterType: FilterType, intensity?: number) => {
+    const currentImage = processedImage || originalImage;
+    if (!currentImage) return;
+
+    setIsProcessing(true);
+
+    setTimeout(() => {
+      try {
+        let filtered: ImageData;
+
+        switch (filterType) {
+          case 'blur':
+            filtered = applyBlur(currentImage, intensity || 3);
+            break;
+          case 'gaussianBlur':
+            filtered = applyBlur(currentImage, intensity || 5);
+            break;
+          case 'sharpen':
+            filtered = applySharpen(currentImage, intensity || 0.5);
+            break;
+          case 'grayscale':
+            filtered = applyGrayscale(currentImage);
+            break;
+          case 'sepia':
+            filtered = applySepia(currentImage, intensity || 100);
+            break;
+          case 'invert':
+            filtered = applyInvert(currentImage);
+            break;
+          case 'pixelate':
+            filtered = applyPixelate(currentImage, intensity || 10);
+            break;
+          case 'emboss':
+            filtered = applyEmboss(currentImage);
+            break;
+          case 'edgeDetect':
+            filtered = applyEdgeDetect(currentImage);
+            break;
+          default:
+            filtered = currentImage;
+        }
+
+        // Update the original image so adjustments are applied on top
+        setOriginalImage(filtered);
+        setProcessedImage(filtered);
+
+        // Update canvas
+        if (canvasRef.current) {
+          const canvas = document.createElement('canvas');
+          canvas.width = filtered.width;
+          canvas.height = filtered.height;
+          const ctx = canvas.getContext('2d');
+          if (ctx) {
+            ctx.putImageData(filtered, 0, 0);
+
+            FabricImage.fromURL(canvas.toDataURL()).then((fabricImg) => {
+              if (!canvasRef.current) return;
+
+              fabricImg.set({
+                left: 0,
+                top: 0,
+                selectable: true,
+              });
+
+              canvasRef.current.clear();
+              canvasRef.current.add(fabricImg);
+              canvasRef.current.renderAll();
+            });
+          }
+        }
+      } catch (error) {
+        console.error('Error applying filter:', error);
+      } finally {
+        setIsProcessing(false);
+      }
+    }, 10);
+  }, [originalImage, processedImage]);
+
   // Keyboard shortcuts
   useEffect(() => {
     const handleShortcut = (action: ShortcutAction) => {
@@ -296,6 +386,7 @@ export function Editor() {
             activeLayerId={activeLayerId}
             onLayerSelect={setActiveLayerId}
             onLayersChange={setLayers}
+            onApplyFilter={handleApplyFilter}
           />
         )}
       </div>
