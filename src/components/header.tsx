@@ -1,7 +1,7 @@
 import Image from "next/image"
 import Link from "next/link"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
-import { ChevronDown, Pencil, Grip, Eraser } from "lucide-react"
+import { ChevronDown, Pencil, Grip, Eraser, ImageIcon } from "lucide-react"
 
 export function Header() {
   return (
@@ -44,6 +44,12 @@ export function Header() {
                     <Link href="/removebg" className="flex items-center gap-2">
                       <Eraser className="h-4 w-4" />
                       Background Remover
+                    </Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem asChild>
+                    <Link href="/editor" className="flex items-center gap-2">
+                      <ImageIcon className="h-4 w-4" />
+                      Image Editor
                     </Link>
                   </DropdownMenuItem>
                 </DropdownMenuContent>
