@@ -1,9 +1,11 @@
 'use client';
 
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 import { ArrowLeft, Download } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useRouter } from 'next/navigation';
+
+type ViewState = 'original' | 'comparing' | 'processed';
 
 export function BackgroundRemover() {
   const router = useRouter();
@@ -17,6 +19,8 @@ export function BackgroundRemover() {
   const [selectedScale, setSelectedScale] = useState<number>(1);
   const [jpgQuality, setJpgQuality] = useState<number>(95);
   const [webpQuality, setWebpQuality] = useState<number>(90);
+  const [viewState, setViewState] = useState<ViewState>('original');
+  const [swipePosition, setSwipePosition] = useState(0);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const imgRef = useRef<HTMLImageElement>(null);
@@ -88,6 +92,10 @@ export function BackgroundRemover() {
       setProcessedBlob(blob);
       const url = URL.createObjectURL(blob);
       setProcessedImage(url);
+
+      // Start comparison animation
+      setViewState('comparing');
+      setSwipePosition(0);
     } catch (err) {
       console.error('Error removing background:', err);
       setError(err instanceof Error ? err.message : 'Failed to remove background');
@@ -96,6 +104,40 @@ export function BackgroundRemover() {
       setProgress('');
     }
   }, [originalImage]);
+
+  // Animate the swipe comparison when processing completes
+  useEffect(() => {
+    if (viewState === 'comparing') {
+      let animationFrame: number;
+      let startTime = Date.now();
+      const duration = 2500; // 2.5 seconds for the full animation
+      const pauseAtEnd = 800; // Pause at 100% for 0.8s
+
+      const animate = () => {
+        const elapsed = Date.now() - startTime;
+
+        if (elapsed < duration) {
+          // Smooth easing function (ease-in-out)
+          const progress = elapsed / duration;
+          const eased = progress < 0.5
+            ? 2 * progress * progress
+            : 1 - Math.pow(-2 * progress + 2, 2) / 2;
+          setSwipePosition(eased * 100);
+          animationFrame = requestAnimationFrame(animate);
+        } else if (elapsed < duration + pauseAtEnd) {
+          // Pause at 100%
+          setSwipePosition(100);
+          animationFrame = requestAnimationFrame(animate);
+        } else {
+          // Animation complete, show only processed image
+          setViewState('processed');
+        }
+      };
+
+      animationFrame = requestAnimationFrame(animate);
+      return () => cancelAnimationFrame(animationFrame);
+    }
+  }, [viewState]);
 
   const downloadImage = useCallback(async () => {
     if (!processedBlob || !canvasRef.current) return;
@@ -167,6 +209,8 @@ export function BackgroundRemover() {
     setProcessedImage(null);
     setProcessedBlob(null);
     setError(null);
+    setViewState('original');
+    setSwipePosition(0);
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
@@ -233,53 +277,95 @@ export function BackgroundRemover() {
         ) : (
           <>
             {/* Main Preview Area */}
-            <div className="flex-1 overflow-auto p-6">
-              <div className="grid lg:grid-cols-2 gap-6 h-full">
-                {/* Original Image */}
-                <div className="space-y-3">
-                  <h2 className="text-sm font-medium text-muted-foreground">Original</h2>
-                  <div className="border border-border rounded-lg overflow-hidden bg-[repeating-conic-gradient(#e5e7eb_0%_25%,white_0%_50%)] bg-[length:20px_20px] h-[calc(100%-2rem)]">
+            <div className="flex-1 overflow-hidden flex items-center justify-center p-8 bg-background">
+              <div className="relative w-full h-full flex items-center justify-center">
+                {viewState === 'original' && (
+                  <div className="relative max-w-full max-h-full">
                     <img
                       ref={imgRef}
                       src={originalImage}
                       alt="Original"
-                      className="w-full h-full object-contain"
+                      className="max-w-full max-h-full object-contain"
                       crossOrigin="anonymous"
                     />
+                    {!processedImage && !isProcessing && (
+                      <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                        <div className="bg-background/90 backdrop-blur-sm px-6 py-3 rounded-lg border border-border">
+                          <p className="text-sm text-muted-foreground">
+                            Click "Remove Background" to start
+                          </p>
+                        </div>
+                      </div>
+                    )}
                   </div>
-                </div>
+                )}
 
-                {/* Processed Image */}
-                <div className="space-y-3">
-                  <h2 className="text-sm font-medium text-muted-foreground">Background Removed</h2>
-                  <div className="border border-border rounded-lg overflow-hidden bg-[repeating-conic-gradient(#e5e7eb_0%_25%,white_0%_50%)] bg-[length:20px_20px] h-[calc(100%-2rem)] flex items-center justify-center">
-                    {processedImage ? (
+                {viewState === 'comparing' && processedImage && (
+                  <div className="relative max-w-full max-h-full">
+                    {/* Original image (background) */}
+                    <div className="relative">
+                      <img
+                        src={originalImage}
+                        alt="Original"
+                        className="max-w-full max-h-full object-contain"
+                        crossOrigin="anonymous"
+                      />
+                    </div>
+
+                    {/* Processed image overlay with animated clip */}
+                    <div
+                      className="absolute inset-0 overflow-hidden bg-[repeating-conic-gradient(#e5e7eb_0%_25%,white_0%_50%)] bg-[length:20px_20px] rounded-lg"
+                      style={{
+                        clipPath: `inset(0 ${100 - swipePosition}% 0 0)`
+                      }}
+                    >
                       <img
                         src={processedImage}
                         alt="Processed"
-                        className="w-full h-full object-contain"
+                        className="max-w-full max-h-full object-contain"
                       />
-                    ) : (
-                      <p className="text-muted-foreground">
-                        {isProcessing ? (progress || 'Processing...') : 'Click "Remove Background" to start'}
-                      </p>
-                    )}
+                    </div>
+
+                    {/* Swipe line indicator */}
+                    <div
+                      className="absolute top-0 bottom-0 w-0.5 bg-accent shadow-lg"
+                      style={{
+                        left: `${swipePosition}%`,
+                        transition: 'left 0.05s linear'
+                      }}
+                    >
+                      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-12 h-12 bg-accent rounded-full flex items-center justify-center shadow-xl">
+                        <div className="w-6 h-6 border-2 border-white rounded-full" />
+                      </div>
+                    </div>
                   </div>
-                </div>
+                )}
+
+                {viewState === 'processed' && processedImage && (
+                  <div className="relative max-w-full max-h-full bg-[repeating-conic-gradient(#e5e7eb_0%_25%,white_0%_50%)] bg-[length:20px_20px] rounded-lg">
+                    <img
+                      src={processedImage}
+                      alt="Processed"
+                      className="max-w-full max-h-full object-contain"
+                    />
+                  </div>
+                )}
+
+                {isProcessing && (
+                  <div className="absolute inset-0 flex items-center justify-center bg-background/50 backdrop-blur-sm">
+                    <div className="flex flex-col items-center gap-4 bg-card px-8 py-6 rounded-lg border border-border shadow-xl">
+                      <div className="w-8 h-8 border-4 border-accent border-t-transparent rounded-full animate-spin" />
+                      <span className="font-medium text-lg">{progress || 'Processing image...'}</span>
+                    </div>
+                  </div>
+                )}
+
+                {error && (
+                  <div className="absolute bottom-8 left-1/2 -translate-x-1/2 bg-destructive/10 border border-destructive text-destructive px-6 py-3 rounded-lg max-w-md">
+                    {error}
+                  </div>
+                )}
               </div>
-
-              {error && (
-                <div className="mt-6 bg-destructive/10 border border-destructive text-destructive px-4 py-3 rounded-lg">
-                  {error}
-                </div>
-              )}
-
-              {isProcessing && (
-                <div className="mt-6 flex items-center justify-center gap-3 p-4 bg-secondary/30 rounded-lg">
-                  <div className="w-5 h-5 border-3 border-accent border-t-transparent rounded-full animate-spin" />
-                  <span className="font-medium">{progress || 'Processing image...'}</span>
-                </div>
-              )}
             </div>
 
             {/* Right Sidebar - Controls */}
