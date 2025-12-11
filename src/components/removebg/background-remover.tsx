@@ -20,7 +20,6 @@ export function BackgroundRemover() {
   const router = useRouter();
   const [originalImage, setOriginalImage] = useState<string | null>(null);
   const [processedImage, setProcessedImage] = useState<string | null>(null);
-  const [processedBlob, setProcessedBlob] = useState<Blob | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [progress, setProgress] = useState<string>('');
   const [error, setError] = useState<string | null>(null);
@@ -57,7 +56,13 @@ export function BackgroundRemover() {
   const workingCanvasRef = useRef<HTMLCanvasElement>(null);
   const originalImageDataRef = useRef<ImageData | null>(null);
   const processedImageDataRef = useRef<ImageData | null>(null);
-  const maskCanvasRef = useRef<HTMLCanvasElement>(null);
+
+  // Ensure we have an offscreen working canvas for brush operations
+  useEffect(() => {
+    if (!workingCanvasRef.current) {
+      workingCanvasRef.current = document.createElement('canvas');
+    }
+  }, []);
 
   const convertImageToPNG = useCallback(async (file: File): Promise<string> => {
     return new Promise((resolve, reject) => {
@@ -96,12 +101,12 @@ export function BackgroundRemover() {
 
     setError(null);
     setProcessedImage(null);
-    setProcessedBlob(null);
     setBrushStrokes([]);
     setUndoStack([]);
     setRedoStack([]);
     setZoom(100);
     setPan({ x: 0, y: 0 });
+    setActiveTool('none');
 
     try {
       const pngDataUrl = await convertImageToPNG(file);
@@ -118,6 +123,9 @@ export function BackgroundRemover() {
     setIsProcessing(true);
     setError(null);
     setProcessedImage(null);
+    setBrushStrokes([]);
+    setUndoStack([]);
+    setRedoStack([]);
 
     try {
       const { removeBackground } = await import('@imgly/background-removal');
@@ -128,37 +136,44 @@ export function BackgroundRemover() {
         },
       });
 
-      setProcessedBlob(blob);
       const url = URL.createObjectURL(blob);
+
+      // Load both images and their data before starting animation
+      const processedImg = new Image();
+      const originalImg = new Image();
+
+      await Promise.all([
+        new Promise<void>((resolve) => {
+          processedImg.onload = () => {
+            const canvas = document.createElement('canvas');
+            canvas.width = processedImg.width;
+            canvas.height = processedImg.height;
+            const ctx = canvas.getContext('2d');
+            if (ctx) {
+              ctx.drawImage(processedImg, 0, 0);
+              processedImageDataRef.current = ctx.getImageData(0, 0, canvas.width, canvas.height);
+            }
+            resolve();
+          };
+          processedImg.src = url;
+        }),
+        new Promise<void>((resolve) => {
+          originalImg.onload = () => {
+            const canvas = document.createElement('canvas');
+            canvas.width = originalImg.width;
+            canvas.height = originalImg.height;
+            const ctx = canvas.getContext('2d');
+            if (ctx) {
+              ctx.drawImage(originalImg, 0, 0);
+              originalImageDataRef.current = ctx.getImageData(0, 0, canvas.width, canvas.height);
+            }
+            resolve();
+          };
+          originalImg.src = originalImage;
+        })
+      ]);
+
       setProcessedImage(url);
-
-      // Load processed image data for brush editing
-      const img = new Image();
-      img.onload = () => {
-        const canvas = document.createElement('canvas');
-        canvas.width = img.width;
-        canvas.height = img.height;
-        const ctx = canvas.getContext('2d');
-        if (ctx) {
-          ctx.drawImage(img, 0, 0);
-          processedImageDataRef.current = ctx.getImageData(0, 0, canvas.width, canvas.height);
-        }
-      };
-      img.src = url;
-
-      // Also load original image data
-      const origImg = new Image();
-      origImg.onload = () => {
-        const canvas = document.createElement('canvas');
-        canvas.width = origImg.width;
-        canvas.height = origImg.height;
-        const ctx = canvas.getContext('2d');
-        if (ctx) {
-          ctx.drawImage(origImg, 0, 0);
-          originalImageDataRef.current = ctx.getImageData(0, 0, canvas.width, canvas.height);
-        }
-      };
-      origImg.src = originalImage;
 
       // Start comparison animation
       setViewState('comparing');
@@ -256,12 +271,13 @@ export function BackgroundRemover() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [handleZoomIn, handleZoomOut, handleFitToScreen]);
 
-  // Mouse wheel zoom
+  // Wheel handling: pinch/ctrl+wheel zooms, two-finger scroll pans
   useEffect(() => {
     const container = containerRef.current;
     if (!container) return;
 
     const handleWheel = (e: WheelEvent) => {
+      // Ctrl+Scroll or pinch-to-zoom (two-finger trackpad)
       if (e.ctrlKey || e.metaKey) {
         e.preventDefault();
 
@@ -273,23 +289,27 @@ export function BackgroundRemover() {
         const prevZoom = zoom;
         const newZoom = Math.max(25, Math.min(1000, prevZoom * delta));
 
-        const canvasElement = canvasRef.current;
-        if (canvasElement) {
-          const canvasRect = canvasElement.getBoundingClientRect();
-          const canvasCenterX = canvasRect.left + canvasRect.width / 2 - rect.left;
-          const canvasCenterY = canvasRect.top + canvasRect.height / 2 - rect.top;
+        // Zoom towards mouse position
+        const centerX = rect.width / 2;
+        const centerY = rect.height / 2;
 
-          const offsetX = mouseX - canvasCenterX;
-          const offsetY = mouseY - canvasCenterY;
+        const offsetX = mouseX - centerX;
+        const offsetY = mouseY - centerY;
 
-          const scaleFactor = newZoom / prevZoom - 1;
-          setPan((prevPan) => ({
-            x: prevPan.x - offsetX * scaleFactor,
-            y: prevPan.y - offsetY * scaleFactor,
-          }));
-        }
+        const scaleFactor = newZoom / prevZoom - 1;
+        setPan((prevPan) => ({
+          x: prevPan.x - offsetX * scaleFactor,
+          y: prevPan.y - offsetY * scaleFactor,
+        }));
 
         setZoom(newZoom);
+      } else {
+        // Regular scroll for panning
+        e.preventDefault();
+        setPan((prev) => ({
+          x: prev.x - e.deltaX,
+          y: prev.y - e.deltaY,
+        }));
       }
     };
 
@@ -308,18 +328,25 @@ export function BackgroundRemover() {
     return { x, y };
   }, []);
 
-  // Pan handlers
+  // Mouse handlers
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
-    if (activeTool === 'none' || e.button === 1) {
+    // Allow panning with middle click or shift+drag regardless of tool
+    if (e.button === 1 || (e.button === 0 && e.shiftKey)) {
       setIsPanning(true);
       setPanStart({ x: e.clientX - pan.x, y: e.clientY - pan.y });
-    } else if (activeTool === 'crop') {
+      return;
+    }
+    // Always allow panning with left click when no tool is active
+    if (activeTool === 'none') {
+      setIsPanning(true);
+      setPanStart({ x: e.clientX - pan.x, y: e.clientY - pan.y });
+    } else if (activeTool === 'crop' && viewState === 'processed') {
       const coords = getCanvasCoords(e);
       if (coords) {
         setCropStart(coords);
         setCropArea({ ...coords, width: 0, height: 0 });
       }
-    } else if (activeTool === 'brush' || activeTool === 'erase') {
+    } else if ((activeTool === 'brush' || activeTool === 'erase') && viewState === 'processed') {
       const coords = getCanvasCoords(e);
       if (coords) {
         setIsDrawing(true);
@@ -331,7 +358,7 @@ export function BackgroundRemover() {
         });
       }
     }
-  }, [activeTool, pan, brushSize, brushStrength, getCanvasCoords]);
+  }, [activeTool, pan, brushSize, brushStrength, getCanvasCoords, viewState]);
 
   const handleMouseMove = useCallback((e: React.MouseEvent) => {
     if (isPanning) {
@@ -339,7 +366,7 @@ export function BackgroundRemover() {
         x: e.clientX - panStart.x,
         y: e.clientY - panStart.y,
       });
-    } else if (activeTool === 'crop' && cropStart) {
+    } else if (activeTool === 'crop' && cropStart && viewState === 'processed') {
       const coords = getCanvasCoords(e);
       if (coords) {
         setCropArea({
@@ -349,7 +376,7 @@ export function BackgroundRemover() {
           height: Math.abs(coords.y - cropStart.y),
         });
       }
-    } else if (isDrawing && currentStroke) {
+    } else if (isDrawing && currentStroke && viewState === 'processed') {
       const coords = getCanvasCoords(e);
       if (coords) {
         setCurrentStroke({
@@ -358,7 +385,7 @@ export function BackgroundRemover() {
         });
       }
     }
-  }, [isPanning, panStart, activeTool, cropStart, isDrawing, currentStroke, getCanvasCoords]);
+  }, [isPanning, panStart, activeTool, cropStart, isDrawing, currentStroke, getCanvasCoords, viewState]);
 
   const handleMouseUp = useCallback(() => {
     setIsPanning(false);
@@ -385,69 +412,107 @@ export function BackgroundRemover() {
     }
   }, [activeTool, cropArea, isDrawing, currentStroke, brushStrokes, undoStack]);
 
-  const applyCrop = useCallback(() => {
-    if (!cropArea || !canvasRef.current) return;
+  const applyCrop = useCallback(async () => {
+    if (!cropArea || !processedImage) return;
 
-    const canvas = canvasRef.current;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
+    // Render the current processed image (without overlays) to an offscreen canvas
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
 
-    // Get current canvas content
-    const currentImageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    await new Promise<void>((resolve) => {
+      img.onload = () => resolve();
+      img.onerror = () => resolve();
+      img.src = processedImage;
+    });
 
-    // Create new cropped image data
-    const croppedData = ctx.getImageData(
-      Math.floor(cropArea.x),
-      Math.floor(cropArea.y),
-      Math.floor(cropArea.width),
-      Math.floor(cropArea.height)
-    );
+    if (!img.width || !img.height) return;
 
-    // Update canvas size and draw cropped data
-    canvas.width = Math.floor(cropArea.width);
-    canvas.height = Math.floor(cropArea.height);
-    ctx.putImageData(croppedData, 0, 0);
+    const sourceCanvas = document.createElement('canvas');
+    sourceCanvas.width = img.width;
+    sourceCanvas.height = img.height;
+    const sourceCtx = sourceCanvas.getContext('2d');
+    if (!sourceCtx) return;
+    sourceCtx.drawImage(img, 0, 0);
 
-    // Update the processed image
-    const url = canvas.toDataURL('image/png');
+    const x = Math.floor(cropArea.x);
+    const y = Math.floor(cropArea.y);
+    const w = Math.floor(cropArea.width);
+    const h = Math.floor(cropArea.height);
+    if (w <= 0 || h <= 0) return;
+
+    let croppedData: ImageData;
+    try {
+      croppedData = sourceCtx.getImageData(x, y, w, h);
+    } catch {
+      return;
+    }
+
+    // Update visible canvas to show crop
+    if (canvasRef.current) {
+      const displayCanvas = canvasRef.current;
+      const displayCtx = displayCanvas.getContext('2d');
+      if (displayCtx) {
+        displayCanvas.width = w;
+        displayCanvas.height = h;
+        displayCtx.putImageData(croppedData, 0, 0);
+      }
+    }
+
+    // Create a new data URL from cropped pixels
+    const cropCanvas = document.createElement('canvas');
+    cropCanvas.width = w;
+    cropCanvas.height = h;
+    const cropCtx = cropCanvas.getContext('2d');
+    if (!cropCtx) return;
+    cropCtx.putImageData(croppedData, 0, 0);
+    const url = cropCanvas.toDataURL('image/png');
     setProcessedImage(url);
 
-    // Update image data refs
     processedImageDataRef.current = croppedData;
 
-    // Also update original image data if it exists
+    // Crop original image data to stay aligned
     if (originalImageDataRef.current) {
-      const origCanvas = document.createElement('canvas');
-      origCanvas.width = currentImageData.width;
-      origCanvas.height = currentImageData.height;
-      const origCtx = origCanvas.getContext('2d');
-      if (origCtx) {
-        origCtx.putImageData(currentImageData, 0, 0);
-        const croppedOrig = origCtx.getImageData(
-          Math.floor(cropArea.x),
-          Math.floor(cropArea.y),
-          Math.floor(cropArea.width),
-          Math.floor(cropArea.height)
+      try {
+        const croppedOrig = new ImageData(
+          new Uint8ClampedArray(originalImageDataRef.current.data),
+          originalImageDataRef.current.width,
+          originalImageDataRef.current.height
         );
-        originalImageDataRef.current = croppedOrig;
+        const origCanvas = document.createElement('canvas');
+        origCanvas.width = croppedOrig.width;
+        origCanvas.height = croppedOrig.height;
+        const origCtx = origCanvas.getContext('2d');
+        if (origCtx) {
+          origCtx.putImageData(croppedOrig, 0, 0);
+          originalImageDataRef.current = origCtx.getImageData(x, y, w, h);
+        }
+      } catch {
+        // ignore if out of bounds
       }
     }
 
     setActiveTool('none');
-  }, [cropArea]);
+    setBrushStrokes([]);
+    setUndoStack([]);
+    setRedoStack([]);
+  }, [cropArea, processedImage]);
 
   const applyBrushStrokes = useCallback((strokes: BrushStroke[]) => {
-    if (!processedImageDataRef.current || !originalImageDataRef.current || !workingCanvasRef.current) return;
+    if (!processedImageDataRef.current || !originalImageDataRef.current || !workingCanvasRef.current) {
+      console.error('Missing image data or canvas for brush strokes');
+      return;
+    }
 
     const canvas = workingCanvasRef.current;
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    // Start with a copy of the processed image
+    // Start with a fresh copy of the original processed image (without any previous strokes)
+    const baseImageData = processedImageDataRef.current;
     const workingData = new ImageData(
-      new Uint8ClampedArray(processedImageDataRef.current.data),
-      processedImageDataRef.current.width,
-      processedImageDataRef.current.height
+      new Uint8ClampedArray(baseImageData.data),
+      baseImageData.width,
+      baseImageData.height
     );
 
     // Apply each stroke
@@ -479,14 +544,20 @@ export function BackgroundRemover() {
               const alpha = (1 - dist / stroke.size) * (stroke.strength / 100);
 
               if (stroke.type === 'restore') {
-                // Restore from original
-                const origIdx = idx;
-                workingData.data[idx] = Math.round(workingData.data[idx] * (1 - alpha) + originalImageDataRef.current!.data[origIdx] * alpha);
-                workingData.data[idx + 1] = Math.round(workingData.data[idx + 1] * (1 - alpha) + originalImageDataRef.current!.data[origIdx + 1] * alpha);
-                workingData.data[idx + 2] = Math.round(workingData.data[idx + 2] * (1 - alpha) + originalImageDataRef.current!.data[origIdx + 2] * alpha);
-                workingData.data[idx + 3] = Math.round(workingData.data[idx + 3] * (1 - alpha) + originalImageDataRef.current!.data[origIdx + 3] * alpha);
+                // Restore from original - blend the original image back in
+                if (originalImageDataRef.current) {
+                  const origR = originalImageDataRef.current.data[idx];
+                  const origG = originalImageDataRef.current.data[idx + 1];
+                  const origB = originalImageDataRef.current.data[idx + 2];
+                  const origA = originalImageDataRef.current.data[idx + 3];
+
+                  workingData.data[idx] = Math.round(workingData.data[idx] * (1 - alpha) + origR * alpha);
+                  workingData.data[idx + 1] = Math.round(workingData.data[idx + 1] * (1 - alpha) + origG * alpha);
+                  workingData.data[idx + 2] = Math.round(workingData.data[idx + 2] * (1 - alpha) + origB * alpha);
+                  workingData.data[idx + 3] = Math.round(workingData.data[idx + 3] * (1 - alpha) + origA * alpha);
+                }
               } else {
-                // Erase (make transparent)
+                // Erase - reduce alpha channel only
                 workingData.data[idx + 3] = Math.round(workingData.data[idx + 3] * (1 - alpha));
               }
             }
@@ -502,9 +573,6 @@ export function BackgroundRemover() {
     // Update processed image
     const url = canvas.toDataURL('image/png');
     setProcessedImage(url);
-
-    // Update the image data ref to include the brush changes
-    processedImageDataRef.current = workingData;
   }, []);
 
   const handleUndo = useCallback(() => {
@@ -589,7 +657,6 @@ export function BackgroundRemover() {
   const handleReset = useCallback(() => {
     setOriginalImage(null);
     setProcessedImage(null);
-    setProcessedBlob(null);
     setError(null);
     setViewState('original');
     setSwipePosition(0);
@@ -797,18 +864,16 @@ export function BackgroundRemover() {
 
                 {viewState === 'comparing' && processedImage && (
                   <div className="relative">
-                    <div className="relative">
-                      <img
-                        src={originalImage}
-                        alt="Original"
-                        style={{
-                          width: `${zoom}%`,
-                          imageRendering: zoom > 100 ? 'pixelated' : 'auto',
-                        }}
-                        className="object-contain max-w-none"
-                        crossOrigin="anonymous"
-                      />
-                    </div>
+                    <img
+                      src={originalImage}
+                      alt="Original"
+                      style={{
+                        width: `${zoom}%`,
+                        imageRendering: zoom > 100 ? 'pixelated' : 'auto',
+                      }}
+                      className="object-contain max-w-none"
+                      crossOrigin="anonymous"
+                    />
 
                     <div
                       className="absolute inset-0 overflow-hidden bg-[repeating-conic-gradient(#e5e7eb_0%_25%,white_0%_50%)] bg-[length:20px_20px] rounded-lg"
@@ -1071,7 +1136,6 @@ export function BackgroundRemover() {
       </div>
 
       <canvas ref={workingCanvasRef} className="hidden" />
-      <canvas ref={maskCanvasRef} className="hidden" />
     </div>
   );
 }
