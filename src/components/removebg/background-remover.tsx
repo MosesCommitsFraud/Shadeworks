@@ -234,20 +234,38 @@ export function BackgroundRemover() {
   }, []);
 
   const handleFitToScreen = useCallback(() => {
-    if (!canvasRef.current || !containerRef.current) return;
+    if (!containerRef.current) return;
 
     const containerWidth = containerRef.current.clientWidth;
     const containerHeight = containerRef.current.clientHeight;
-    const imageWidth = canvasRef.current.width;
-    const imageHeight = canvasRef.current.height;
 
-    const scaleX = (containerWidth * 0.9) / imageWidth;
-    const scaleY = (containerHeight * 0.9) / imageHeight;
+    let imageWidth = 0;
+    let imageHeight = 0;
+
+    if (viewState === 'processed' && processedImageDataRef.current) {
+      imageWidth = processedImageDataRef.current.width;
+      imageHeight = processedImageDataRef.current.height;
+    } else if (originalImageDataRef.current) {
+      imageWidth = originalImageDataRef.current.width;
+      imageHeight = originalImageDataRef.current.height;
+    } else if (canvasRef.current) {
+      imageWidth = canvasRef.current.width;
+      imageHeight = canvasRef.current.height;
+    }
+
+    if (!imageWidth || !imageHeight) return;
+
+    const margin = 0.98;
+    const scaleX = (containerWidth * margin) / imageWidth;
+    const scaleY = (containerHeight * margin) / imageHeight;
     const scale = Math.min(scaleX, scaleY);
 
-    setZoom(Math.round(scale * 100));
+    // zoom is interpreted as % of container width in our CSS,
+    // so convert desired pixel scale into that space.
+    const cssZoom = (imageWidth * scale / containerWidth) * 100;
+    setZoom(Math.round(cssZoom));
     setPan({ x: 0, y: 0 });
-  }, []);
+  }, [viewState]);
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -277,51 +295,55 @@ export function BackgroundRemover() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [handleZoomIn, handleZoomOut, handleFitToScreen]);
 
-  // Wheel handling: pinch/ctrl+wheel zooms, two-finger scroll pans
+  // Wheel handling: pinch/ctrl+wheel zooms, two-finger scroll pans.
+  // Use native non-passive listener so browser doesn't zoom/back-swipe.
+  const handleWheelNative = useCallback((e: WheelEvent) => {
+    const container = containerRef.current;
+    if (!container) return;
+
+    // Always prevent default to avoid scroll chaining / history swipe
+    e.preventDefault();
+
+    if (e.ctrlKey || e.metaKey) {
+      const rect = container.getBoundingClientRect();
+      const mouseX = e.clientX - rect.left;
+      const mouseY = e.clientY - rect.top;
+
+      const delta = e.deltaY > 0 ? 0.9 : 1.1;
+      const prevZoom = zoom;
+      const newZoom = Math.max(25, Math.min(1000, prevZoom * delta));
+
+      const centerX = rect.width / 2;
+      const centerY = rect.height / 2;
+
+      const offsetX = mouseX - centerX;
+      const offsetY = mouseY - centerY;
+
+      const scaleFactor = newZoom / prevZoom - 1;
+      setPan((prevPan) => ({
+        x: prevPan.x - offsetX * scaleFactor,
+        y: prevPan.y - offsetY * scaleFactor,
+      }));
+
+      setZoom(newZoom);
+    } else {
+      setPan((prev) => ({
+        x: prev.x - e.deltaX,
+        y: prev.y - e.deltaY,
+      }));
+    }
+  }, [zoom]);
+
   useEffect(() => {
     const container = containerRef.current;
     if (!container) return;
 
-    const handleWheel = (e: WheelEvent) => {
-      // Ctrl+Scroll or pinch-to-zoom (two-finger trackpad)
-      if (e.ctrlKey || e.metaKey) {
-        e.preventDefault();
-
-        const rect = container.getBoundingClientRect();
-        const mouseX = e.clientX - rect.left;
-        const mouseY = e.clientY - rect.top;
-
-        const delta = e.deltaY > 0 ? 0.9 : 1.1;
-        const prevZoom = zoom;
-        const newZoom = Math.max(25, Math.min(1000, prevZoom * delta));
-
-        // Zoom towards mouse position
-        const centerX = rect.width / 2;
-        const centerY = rect.height / 2;
-
-        const offsetX = mouseX - centerX;
-        const offsetY = mouseY - centerY;
-
-        const scaleFactor = newZoom / prevZoom - 1;
-        setPan((prevPan) => ({
-          x: prevPan.x - offsetX * scaleFactor,
-          y: prevPan.y - offsetY * scaleFactor,
-        }));
-
-        setZoom(newZoom);
-      } else {
-        // Regular scroll for panning
-        e.preventDefault();
-        setPan((prev) => ({
-          x: prev.x - e.deltaX,
-          y: prev.y - e.deltaY,
-        }));
-      }
+    container.addEventListener('wheel', handleWheelNative, { passive: false });
+    return () => {
+      container.removeEventListener('wheel', handleWheelNative);
     };
-
-    container.addEventListener('wheel', handleWheel, { passive: false });
-    return () => container.removeEventListener('wheel', handleWheel);
-  }, [zoom]);
+    // Re-run when the preview container mounts/changes.
+  }, [handleWheelNative, originalImage, processedImage, viewState]);
 
   // Get canvas coordinates from mouse event
   const getCanvasCoords = useCallback((e: React.MouseEvent): { x: number; y: number } | null => {
@@ -907,8 +929,8 @@ export function BackgroundRemover() {
             {/* Main Preview Area */}
             <div
               ref={containerRef}
-              className="flex-1 overflow-hidden flex items-center justify-center bg-background relative"
-              style={{ cursor: getCursor() }}
+              className="flex-1 overflow-hidden flex items-center justify-center bg-background relative overscroll-none touch-none"
+              style={{ cursor: getCursor(), overscrollBehavior: 'none', touchAction: 'none' }}
               onMouseDown={handleMouseDown}
               onMouseMove={handleMouseMove}
               onMouseUp={handleMouseUp}
@@ -1076,7 +1098,7 @@ export function BackgroundRemover() {
                             variant="outline"
                             size="sm"
                             onClick={handleUndo}
-                            disabled={undoStack.length === 0}
+                            disabled={undoStack.length === 0 && imageUndoStack.length === 0}
                             className="flex-1"
                           >
                             <Undo className="w-4 h-4" />
@@ -1085,7 +1107,7 @@ export function BackgroundRemover() {
                             variant="outline"
                             size="sm"
                             onClick={handleRedo}
-                            disabled={redoStack.length === 0}
+                            disabled={redoStack.length === 0 && imageRedoStack.length === 0}
                             className="flex-1"
                           >
                             <Redo className="w-4 h-4" />
