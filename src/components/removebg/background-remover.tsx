@@ -42,7 +42,7 @@ export function BackgroundRemover() {
   const [brushSize, setBrushSize] = useState<number>(50);
   const [brushStrength, setBrushStrength] = useState<number>(100);
   const [isDrawing, setIsDrawing] = useState(false);
-  const [brushStrokes, setBrushStrokes] = useState<BrushStroke[]>();
+  const [brushStrokes, setBrushStrokes] = useState<BrushStroke[]>([]);
   const [currentStroke, setCurrentStroke] = useState<BrushStroke | null>(null);
   const [undoStack, setUndoStack] = useState<BrushStroke[][]>([]);
   const [redoStack, setRedoStack] = useState<BrushStroke[][]>([]);
@@ -54,10 +54,10 @@ export function BackgroundRemover() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
-  const imgRef = useRef<HTMLImageElement>(null);
   const workingCanvasRef = useRef<HTMLCanvasElement>(null);
   const originalImageDataRef = useRef<ImageData | null>(null);
   const processedImageDataRef = useRef<ImageData | null>(null);
+  const maskCanvasRef = useRef<HTMLCanvasElement>(null);
 
   const convertImageToPNG = useCallback(async (file: File): Promise<string> => {
     return new Promise((resolve, reject) => {
@@ -297,30 +297,41 @@ export function BackgroundRemover() {
     return () => container.removeEventListener('wheel', handleWheel);
   }, [zoom]);
 
+  // Get canvas coordinates from mouse event
+  const getCanvasCoords = useCallback((e: React.MouseEvent): { x: number; y: number } | null => {
+    if (!canvasRef.current) return null;
+
+    const rect = canvasRef.current.getBoundingClientRect();
+    const x = (e.clientX - rect.left) * (canvasRef.current.width / rect.width);
+    const y = (e.clientY - rect.top) * (canvasRef.current.height / rect.height);
+
+    return { x, y };
+  }, []);
+
   // Pan handlers
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
     if (activeTool === 'none' || e.button === 1) {
       setIsPanning(true);
       setPanStart({ x: e.clientX - pan.x, y: e.clientY - pan.y });
-    } else if (activeTool === 'crop' && canvasRef.current) {
-      const rect = canvasRef.current.getBoundingClientRect();
-      const x = (e.clientX - rect.left) / (zoom / 100);
-      const y = (e.clientY - rect.top) / (zoom / 100);
-      setCropStart({ x, y });
-      setCropArea({ x, y, width: 0, height: 0 });
-    } else if ((activeTool === 'brush' || activeTool === 'erase') && canvasRef.current) {
-      const rect = canvasRef.current.getBoundingClientRect();
-      const x = (e.clientX - rect.left) / (zoom / 100);
-      const y = (e.clientY - rect.top) / (zoom / 100);
-      setIsDrawing(true);
-      setCurrentStroke({
-        points: [{ x, y }],
-        size: brushSize,
-        strength: brushStrength,
-        type: activeTool === 'brush' ? 'restore' : 'erase',
-      });
+    } else if (activeTool === 'crop') {
+      const coords = getCanvasCoords(e);
+      if (coords) {
+        setCropStart(coords);
+        setCropArea({ ...coords, width: 0, height: 0 });
+      }
+    } else if (activeTool === 'brush' || activeTool === 'erase') {
+      const coords = getCanvasCoords(e);
+      if (coords) {
+        setIsDrawing(true);
+        setCurrentStroke({
+          points: [coords],
+          size: brushSize,
+          strength: brushStrength,
+          type: activeTool === 'brush' ? 'restore' : 'erase',
+        });
+      }
     }
-  }, [activeTool, pan, zoom, brushSize, brushStrength]);
+  }, [activeTool, pan, brushSize, brushStrength, getCanvasCoords]);
 
   const handleMouseMove = useCallback((e: React.MouseEvent) => {
     if (isPanning) {
@@ -328,71 +339,100 @@ export function BackgroundRemover() {
         x: e.clientX - panStart.x,
         y: e.clientY - panStart.y,
       });
-    } else if (activeTool === 'crop' && cropStart && canvasRef.current) {
-      const rect = canvasRef.current.getBoundingClientRect();
-      const x = (e.clientX - rect.left) / (zoom / 100);
-      const y = (e.clientY - rect.top) / (zoom / 100);
-      setCropArea({
-        x: Math.min(cropStart.x, x),
-        y: Math.min(cropStart.y, y),
-        width: Math.abs(x - cropStart.x),
-        height: Math.abs(y - cropStart.y),
-      });
-    } else if (isDrawing && currentStroke && canvasRef.current) {
-      const rect = canvasRef.current.getBoundingClientRect();
-      const x = (e.clientX - rect.left) / (zoom / 100);
-      const y = (e.clientY - rect.top) / (zoom / 100);
-      setCurrentStroke({
-        ...currentStroke,
-        points: [...currentStroke.points, { x, y }],
-      });
+    } else if (activeTool === 'crop' && cropStart) {
+      const coords = getCanvasCoords(e);
+      if (coords) {
+        setCropArea({
+          x: Math.min(cropStart.x, coords.x),
+          y: Math.min(cropStart.y, coords.y),
+          width: Math.abs(coords.x - cropStart.x),
+          height: Math.abs(coords.y - cropStart.y),
+        });
+      }
+    } else if (isDrawing && currentStroke) {
+      const coords = getCanvasCoords(e);
+      if (coords) {
+        setCurrentStroke({
+          ...currentStroke,
+          points: [...currentStroke.points, coords],
+        });
+      }
     }
-  }, [isPanning, panStart, activeTool, cropStart, zoom, isDrawing, currentStroke]);
+  }, [isPanning, panStart, activeTool, cropStart, isDrawing, currentStroke, getCanvasCoords]);
 
   const handleMouseUp = useCallback(() => {
     setIsPanning(false);
 
-    if (activeTool === 'crop' && cropArea) {
-      // Apply crop
+    if (activeTool === 'crop' && cropArea && cropArea.width > 0 && cropArea.height > 0) {
       applyCrop();
       setCropStart(null);
+      setCropArea(null);
     }
 
-    if (isDrawing && currentStroke) {
-      const newStrokes = [...(brushStrokes || []), currentStroke];
+    if (isDrawing && currentStroke && currentStroke.points.length > 1) {
+      const newStrokes = [...brushStrokes, currentStroke];
       setBrushStrokes(newStrokes);
-      setUndoStack([...(undoStack || []), brushStrokes || []]);
+      setUndoStack([...undoStack, brushStrokes]);
       setRedoStack([]);
       setCurrentStroke(null);
       setIsDrawing(false);
 
       // Apply the stroke to the canvas
       applyBrushStrokes(newStrokes);
+    } else {
+      setCurrentStroke(null);
+      setIsDrawing(false);
     }
   }, [activeTool, cropArea, isDrawing, currentStroke, brushStrokes, undoStack]);
 
   const applyCrop = useCallback(() => {
-    if (!cropArea || !canvasRef.current || !processedImageDataRef.current) return;
+    if (!cropArea || !canvasRef.current) return;
 
     const canvas = canvasRef.current;
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
+    // Get current canvas content
+    const currentImageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+
     // Create new cropped image data
     const croppedData = ctx.getImageData(
-      cropArea.x,
-      cropArea.y,
-      cropArea.width,
-      cropArea.height
+      Math.floor(cropArea.x),
+      Math.floor(cropArea.y),
+      Math.floor(cropArea.width),
+      Math.floor(cropArea.height)
     );
 
-    // Update canvas size
-    canvas.width = cropArea.width;
-    canvas.height = cropArea.height;
+    // Update canvas size and draw cropped data
+    canvas.width = Math.floor(cropArea.width);
+    canvas.height = Math.floor(cropArea.height);
     ctx.putImageData(croppedData, 0, 0);
 
+    // Update the processed image
+    const url = canvas.toDataURL('image/png');
+    setProcessedImage(url);
+
+    // Update image data refs
     processedImageDataRef.current = croppedData;
-    setCropArea(null);
+
+    // Also update original image data if it exists
+    if (originalImageDataRef.current) {
+      const origCanvas = document.createElement('canvas');
+      origCanvas.width = currentImageData.width;
+      origCanvas.height = currentImageData.height;
+      const origCtx = origCanvas.getContext('2d');
+      if (origCtx) {
+        origCtx.putImageData(currentImageData, 0, 0);
+        const croppedOrig = origCtx.getImageData(
+          Math.floor(cropArea.x),
+          Math.floor(cropArea.y),
+          Math.floor(cropArea.width),
+          Math.floor(cropArea.height)
+        );
+        originalImageDataRef.current = croppedOrig;
+      }
+    }
+
     setActiveTool('none');
   }, [cropArea]);
 
@@ -403,7 +443,7 @@ export function BackgroundRemover() {
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    // Start with processed image
+    // Start with a copy of the processed image
     const workingData = new ImageData(
       new Uint8ClampedArray(processedImageDataRef.current.data),
       processedImageDataRef.current.width,
@@ -412,19 +452,15 @@ export function BackgroundRemover() {
 
     // Apply each stroke
     strokes.forEach((stroke) => {
-      const sourceData = stroke.type === 'restore'
-        ? originalImageDataRef.current!.data
-        : processedImageDataRef.current!.data;
-
       stroke.points.forEach((point, i) => {
         if (i === 0) return;
 
         const prevPoint = stroke.points[i - 1];
         const distance = Math.hypot(point.x - prevPoint.x, point.y - prevPoint.y);
-        const steps = Math.max(1, Math.floor(distance));
+        const steps = Math.max(1, Math.ceil(distance / 2));
 
         for (let step = 0; step <= steps; step++) {
-          const t = step / steps;
+          const t = steps > 0 ? step / steps : 0;
           const x = Math.round(prevPoint.x + (point.x - prevPoint.x) * t);
           const y = Math.round(prevPoint.y + (point.y - prevPoint.y) * t);
 
@@ -444,13 +480,14 @@ export function BackgroundRemover() {
 
               if (stroke.type === 'restore') {
                 // Restore from original
-                workingData.data[idx] = workingData.data[idx] * (1 - alpha) + sourceData[idx] * alpha;
-                workingData.data[idx + 1] = workingData.data[idx + 1] * (1 - alpha) + sourceData[idx + 1] * alpha;
-                workingData.data[idx + 2] = workingData.data[idx + 2] * (1 - alpha) + sourceData[idx + 2] * alpha;
-                workingData.data[idx + 3] = workingData.data[idx + 3] * (1 - alpha) + sourceData[idx + 3] * alpha;
+                const origIdx = idx;
+                workingData.data[idx] = Math.round(workingData.data[idx] * (1 - alpha) + originalImageDataRef.current!.data[origIdx] * alpha);
+                workingData.data[idx + 1] = Math.round(workingData.data[idx + 1] * (1 - alpha) + originalImageDataRef.current!.data[origIdx + 1] * alpha);
+                workingData.data[idx + 2] = Math.round(workingData.data[idx + 2] * (1 - alpha) + originalImageDataRef.current!.data[origIdx + 2] * alpha);
+                workingData.data[idx + 3] = Math.round(workingData.data[idx + 3] * (1 - alpha) + originalImageDataRef.current!.data[origIdx + 3] * alpha);
               } else {
                 // Erase (make transparent)
-                workingData.data[idx + 3] = workingData.data[idx + 3] * (1 - alpha);
+                workingData.data[idx + 3] = Math.round(workingData.data[idx + 3] * (1 - alpha));
               }
             }
           }
@@ -465,76 +502,71 @@ export function BackgroundRemover() {
     // Update processed image
     const url = canvas.toDataURL('image/png');
     setProcessedImage(url);
+
+    // Update the image data ref to include the brush changes
+    processedImageDataRef.current = workingData;
   }, []);
 
   const handleUndo = useCallback(() => {
-    if (!undoStack || undoStack.length === 0) return;
+    if (undoStack.length === 0) return;
 
     const newUndoStack = [...undoStack];
     const prevState = newUndoStack.pop()!;
     setUndoStack(newUndoStack);
-    setRedoStack([...(redoStack || []), brushStrokes || []]);
+    setRedoStack([...redoStack, brushStrokes]);
     setBrushStrokes(prevState);
     applyBrushStrokes(prevState);
   }, [undoStack, redoStack, brushStrokes, applyBrushStrokes]);
 
   const handleRedo = useCallback(() => {
-    if (!redoStack || redoStack.length === 0) return;
+    if (redoStack.length === 0) return;
 
     const newRedoStack = [...redoStack];
     const nextState = newRedoStack.pop()!;
     setRedoStack(newRedoStack);
-    setUndoStack([...(undoStack || []), brushStrokes || []]);
+    setUndoStack([...undoStack, brushStrokes]);
     setBrushStrokes(nextState);
     applyBrushStrokes(nextState);
   }, [redoStack, undoStack, brushStrokes, applyBrushStrokes]);
 
   const downloadImage = useCallback(async () => {
-    if (!processedBlob || !canvasRef.current) return;
+    if (!canvasRef.current) return;
 
     const format = selectedFormat;
     const scale = selectedScale;
     const quality = format === 'jpg' ? jpgQuality / 100 : format === 'webp' ? webpQuality / 100 : 1;
 
     try {
-      const img = new Image();
-      const blobUrl = URL.createObjectURL(processedBlob);
+      const sourceCanvas = canvasRef.current;
+      const canvas = document.createElement('canvas');
+      canvas.width = sourceCanvas.width * scale;
+      canvas.height = sourceCanvas.height * scale;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return;
 
-      img.onload = () => {
-        const canvas = document.createElement('canvas');
-        canvas.width = img.width * scale;
-        canvas.height = img.height * scale;
-        const ctx = canvas.getContext('2d');
-        if (!ctx) return;
+      if (format === 'jpg') {
+        ctx.fillStyle = '#FFFFFF';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+      }
 
-        if (format === 'jpg') {
-          ctx.fillStyle = '#FFFFFF';
-          ctx.fillRect(0, 0, canvas.width, canvas.height);
-        }
+      ctx.drawImage(sourceCanvas, 0, 0, canvas.width, canvas.height);
 
-        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-
-        canvas.toBlob((blob) => {
-          if (!blob) return;
-          const link = document.createElement('a');
-          link.href = URL.createObjectURL(blob);
-          const scaleSuffix = scale !== 1 ? `_${scale}x` : '';
-          link.download = `no-background${scaleSuffix}.${format}`;
-          document.body.appendChild(link);
-          link.click();
-          document.body.removeChild(link);
-          URL.revokeObjectURL(link.href);
-        }, `image/${format === 'jpg' ? 'jpeg' : format}`, quality);
-
-        URL.revokeObjectURL(blobUrl);
-      };
-
-      img.src = blobUrl;
+      canvas.toBlob((blob) => {
+        if (!blob) return;
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        const scaleSuffix = scale !== 1 ? `_${scale}x` : '';
+        link.download = `no-background${scaleSuffix}.${format}`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(link.href);
+      }, `image/${format === 'jpg' ? 'jpeg' : format}`, quality);
     } catch (err) {
       console.error('Download failed:', err);
       setError('Failed to download image');
     }
-  }, [processedBlob, selectedFormat, selectedScale, jpgQuality, webpQuality]);
+  }, [selectedFormat, selectedScale, jpgQuality, webpQuality]);
 
   const handleDrop = useCallback((e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
@@ -585,16 +617,17 @@ export function BackgroundRemover() {
       img.onload = () => {
         canvas.width = img.width;
         canvas.height = img.height;
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
         ctx.drawImage(img, 0, 0);
 
         // Draw current stroke preview
-        if (currentStroke) {
+        if (currentStroke && currentStroke.points.length > 0) {
           ctx.save();
           currentStroke.points.forEach((point, i) => {
             if (i === 0) return;
             const prevPoint = currentStroke.points[i - 1];
 
-            ctx.strokeStyle = currentStroke.type === 'restore' ? 'rgba(0, 255, 0, 0.3)' : 'rgba(255, 0, 0, 0.3)';
+            ctx.strokeStyle = currentStroke.type === 'restore' ? 'rgba(0, 255, 0, 0.5)' : 'rgba(255, 0, 0, 0.5)';
             ctx.lineWidth = currentStroke.size * 2;
             ctx.lineCap = 'round';
             ctx.lineJoin = 'round';
@@ -614,14 +647,14 @@ export function BackgroundRemover() {
           ctx.fillRect(0, 0, canvas.width, canvas.height);
           ctx.clearRect(cropArea.x, cropArea.y, cropArea.width, cropArea.height);
           ctx.strokeStyle = '#3b82f6';
-          ctx.lineWidth = 2;
+          ctx.lineWidth = 2 / (zoom / 100);
           ctx.strokeRect(cropArea.x, cropArea.y, cropArea.width, cropArea.height);
           ctx.restore();
         }
       };
       img.src = processedImage;
     }
-  }, [viewState, processedImage, currentStroke, cropArea, activeTool]);
+  }, [viewState, processedImage, currentStroke, cropArea, activeTool, zoom]);
 
   const getCursor = () => {
     if (activeTool === 'crop') return 'crosshair';
@@ -725,30 +758,29 @@ export function BackgroundRemover() {
             {/* Main Preview Area */}
             <div
               ref={containerRef}
-              className="flex-1 overflow-hidden flex items-center justify-center p-8 bg-background"
+              className="flex-1 overflow-hidden flex items-center justify-center bg-background relative"
               style={{ cursor: getCursor() }}
               onMouseDown={handleMouseDown}
               onMouseMove={handleMouseMove}
               onMouseUp={handleMouseUp}
               onMouseLeave={handleMouseUp}
             >
-              <div className="relative w-full h-full flex items-center justify-center">
+              <div
+                className="absolute inset-0 flex items-center justify-center"
+                style={{
+                  transform: `translate(${pan.x}px, ${pan.y}px)`,
+                }}
+              >
                 {viewState === 'original' && (
-                  <div
-                    className="relative"
-                    style={{
-                      transform: `translate(${pan.x}px, ${pan.y}px)`,
-                    }}
-                  >
+                  <div className="relative">
                     <img
-                      ref={imgRef}
                       src={originalImage}
                       alt="Original"
                       style={{
                         width: `${zoom}%`,
                         imageRendering: zoom > 100 ? 'pixelated' : 'auto',
                       }}
-                      className="object-contain"
+                      className="object-contain max-w-none"
                       crossOrigin="anonymous"
                     />
                     {!processedImage && !isProcessing && (
@@ -764,12 +796,7 @@ export function BackgroundRemover() {
                 )}
 
                 {viewState === 'comparing' && processedImage && (
-                  <div
-                    className="relative"
-                    style={{
-                      transform: `translate(${pan.x}px, ${pan.y}px)`,
-                    }}
-                  >
+                  <div className="relative">
                     <div className="relative">
                       <img
                         src={originalImage}
@@ -778,7 +805,7 @@ export function BackgroundRemover() {
                           width: `${zoom}%`,
                           imageRendering: zoom > 100 ? 'pixelated' : 'auto',
                         }}
-                        className="object-contain"
+                        className="object-contain max-w-none"
                         crossOrigin="anonymous"
                       />
                     </div>
@@ -796,7 +823,7 @@ export function BackgroundRemover() {
                           width: `${zoom}%`,
                           imageRendering: zoom > 100 ? 'pixelated' : 'auto',
                         }}
-                        className="object-contain"
+                        className="object-contain max-w-none"
                       />
                     </div>
 
@@ -815,39 +842,33 @@ export function BackgroundRemover() {
                 )}
 
                 {viewState === 'processed' && processedImage && (
-                  <div
-                    className="relative"
+                  <canvas
+                    ref={canvasRef}
                     style={{
-                      transform: `translate(${pan.x}px, ${pan.y}px)`,
+                      width: `${zoom}%`,
+                      imageRendering: zoom > 100 ? 'pixelated' : 'auto',
+                      background: 'repeating-conic-gradient(#e5e7eb 0% 25%, white 0% 50%) 50% / 20px 20px',
+                      maxWidth: 'none',
                     }}
-                  >
-                    <canvas
-                      ref={canvasRef}
-                      style={{
-                        width: `${zoom}%`,
-                        imageRendering: zoom > 100 ? 'pixelated' : 'auto',
-                        background: 'repeating-conic-gradient(#e5e7eb 0% 25%, white 0% 50%) 50% / 20px 20px',
-                      }}
-                      className="rounded-lg shadow-lg"
-                    />
-                  </div>
-                )}
-
-                {isProcessing && (
-                  <div className="absolute inset-0 flex items-center justify-center bg-background/50 backdrop-blur-sm">
-                    <div className="flex flex-col items-center gap-4 bg-card px-8 py-6 rounded-lg border border-border shadow-xl">
-                      <div className="w-8 h-8 border-4 border-accent border-t-transparent rounded-full animate-spin" />
-                      <span className="font-medium text-lg">{progress || 'Processing image...'}</span>
-                    </div>
-                  </div>
-                )}
-
-                {error && (
-                  <div className="absolute bottom-8 left-1/2 -translate-x-1/2 bg-destructive/10 border border-destructive text-destructive px-6 py-3 rounded-lg max-w-md">
-                    {error}
-                  </div>
+                    className="rounded-lg shadow-lg"
+                  />
                 )}
               </div>
+
+              {isProcessing && (
+                <div className="absolute inset-0 flex items-center justify-center bg-background/80 backdrop-blur-md z-50">
+                  <div className="flex flex-col items-center gap-4 bg-card px-8 py-6 rounded-lg border border-border shadow-xl">
+                    <div className="w-8 h-8 border-4 border-accent border-t-transparent rounded-full animate-spin" />
+                    <span className="font-medium text-lg">{progress || 'Processing image...'}</span>
+                  </div>
+                </div>
+              )}
+
+              {error && (
+                <div className="absolute bottom-8 left-1/2 -translate-x-1/2 bg-destructive/10 border border-destructive text-destructive px-6 py-3 rounded-lg max-w-md z-50">
+                  {error}
+                </div>
+              )}
             </div>
 
             {/* Right Sidebar - Controls */}
@@ -900,7 +921,7 @@ export function BackgroundRemover() {
                             variant="outline"
                             size="sm"
                             onClick={handleUndo}
-                            disabled={!undoStack || undoStack.length === 0}
+                            disabled={undoStack.length === 0}
                             className="flex-1"
                           >
                             <Undo className="w-4 h-4" />
@@ -909,7 +930,7 @@ export function BackgroundRemover() {
                             variant="outline"
                             size="sm"
                             onClick={handleRedo}
-                            disabled={!redoStack || redoStack.length === 0}
+                            disabled={redoStack.length === 0}
                             className="flex-1"
                           >
                             <Redo className="w-4 h-4" />
@@ -1050,6 +1071,7 @@ export function BackgroundRemover() {
       </div>
 
       <canvas ref={workingCanvasRef} className="hidden" />
+      <canvas ref={maskCanvasRef} className="hidden" />
     </div>
   );
 }
