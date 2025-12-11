@@ -164,36 +164,43 @@ export function generateLayerThumbnail(
   height: number = 40
 ): string {
   try {
+    // Simple placeholder for now - just return a colored rectangle based on layer type
     const tempCanvas = document.createElement('canvas');
     tempCanvas.width = width;
     tempCanvas.height = height;
+    const ctx = tempCanvas.getContext('2d');
 
-    const objWidth = (obj.width || 0) * (obj.scaleX || 1);
-    const objHeight = (obj.height || 0) * (obj.scaleY || 1);
-    const scale = Math.min(width / objWidth, height / objHeight);
+    if (!ctx) return '';
 
-    const fabricCanvas = new fabric.StaticCanvas(tempCanvas, {
-      width,
-      height,
-      backgroundColor: 'transparent',
-    });
+    // Draw a simple representation based on layer type
+    const type = obj.type;
+    ctx.fillStyle = '#f0f0f0';
+    ctx.fillRect(0, 0, width, height);
 
-    obj.clone((cloned: any) => {
-      cloned.set({
-        left: width / 2,
-        top: height / 2,
-        scaleX: (obj.scaleX || 1) * scale * 0.8,
-        scaleY: (obj.scaleY || 1) * scale * 0.8,
-        originX: 'center',
-        originY: 'center',
-      });
+    // Draw type icon
+    ctx.fillStyle = '#666';
+    ctx.font = '20px Arial';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
 
-      fabricCanvas.add(cloned);
-      fabricCanvas.renderAll();
-    });
+    if (type === 'image' || type === 'FabricImage') {
+      ctx.fillText('🖼️', width / 2, height / 2);
+    } else if (type === 'text' || type === 'i-text' || type === 'textbox') {
+      ctx.fillText('T', width / 2, height / 2);
+    } else if (type === 'rect') {
+      ctx.strokeStyle = '#666';
+      ctx.strokeRect(10, 10, 20, 20);
+    } else if (type === 'circle') {
+      ctx.beginPath();
+      ctx.arc(width / 2, height / 2, 10, 0, Math.PI * 2);
+      ctx.stroke();
+    } else if (type === 'path') {
+      ctx.fillText('✏️', width / 2, height / 2);
+    } else {
+      ctx.fillText('▢', width / 2, height / 2);
+    }
 
-    const dataUrl = fabricCanvas.toDataURL({ format: 'png', quality: 0.8, multiplier: 1 });
-    return dataUrl;
+    return tempCanvas.toDataURL('image/png');
   } catch (error) {
     console.error('Error generating thumbnail:', error);
     return '';

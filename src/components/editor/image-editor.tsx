@@ -18,7 +18,7 @@ import {
   selectLayer,
   generateLayerThumbnail,
 } from '@/lib/editor/layers';
-import { loadImage, generateLayerId, centerObject } from '@/lib/editor/fabric-helpers';
+import { loadImage, generateLayerId } from '@/lib/editor/fabric-helpers';
 import type { Tool, Layer, ToolSettings } from '@/lib/editor/types';
 
 const DEFAULT_TOOL_SETTINGS: ToolSettings = {
@@ -146,15 +146,19 @@ export function ImageEditor() {
 
           // Scale image to fit canvas if too large
           const maxDim = 800;
-          const scale = Math.min(
-            1,
-            maxDim / (img.width || 1),
-            maxDim / (img.height || 1)
-          );
-          img.scale(scale);
+          const imgWidth = img.width || 1;
+          const imgHeight = img.height || 1;
+          const scale = Math.min(1, maxDim / imgWidth, maxDim / imgHeight);
 
-          centerObject(canvasRef.current, img);
+          img.scale(scale);
+          img.set({
+            left: 100,
+            top: 100,
+          });
+
           canvasRef.current.add(img);
+          canvasRef.current.setActiveObject(img);
+          canvasRef.current.requestRenderAll();
         }
 
         canvasRef.current.requestRenderAll();

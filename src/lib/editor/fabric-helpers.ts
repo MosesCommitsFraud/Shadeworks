@@ -19,6 +19,11 @@ export function initializeCanvas(
     renderOnAddRemove: true,
   });
 
+  // Force initial render
+  setTimeout(() => {
+    canvas.requestRenderAll();
+  }, 0);
+
   return canvas;
 }
 
