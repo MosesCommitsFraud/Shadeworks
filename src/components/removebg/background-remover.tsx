@@ -29,6 +29,7 @@ export function BackgroundRemover() {
   const [webpQuality, setWebpQuality] = useState<number>(90);
   const [viewState, setViewState] = useState<ViewState>('original');
   const [swipePosition, setSwipePosition] = useState(0);
+  const [displaySize, setDisplaySize] = useState<{ width: number; height: number } | null>(null);
 
   // Zoom and pan state
   const [zoom, setZoom] = useState<number>(100);
@@ -69,6 +70,36 @@ export function BackgroundRemover() {
       workingCanvasRef.current = document.createElement('canvas');
     }
   }, []);
+
+  // Track intrinsic image size for correct scaling/bounds
+  useEffect(() => {
+    if (!originalImage) return;
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = () => {
+      setDisplaySize({ width: img.width, height: img.height });
+      // Also cache original image data for tools/fit
+      const canvas = document.createElement('canvas');
+      canvas.width = img.width;
+      canvas.height = img.height;
+      const ctx = canvas.getContext('2d');
+      if (ctx) {
+        ctx.drawImage(img, 0, 0);
+        originalImageDataRef.current = ctx.getImageData(0, 0, img.width, img.height);
+      }
+    };
+    img.src = originalImage;
+  }, [originalImage]);
+
+  useEffect(() => {
+    if (!processedImage) return;
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = () => {
+      setDisplaySize({ width: img.width, height: img.height });
+    };
+    img.src = processedImage;
+  }, [processedImage]);
 
   const convertImageToPNG = useCallback(async (file: File): Promise<string> => {
     return new Promise((resolve, reject) => {
@@ -943,40 +974,53 @@ export function BackgroundRemover() {
                 }}
               >
                 {viewState === 'original' && (
-                  <div className="relative">
+                  <div
+                    className="relative inline-block"
+                    style={
+                      displaySize
+                        ? {
+                            width: `${(displaySize.width * zoom) / 100}px`,
+                            height: `${(displaySize.height * zoom) / 100}px`,
+                          }
+                        : undefined
+                    }
+                  >
                     <img
                       src={originalImage}
                       alt="Original"
                       draggable={false}
                       onDragStart={(e) => e.preventDefault()}
                       style={{
-                        width: `${zoom}%`,
+                        width: '100%',
+                        height: '100%',
                         imageRendering: zoom > 100 ? 'pixelated' : 'auto',
                       }}
                       className="object-contain max-w-none"
                       crossOrigin="anonymous"
                     />
-                    {!processedImage && !isProcessing && (
-                      <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                        <div className="bg-card/90 backdrop-blur-sm px-6 py-3 rounded-lg border border-border">
-                          <p className="text-sm text-muted-foreground">
-                            Click "Remove Background" to start
-                          </p>
-                        </div>
-                      </div>
-                    )}
                   </div>
                 )}
 
                 {viewState === 'comparing' && processedImage && (
-                  <div className="relative">
+                  <div
+                    className="relative inline-block"
+                    style={
+                      displaySize
+                        ? {
+                            width: `${(displaySize.width * zoom) / 100}px`,
+                            height: `${(displaySize.height * zoom) / 100}px`,
+                          }
+                        : undefined
+                    }
+                  >
                     <img
                       src={originalImage}
                       alt="Original"
                       draggable={false}
                       onDragStart={(e) => e.preventDefault()}
                       style={{
-                        width: `${zoom}%`,
+                        width: '100%',
+                        height: '100%',
                         imageRendering: zoom > 100 ? 'pixelated' : 'auto',
                       }}
                       className="object-contain max-w-none"
@@ -995,7 +1039,8 @@ export function BackgroundRemover() {
                         draggable={false}
                         onDragStart={(e) => e.preventDefault()}
                         style={{
-                          width: `${zoom}%`,
+                          width: '100%',
+                          height: '100%',
                           imageRendering: zoom > 100 ? 'pixelated' : 'auto',
                         }}
                         className="object-contain max-w-none"
