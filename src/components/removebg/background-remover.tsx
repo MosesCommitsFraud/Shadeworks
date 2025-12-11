@@ -1,11 +1,20 @@
 'use client';
 
 import { useState, useRef, useCallback, useEffect } from 'react';
-import { ArrowLeft, Download } from 'lucide-react';
+import { ArrowLeft, Download, ZoomIn, ZoomOut, Maximize2, Crop, Paintbrush, Eraser, Undo, Redo } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { ModernSlider } from '@/components/ui/modern-slider';
 import { useRouter } from 'next/navigation';
 
 type ViewState = 'original' | 'comparing' | 'processed';
+type Tool = 'none' | 'crop' | 'brush' | 'erase';
+
+interface BrushStroke {
+  points: { x: number; y: number }[];
+  size: number;
+  strength: number;
+  type: 'restore' | 'erase';
+}
 
 export function BackgroundRemover() {
   const router = useRouter();
@@ -21,9 +30,34 @@ export function BackgroundRemover() {
   const [webpQuality, setWebpQuality] = useState<number>(90);
   const [viewState, setViewState] = useState<ViewState>('original');
   const [swipePosition, setSwipePosition] = useState(0);
+
+  // Zoom and pan state
+  const [zoom, setZoom] = useState<number>(100);
+  const [pan, setPan] = useState({ x: 0, y: 0 });
+  const [isPanning, setIsPanning] = useState(false);
+  const [panStart, setPanStart] = useState({ x: 0, y: 0 });
+
+  // Tool state
+  const [activeTool, setActiveTool] = useState<Tool>('none');
+  const [brushSize, setBrushSize] = useState<number>(50);
+  const [brushStrength, setBrushStrength] = useState<number>(100);
+  const [isDrawing, setIsDrawing] = useState(false);
+  const [brushStrokes, setBrushStrokes] = useState<BrushStroke[]>();
+  const [currentStroke, setCurrentStroke] = useState<BrushStroke | null>(null);
+  const [undoStack, setUndoStack] = useState<BrushStroke[][]>([]);
+  const [redoStack, setRedoStack] = useState<BrushStroke[][]>([]);
+
+  // Crop state
+  const [cropArea, setCropArea] = useState<{ x: number; y: number; width: number; height: number } | null>(null);
+  const [cropStart, setCropStart] = useState<{ x: number; y: number } | null>(null);
+
   const fileInputRef = useRef<HTMLInputElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
   const imgRef = useRef<HTMLImageElement>(null);
+  const workingCanvasRef = useRef<HTMLCanvasElement>(null);
+  const originalImageDataRef = useRef<ImageData | null>(null);
+  const processedImageDataRef = useRef<ImageData | null>(null);
 
   const convertImageToPNG = useCallback(async (file: File): Promise<string> => {
     return new Promise((resolve, reject) => {
@@ -63,6 +97,11 @@ export function BackgroundRemover() {
     setError(null);
     setProcessedImage(null);
     setProcessedBlob(null);
+    setBrushStrokes([]);
+    setUndoStack([]);
+    setRedoStack([]);
+    setZoom(100);
+    setPan({ x: 0, y: 0 });
 
     try {
       const pngDataUrl = await convertImageToPNG(file);
@@ -93,6 +132,34 @@ export function BackgroundRemover() {
       const url = URL.createObjectURL(blob);
       setProcessedImage(url);
 
+      // Load processed image data for brush editing
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        canvas.width = img.width;
+        canvas.height = img.height;
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+          ctx.drawImage(img, 0, 0);
+          processedImageDataRef.current = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        }
+      };
+      img.src = url;
+
+      // Also load original image data
+      const origImg = new Image();
+      origImg.onload = () => {
+        const canvas = document.createElement('canvas');
+        canvas.width = origImg.width;
+        canvas.height = origImg.height;
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+          ctx.drawImage(origImg, 0, 0);
+          originalImageDataRef.current = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        }
+      };
+      origImg.src = originalImage;
+
       // Start comparison animation
       setViewState('comparing');
       setSwipePosition(0);
@@ -110,14 +177,13 @@ export function BackgroundRemover() {
     if (viewState === 'comparing') {
       let animationFrame: number;
       let startTime = Date.now();
-      const duration = 2500; // 2.5 seconds for the full animation
-      const pauseAtEnd = 800; // Pause at 100% for 0.8s
+      const duration = 2500;
+      const pauseAtEnd = 800;
 
       const animate = () => {
         const elapsed = Date.now() - startTime;
 
         if (elapsed < duration) {
-          // Smooth easing function (ease-in-out)
           const progress = elapsed / duration;
           const eased = progress < 0.5
             ? 2 * progress * progress
@@ -125,11 +191,9 @@ export function BackgroundRemover() {
           setSwipePosition(eased * 100);
           animationFrame = requestAnimationFrame(animate);
         } else if (elapsed < duration + pauseAtEnd) {
-          // Pause at 100%
           setSwipePosition(100);
           animationFrame = requestAnimationFrame(animate);
         } else {
-          // Animation complete, show only processed image
           setViewState('processed');
         }
       };
@@ -138,6 +202,292 @@ export function BackgroundRemover() {
       return () => cancelAnimationFrame(animationFrame);
     }
   }, [viewState]);
+
+  // Zoom handlers
+  const handleZoomIn = useCallback(() => {
+    setZoom((prev) => Math.min(prev * 1.25, 1000));
+  }, []);
+
+  const handleZoomOut = useCallback(() => {
+    setZoom((prev) => Math.max(prev / 1.25, 25));
+  }, []);
+
+  const handleFitToScreen = useCallback(() => {
+    if (!canvasRef.current || !containerRef.current) return;
+
+    const containerWidth = containerRef.current.clientWidth;
+    const containerHeight = containerRef.current.clientHeight;
+    const imageWidth = canvasRef.current.width;
+    const imageHeight = canvasRef.current.height;
+
+    const scaleX = (containerWidth * 0.9) / imageWidth;
+    const scaleY = (containerHeight * 0.9) / imageHeight;
+    const scale = Math.min(scaleX, scaleY);
+
+    setZoom(Math.round(scale * 100));
+    setPan({ x: 0, y: 0 });
+  }, []);
+
+  // Keyboard shortcuts
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Zoom shortcuts
+      if ((e.metaKey || e.ctrlKey) && (e.key === '=' || e.key === '+')) {
+        e.preventDefault();
+        handleZoomIn();
+      } else if ((e.metaKey || e.ctrlKey) && (e.key === '-' || e.key === '_')) {
+        e.preventDefault();
+        handleZoomOut();
+      } else if (e.key === '0' && !e.metaKey && !e.ctrlKey) {
+        e.preventDefault();
+        handleFitToScreen();
+      }
+      // Undo/Redo
+      else if ((e.metaKey || e.ctrlKey) && e.key === 'z' && !e.shiftKey) {
+        e.preventDefault();
+        handleUndo();
+      } else if ((e.metaKey || e.ctrlKey) && (e.key === 'y' || (e.key === 'z' && e.shiftKey))) {
+        e.preventDefault();
+        handleRedo();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [handleZoomIn, handleZoomOut, handleFitToScreen]);
+
+  // Mouse wheel zoom
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+
+    const handleWheel = (e: WheelEvent) => {
+      if (e.ctrlKey || e.metaKey) {
+        e.preventDefault();
+
+        const rect = container.getBoundingClientRect();
+        const mouseX = e.clientX - rect.left;
+        const mouseY = e.clientY - rect.top;
+
+        const delta = e.deltaY > 0 ? 0.9 : 1.1;
+        const prevZoom = zoom;
+        const newZoom = Math.max(25, Math.min(1000, prevZoom * delta));
+
+        const canvasElement = canvasRef.current;
+        if (canvasElement) {
+          const canvasRect = canvasElement.getBoundingClientRect();
+          const canvasCenterX = canvasRect.left + canvasRect.width / 2 - rect.left;
+          const canvasCenterY = canvasRect.top + canvasRect.height / 2 - rect.top;
+
+          const offsetX = mouseX - canvasCenterX;
+          const offsetY = mouseY - canvasCenterY;
+
+          const scaleFactor = newZoom / prevZoom - 1;
+          setPan((prevPan) => ({
+            x: prevPan.x - offsetX * scaleFactor,
+            y: prevPan.y - offsetY * scaleFactor,
+          }));
+        }
+
+        setZoom(newZoom);
+      }
+    };
+
+    container.addEventListener('wheel', handleWheel, { passive: false });
+    return () => container.removeEventListener('wheel', handleWheel);
+  }, [zoom]);
+
+  // Pan handlers
+  const handleMouseDown = useCallback((e: React.MouseEvent) => {
+    if (activeTool === 'none' || e.button === 1) {
+      setIsPanning(true);
+      setPanStart({ x: e.clientX - pan.x, y: e.clientY - pan.y });
+    } else if (activeTool === 'crop' && canvasRef.current) {
+      const rect = canvasRef.current.getBoundingClientRect();
+      const x = (e.clientX - rect.left) / (zoom / 100);
+      const y = (e.clientY - rect.top) / (zoom / 100);
+      setCropStart({ x, y });
+      setCropArea({ x, y, width: 0, height: 0 });
+    } else if ((activeTool === 'brush' || activeTool === 'erase') && canvasRef.current) {
+      const rect = canvasRef.current.getBoundingClientRect();
+      const x = (e.clientX - rect.left) / (zoom / 100);
+      const y = (e.clientY - rect.top) / (zoom / 100);
+      setIsDrawing(true);
+      setCurrentStroke({
+        points: [{ x, y }],
+        size: brushSize,
+        strength: brushStrength,
+        type: activeTool === 'brush' ? 'restore' : 'erase',
+      });
+    }
+  }, [activeTool, pan, zoom, brushSize, brushStrength]);
+
+  const handleMouseMove = useCallback((e: React.MouseEvent) => {
+    if (isPanning) {
+      setPan({
+        x: e.clientX - panStart.x,
+        y: e.clientY - panStart.y,
+      });
+    } else if (activeTool === 'crop' && cropStart && canvasRef.current) {
+      const rect = canvasRef.current.getBoundingClientRect();
+      const x = (e.clientX - rect.left) / (zoom / 100);
+      const y = (e.clientY - rect.top) / (zoom / 100);
+      setCropArea({
+        x: Math.min(cropStart.x, x),
+        y: Math.min(cropStart.y, y),
+        width: Math.abs(x - cropStart.x),
+        height: Math.abs(y - cropStart.y),
+      });
+    } else if (isDrawing && currentStroke && canvasRef.current) {
+      const rect = canvasRef.current.getBoundingClientRect();
+      const x = (e.clientX - rect.left) / (zoom / 100);
+      const y = (e.clientY - rect.top) / (zoom / 100);
+      setCurrentStroke({
+        ...currentStroke,
+        points: [...currentStroke.points, { x, y }],
+      });
+    }
+  }, [isPanning, panStart, activeTool, cropStart, zoom, isDrawing, currentStroke]);
+
+  const handleMouseUp = useCallback(() => {
+    setIsPanning(false);
+
+    if (activeTool === 'crop' && cropArea) {
+      // Apply crop
+      applyCrop();
+      setCropStart(null);
+    }
+
+    if (isDrawing && currentStroke) {
+      const newStrokes = [...(brushStrokes || []), currentStroke];
+      setBrushStrokes(newStrokes);
+      setUndoStack([...(undoStack || []), brushStrokes || []]);
+      setRedoStack([]);
+      setCurrentStroke(null);
+      setIsDrawing(false);
+
+      // Apply the stroke to the canvas
+      applyBrushStrokes(newStrokes);
+    }
+  }, [activeTool, cropArea, isDrawing, currentStroke, brushStrokes, undoStack]);
+
+  const applyCrop = useCallback(() => {
+    if (!cropArea || !canvasRef.current || !processedImageDataRef.current) return;
+
+    const canvas = canvasRef.current;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    // Create new cropped image data
+    const croppedData = ctx.getImageData(
+      cropArea.x,
+      cropArea.y,
+      cropArea.width,
+      cropArea.height
+    );
+
+    // Update canvas size
+    canvas.width = cropArea.width;
+    canvas.height = cropArea.height;
+    ctx.putImageData(croppedData, 0, 0);
+
+    processedImageDataRef.current = croppedData;
+    setCropArea(null);
+    setActiveTool('none');
+  }, [cropArea]);
+
+  const applyBrushStrokes = useCallback((strokes: BrushStroke[]) => {
+    if (!processedImageDataRef.current || !originalImageDataRef.current || !workingCanvasRef.current) return;
+
+    const canvas = workingCanvasRef.current;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    // Start with processed image
+    const workingData = new ImageData(
+      new Uint8ClampedArray(processedImageDataRef.current.data),
+      processedImageDataRef.current.width,
+      processedImageDataRef.current.height
+    );
+
+    // Apply each stroke
+    strokes.forEach((stroke) => {
+      const sourceData = stroke.type === 'restore'
+        ? originalImageDataRef.current!.data
+        : processedImageDataRef.current!.data;
+
+      stroke.points.forEach((point, i) => {
+        if (i === 0) return;
+
+        const prevPoint = stroke.points[i - 1];
+        const distance = Math.hypot(point.x - prevPoint.x, point.y - prevPoint.y);
+        const steps = Math.max(1, Math.floor(distance));
+
+        for (let step = 0; step <= steps; step++) {
+          const t = step / steps;
+          const x = Math.round(prevPoint.x + (point.x - prevPoint.x) * t);
+          const y = Math.round(prevPoint.y + (point.y - prevPoint.y) * t);
+
+          // Draw circle at this point
+          for (let dy = -stroke.size; dy <= stroke.size; dy++) {
+            for (let dx = -stroke.size; dx <= stroke.size; dx++) {
+              const dist = Math.hypot(dx, dy);
+              if (dist > stroke.size) continue;
+
+              const px = x + dx;
+              const py = y + dy;
+
+              if (px < 0 || px >= workingData.width || py < 0 || py >= workingData.height) continue;
+
+              const idx = (py * workingData.width + px) * 4;
+              const alpha = (1 - dist / stroke.size) * (stroke.strength / 100);
+
+              if (stroke.type === 'restore') {
+                // Restore from original
+                workingData.data[idx] = workingData.data[idx] * (1 - alpha) + sourceData[idx] * alpha;
+                workingData.data[idx + 1] = workingData.data[idx + 1] * (1 - alpha) + sourceData[idx + 1] * alpha;
+                workingData.data[idx + 2] = workingData.data[idx + 2] * (1 - alpha) + sourceData[idx + 2] * alpha;
+                workingData.data[idx + 3] = workingData.data[idx + 3] * (1 - alpha) + sourceData[idx + 3] * alpha;
+              } else {
+                // Erase (make transparent)
+                workingData.data[idx + 3] = workingData.data[idx + 3] * (1 - alpha);
+              }
+            }
+          }
+        }
+      });
+    });
+
+    canvas.width = workingData.width;
+    canvas.height = workingData.height;
+    ctx.putImageData(workingData, 0, 0);
+
+    // Update processed image
+    const url = canvas.toDataURL('image/png');
+    setProcessedImage(url);
+  }, []);
+
+  const handleUndo = useCallback(() => {
+    if (!undoStack || undoStack.length === 0) return;
+
+    const newUndoStack = [...undoStack];
+    const prevState = newUndoStack.pop()!;
+    setUndoStack(newUndoStack);
+    setRedoStack([...(redoStack || []), brushStrokes || []]);
+    setBrushStrokes(prevState);
+    applyBrushStrokes(prevState);
+  }, [undoStack, redoStack, brushStrokes, applyBrushStrokes]);
+
+  const handleRedo = useCallback(() => {
+    if (!redoStack || redoStack.length === 0) return;
+
+    const newRedoStack = [...redoStack];
+    const nextState = newRedoStack.pop()!;
+    setRedoStack(newRedoStack);
+    setUndoStack([...(undoStack || []), brushStrokes || []]);
+    setBrushStrokes(nextState);
+    applyBrushStrokes(nextState);
+  }, [redoStack, undoStack, brushStrokes, applyBrushStrokes]);
 
   const downloadImage = useCallback(async () => {
     if (!processedBlob || !canvasRef.current) return;
@@ -211,15 +561,78 @@ export function BackgroundRemover() {
     setError(null);
     setViewState('original');
     setSwipePosition(0);
+    setZoom(100);
+    setPan({ x: 0, y: 0 });
+    setBrushStrokes([]);
+    setUndoStack([]);
+    setRedoStack([]);
+    setActiveTool('none');
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
   }, []);
 
+  // Draw canvas
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    if (viewState === 'processed' && processedImage) {
+      const img = new Image();
+      img.onload = () => {
+        canvas.width = img.width;
+        canvas.height = img.height;
+        ctx.drawImage(img, 0, 0);
+
+        // Draw current stroke preview
+        if (currentStroke) {
+          ctx.save();
+          currentStroke.points.forEach((point, i) => {
+            if (i === 0) return;
+            const prevPoint = currentStroke.points[i - 1];
+
+            ctx.strokeStyle = currentStroke.type === 'restore' ? 'rgba(0, 255, 0, 0.3)' : 'rgba(255, 0, 0, 0.3)';
+            ctx.lineWidth = currentStroke.size * 2;
+            ctx.lineCap = 'round';
+            ctx.lineJoin = 'round';
+
+            ctx.beginPath();
+            ctx.moveTo(prevPoint.x, prevPoint.y);
+            ctx.lineTo(point.x, point.y);
+            ctx.stroke();
+          });
+          ctx.restore();
+        }
+
+        // Draw crop area
+        if (cropArea && activeTool === 'crop') {
+          ctx.save();
+          ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+          ctx.fillRect(0, 0, canvas.width, canvas.height);
+          ctx.clearRect(cropArea.x, cropArea.y, cropArea.width, cropArea.height);
+          ctx.strokeStyle = '#3b82f6';
+          ctx.lineWidth = 2;
+          ctx.strokeRect(cropArea.x, cropArea.y, cropArea.width, cropArea.height);
+          ctx.restore();
+        }
+      };
+      img.src = processedImage;
+    }
+  }, [viewState, processedImage, currentStroke, cropArea, activeTool]);
+
+  const getCursor = () => {
+    if (activeTool === 'crop') return 'crosshair';
+    if (activeTool === 'brush' || activeTool === 'erase') return 'crosshair';
+    return isPanning ? 'grabbing' : 'grab';
+  };
+
   return (
     <div className="flex flex-col h-screen bg-background select-none">
       {/* Header */}
-      <header className="border-b border-border px-4 py-3 flex items-center justify-between bg-card">
+      <header className="border-b border-border px-4 py-3 flex items-center justify-between bg-card/50 backdrop-blur-sm">
         <div className="flex items-center gap-4">
           <Button
             variant="ghost"
@@ -232,6 +645,39 @@ export function BackgroundRemover() {
             <h1 className="text-lg font-semibold">Background Remover</h1>
           </div>
         </div>
+
+        {/* Zoom controls in header */}
+        {originalImage && (
+          <div className="flex items-center gap-2">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={handleZoomOut}
+              disabled={zoom <= 25}
+            >
+              <ZoomOut className="h-4 w-4" />
+            </Button>
+            <div className="flex items-center px-3 h-9 bg-muted rounded-md text-sm min-w-[70px] justify-center">
+              {Math.round(zoom)}%
+            </div>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={handleZoomIn}
+              disabled={zoom >= 1000}
+            >
+              <ZoomIn className="h-4 w-4" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleFitToScreen}
+            >
+              <Maximize2 className="h-4 w-4 mr-2" />
+              Fit
+            </Button>
+          </div>
+        )}
       </header>
 
       {/* Main Content */}
@@ -277,20 +723,37 @@ export function BackgroundRemover() {
         ) : (
           <>
             {/* Main Preview Area */}
-            <div className="flex-1 overflow-hidden flex items-center justify-center p-8 bg-background">
+            <div
+              ref={containerRef}
+              className="flex-1 overflow-hidden flex items-center justify-center p-8 bg-background"
+              style={{ cursor: getCursor() }}
+              onMouseDown={handleMouseDown}
+              onMouseMove={handleMouseMove}
+              onMouseUp={handleMouseUp}
+              onMouseLeave={handleMouseUp}
+            >
               <div className="relative w-full h-full flex items-center justify-center">
                 {viewState === 'original' && (
-                  <div className="relative max-w-full max-h-full">
+                  <div
+                    className="relative"
+                    style={{
+                      transform: `translate(${pan.x}px, ${pan.y}px)`,
+                    }}
+                  >
                     <img
                       ref={imgRef}
                       src={originalImage}
                       alt="Original"
-                      className="max-w-full max-h-full object-contain"
+                      style={{
+                        width: `${zoom}%`,
+                        imageRendering: zoom > 100 ? 'pixelated' : 'auto',
+                      }}
+                      className="object-contain"
                       crossOrigin="anonymous"
                     />
                     {!processedImage && !isProcessing && (
                       <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                        <div className="bg-background/90 backdrop-blur-sm px-6 py-3 rounded-lg border border-border">
+                        <div className="bg-card/90 backdrop-blur-sm px-6 py-3 rounded-lg border border-border">
                           <p className="text-sm text-muted-foreground">
                             Click "Remove Background" to start
                           </p>
@@ -301,18 +764,25 @@ export function BackgroundRemover() {
                 )}
 
                 {viewState === 'comparing' && processedImage && (
-                  <div className="relative max-w-full max-h-full">
-                    {/* Original image (background) */}
+                  <div
+                    className="relative"
+                    style={{
+                      transform: `translate(${pan.x}px, ${pan.y}px)`,
+                    }}
+                  >
                     <div className="relative">
                       <img
                         src={originalImage}
                         alt="Original"
-                        className="max-w-full max-h-full object-contain"
+                        style={{
+                          width: `${zoom}%`,
+                          imageRendering: zoom > 100 ? 'pixelated' : 'auto',
+                        }}
+                        className="object-contain"
                         crossOrigin="anonymous"
                       />
                     </div>
 
-                    {/* Processed image overlay with animated clip */}
                     <div
                       className="absolute inset-0 overflow-hidden bg-[repeating-conic-gradient(#e5e7eb_0%_25%,white_0%_50%)] bg-[length:20px_20px] rounded-lg"
                       style={{
@@ -322,11 +792,14 @@ export function BackgroundRemover() {
                       <img
                         src={processedImage}
                         alt="Processed"
-                        className="max-w-full max-h-full object-contain"
+                        style={{
+                          width: `${zoom}%`,
+                          imageRendering: zoom > 100 ? 'pixelated' : 'auto',
+                        }}
+                        className="object-contain"
                       />
                     </div>
 
-                    {/* Swipe line indicator */}
                     <div
                       className="absolute top-0 bottom-0 w-0.5 bg-accent shadow-lg"
                       style={{
@@ -342,11 +815,20 @@ export function BackgroundRemover() {
                 )}
 
                 {viewState === 'processed' && processedImage && (
-                  <div className="relative max-w-full max-h-full bg-[repeating-conic-gradient(#e5e7eb_0%_25%,white_0%_50%)] bg-[length:20px_20px] rounded-lg">
-                    <img
-                      src={processedImage}
-                      alt="Processed"
-                      className="max-w-full max-h-full object-contain"
+                  <div
+                    className="relative"
+                    style={{
+                      transform: `translate(${pan.x}px, ${pan.y}px)`,
+                    }}
+                  >
+                    <canvas
+                      ref={canvasRef}
+                      style={{
+                        width: `${zoom}%`,
+                        imageRendering: zoom > 100 ? 'pixelated' : 'auto',
+                        background: 'repeating-conic-gradient(#e5e7eb 0% 25%, white 0% 50%) 50% / 20px 20px',
+                      }}
+                      className="rounded-lg shadow-lg"
                     />
                   </div>
                 )}
@@ -369,7 +851,7 @@ export function BackgroundRemover() {
             </div>
 
             {/* Right Sidebar - Controls */}
-            <div className="w-80 border-l border-border bg-card overflow-y-auto">
+            <div className="w-80 border-l border-border bg-card/50 backdrop-blur-sm overflow-y-auto">
               <div className="p-6 space-y-6">
                 {/* Process Button */}
                 <div>
@@ -383,8 +865,83 @@ export function BackgroundRemover() {
                   </Button>
                 </div>
 
-                {processedImage && (
+                {processedImage && viewState === 'processed' && (
                   <>
+                    {/* Tools */}
+                    <div className="space-y-3">
+                      <label className="text-sm font-medium">Tools</label>
+                      <div className="grid grid-cols-2 gap-2">
+                        <Button
+                          variant={activeTool === 'crop' ? 'default' : 'outline'}
+                          onClick={() => setActiveTool(activeTool === 'crop' ? 'none' : 'crop')}
+                          size="sm"
+                        >
+                          <Crop className="w-4 h-4 mr-2" />
+                          Crop
+                        </Button>
+                        <Button
+                          variant={activeTool === 'brush' ? 'default' : 'outline'}
+                          onClick={() => setActiveTool(activeTool === 'brush' ? 'none' : 'brush')}
+                          size="sm"
+                        >
+                          <Paintbrush className="w-4 h-4 mr-2" />
+                          Restore
+                        </Button>
+                        <Button
+                          variant={activeTool === 'erase' ? 'default' : 'outline'}
+                          onClick={() => setActiveTool(activeTool === 'erase' ? 'none' : 'erase')}
+                          size="sm"
+                        >
+                          <Eraser className="w-4 h-4 mr-2" />
+                          Erase
+                        </Button>
+                        <div className="flex gap-1">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={handleUndo}
+                            disabled={!undoStack || undoStack.length === 0}
+                            className="flex-1"
+                          >
+                            <Undo className="w-4 h-4" />
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={handleRedo}
+                            disabled={!redoStack || redoStack.length === 0}
+                            className="flex-1"
+                          >
+                            <Redo className="w-4 h-4" />
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Brush Settings */}
+                    {(activeTool === 'brush' || activeTool === 'erase') && (
+                      <div className="space-y-4 p-4 bg-muted/50 rounded-lg">
+                        <ModernSlider
+                          label="Brush Size"
+                          value={brushSize}
+                          onChange={setBrushSize}
+                          min={1}
+                          max={100}
+                          step={1}
+                          formatValue={(v) => `${v}px`}
+                        />
+                        <ModernSlider
+                          label="Brush Strength"
+                          value={brushStrength}
+                          onChange={setBrushStrength}
+                          min={1}
+                          max={100}
+                          step={1}
+                          formatValue={(v) => `${v}%`}
+                        />
+                      </div>
+                    )}
+
                     {/* Export Format */}
                     <div className="space-y-3">
                       <label className="text-sm font-medium">Export Format</label>
@@ -392,7 +949,6 @@ export function BackgroundRemover() {
                         <Button
                           variant={selectedFormat === 'png' ? 'default' : 'outline'}
                           onClick={() => setSelectedFormat('png')}
-                          className="w-full"
                           size="sm"
                         >
                           PNG
@@ -400,7 +956,6 @@ export function BackgroundRemover() {
                         <Button
                           variant={selectedFormat === 'jpg' ? 'default' : 'outline'}
                           onClick={() => setSelectedFormat('jpg')}
-                          className="w-full"
                           size="sm"
                         >
                           JPG
@@ -408,7 +963,6 @@ export function BackgroundRemover() {
                         <Button
                           variant={selectedFormat === 'webp' ? 'default' : 'outline'}
                           onClick={() => setSelectedFormat('webp')}
-                          className="w-full"
                           size="sm"
                         >
                           WebP
@@ -420,98 +974,51 @@ export function BackgroundRemover() {
                     <div className="space-y-3">
                       <label className="text-sm font-medium">Image Scale</label>
                       <div className="grid grid-cols-2 gap-2">
-                        <Button
-                          variant={selectedScale === 0.25 ? 'default' : 'outline'}
-                          onClick={() => setSelectedScale(0.25)}
-                          size="sm"
-                        >
-                          25%
-                        </Button>
-                        <Button
-                          variant={selectedScale === 0.5 ? 'default' : 'outline'}
-                          onClick={() => setSelectedScale(0.5)}
-                          size="sm"
-                        >
-                          50%
-                        </Button>
-                        <Button
-                          variant={selectedScale === 0.75 ? 'default' : 'outline'}
-                          onClick={() => setSelectedScale(0.75)}
-                          size="sm"
-                        >
-                          75%
-                        </Button>
-                        <Button
-                          variant={selectedScale === 1 ? 'default' : 'outline'}
-                          onClick={() => setSelectedScale(1)}
-                          size="sm"
-                        >
-                          100%
-                        </Button>
-                        <Button
-                          variant={selectedScale === 1.5 ? 'default' : 'outline'}
-                          onClick={() => setSelectedScale(1.5)}
-                          size="sm"
-                        >
-                          150%
-                        </Button>
-                        <Button
-                          variant={selectedScale === 2 ? 'default' : 'outline'}
-                          onClick={() => setSelectedScale(2)}
-                          size="sm"
-                        >
-                          200%
-                        </Button>
+                        {[0.25, 0.5, 0.75, 1, 1.5, 2].map((scale) => (
+                          <Button
+                            key={scale}
+                            variant={selectedScale === scale ? 'default' : 'outline'}
+                            onClick={() => setSelectedScale(scale)}
+                            size="sm"
+                          >
+                            {Math.round(scale * 100)}%
+                          </Button>
+                        ))}
                       </div>
-                      <input
-                        type="range"
-                        min="0.1"
-                        max="4"
-                        step="0.1"
+                      <ModernSlider
+                        label="Custom Scale"
                         value={selectedScale}
-                        onChange={(e) => setSelectedScale(parseFloat(e.target.value))}
-                        className="w-full"
+                        onChange={setSelectedScale}
+                        min={0.1}
+                        max={4}
+                        step={0.1}
+                        formatValue={(v) => `${Math.round(v * 100)}%`}
                       />
-                      <div className="text-xs text-muted-foreground text-center">
-                        Custom: {Math.round(selectedScale * 100)}%
-                      </div>
                     </div>
 
                     {/* Quality Settings */}
                     {selectedFormat === 'jpg' && (
-                      <div className="space-y-3">
-                        <label className="text-sm font-medium">JPG Quality: {jpgQuality}%</label>
-                        <input
-                          type="range"
-                          min="1"
-                          max="100"
-                          value={jpgQuality}
-                          onChange={(e) => setJpgQuality(parseInt(e.target.value))}
-                          className="w-full"
-                        />
-                        <div className="flex justify-between text-xs text-muted-foreground">
-                          <span>Lower size</span>
-                          <span>Higher quality</span>
-                        </div>
-                      </div>
+                      <ModernSlider
+                        label="JPG Quality"
+                        value={jpgQuality}
+                        onChange={setJpgQuality}
+                        min={1}
+                        max={100}
+                        step={1}
+                        formatValue={(v) => `${v}%`}
+                      />
                     )}
 
                     {selectedFormat === 'webp' && (
-                      <div className="space-y-3">
-                        <label className="text-sm font-medium">WebP Quality: {webpQuality}%</label>
-                        <input
-                          type="range"
-                          min="1"
-                          max="100"
-                          value={webpQuality}
-                          onChange={(e) => setWebpQuality(parseInt(e.target.value))}
-                          className="w-full"
-                        />
-                        <div className="flex justify-between text-xs text-muted-foreground">
-                          <span>Lower size</span>
-                          <span>Higher quality</span>
-                        </div>
-                      </div>
+                      <ModernSlider
+                        label="WebP Quality"
+                        value={webpQuality}
+                        onChange={setWebpQuality}
+                        min={1}
+                        max={100}
+                        step={1}
+                        formatValue={(v) => `${v}%`}
+                      />
                     )}
 
                     {/* Download Button */}
@@ -519,7 +1026,6 @@ export function BackgroundRemover() {
                       onClick={downloadImage}
                       className="w-full"
                       size="lg"
-                      variant="default"
                     >
                       <Download className="w-4 h-4 mr-2" />
                       Download {selectedFormat.toUpperCase()}
@@ -543,7 +1049,7 @@ export function BackgroundRemover() {
         )}
       </div>
 
-      <canvas ref={canvasRef} className="hidden" />
+      <canvas ref={workingCanvasRef} className="hidden" />
     </div>
   );
 }
