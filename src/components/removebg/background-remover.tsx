@@ -45,6 +45,12 @@ export function BackgroundRemover() {
   const [currentStroke, setCurrentStroke] = useState<BrushStroke | null>(null);
   const [undoStack, setUndoStack] = useState<BrushStroke[][]>([]);
   const [redoStack, setRedoStack] = useState<BrushStroke[][]>([]);
+  const [imageUndoStack, setImageUndoStack] = useState<
+    { processed: ImageData; original: ImageData; processedUrl: string; brushStrokes: BrushStroke[] }[]
+  >([]);
+  const [imageRedoStack, setImageRedoStack] = useState<
+    { processed: ImageData; original: ImageData; processedUrl: string; brushStrokes: BrushStroke[] }[]
+  >([]);
 
   // Crop state
   const [cropArea, setCropArea] = useState<{ x: number; y: number; width: number; height: number } | null>(null);
@@ -415,6 +421,28 @@ export function BackgroundRemover() {
   const applyCrop = useCallback(async () => {
     if (!cropArea || !processedImage) return;
 
+    // Snapshot for undo (crop-level)
+    if (processedImageDataRef.current && originalImageDataRef.current) {
+      setImageUndoStack((prev) => [
+        ...prev,
+        {
+          processed: new ImageData(
+            new Uint8ClampedArray(processedImageDataRef.current!.data),
+            processedImageDataRef.current!.width,
+            processedImageDataRef.current!.height
+          ),
+          original: new ImageData(
+            new Uint8ClampedArray(originalImageDataRef.current!.data),
+            originalImageDataRef.current!.width,
+            originalImageDataRef.current!.height
+          ),
+          processedUrl: processedImage,
+          brushStrokes,
+        },
+      ]);
+      setImageRedoStack([]);
+    }
+
     // Render the current processed image (without overlays) to an offscreen canvas
     const img = new Image();
     img.crossOrigin = 'anonymous';
@@ -495,7 +523,7 @@ export function BackgroundRemover() {
     setBrushStrokes([]);
     setUndoStack([]);
     setRedoStack([]);
-  }, [cropArea, processedImage]);
+  }, [cropArea, processedImage, brushStrokes]);
 
   const applyBrushStrokes = useCallback((strokes: BrushStroke[]) => {
     if (!processedImageDataRef.current || !originalImageDataRef.current || !workingCanvasRef.current) {
@@ -576,26 +604,76 @@ export function BackgroundRemover() {
   }, []);
 
   const handleUndo = useCallback(() => {
-    if (undoStack.length === 0) return;
+    if (undoStack.length > 0) {
+      const newUndoStack = [...undoStack];
+      const prevState = newUndoStack.pop()!;
+      setUndoStack(newUndoStack);
+      setRedoStack([...redoStack, brushStrokes]);
+      setBrushStrokes(prevState);
+      applyBrushStrokes(prevState);
+      return;
+    }
 
-    const newUndoStack = [...undoStack];
-    const prevState = newUndoStack.pop()!;
-    setUndoStack(newUndoStack);
-    setRedoStack([...redoStack, brushStrokes]);
-    setBrushStrokes(prevState);
-    applyBrushStrokes(prevState);
-  }, [undoStack, redoStack, brushStrokes, applyBrushStrokes]);
+    if (imageUndoStack.length === 0) return;
+    const newImageUndo = [...imageUndoStack];
+    const prevImage = newImageUndo.pop()!;
+    setImageUndoStack(newImageUndo);
+
+    if (processedImageDataRef.current && originalImageDataRef.current && processedImage) {
+      setImageRedoStack((prev) => [
+        ...prev,
+        {
+          processed: processedImageDataRef.current!,
+          original: originalImageDataRef.current!,
+          processedUrl: processedImage,
+          brushStrokes,
+        },
+      ]);
+    }
+
+    processedImageDataRef.current = prevImage.processed;
+    originalImageDataRef.current = prevImage.original;
+    setProcessedImage(prevImage.processedUrl);
+    setBrushStrokes(prevImage.brushStrokes);
+    setUndoStack([]);
+    setRedoStack([]);
+  }, [undoStack, redoStack, brushStrokes, applyBrushStrokes, imageUndoStack, processedImage]);
 
   const handleRedo = useCallback(() => {
-    if (redoStack.length === 0) return;
+    if (redoStack.length > 0) {
+      const newRedoStack = [...redoStack];
+      const nextState = newRedoStack.pop()!;
+      setRedoStack(newRedoStack);
+      setUndoStack([...undoStack, brushStrokes]);
+      setBrushStrokes(nextState);
+      applyBrushStrokes(nextState);
+      return;
+    }
 
-    const newRedoStack = [...redoStack];
-    const nextState = newRedoStack.pop()!;
-    setRedoStack(newRedoStack);
-    setUndoStack([...undoStack, brushStrokes]);
-    setBrushStrokes(nextState);
-    applyBrushStrokes(nextState);
-  }, [redoStack, undoStack, brushStrokes, applyBrushStrokes]);
+    if (imageRedoStack.length === 0) return;
+    const newImageRedo = [...imageRedoStack];
+    const nextImage = newImageRedo.pop()!;
+    setImageRedoStack(newImageRedo);
+
+    if (processedImageDataRef.current && originalImageDataRef.current && processedImage) {
+      setImageUndoStack((prev) => [
+        ...prev,
+        {
+          processed: processedImageDataRef.current!,
+          original: originalImageDataRef.current!,
+          processedUrl: processedImage,
+          brushStrokes,
+        },
+      ]);
+    }
+
+    processedImageDataRef.current = nextImage.processed;
+    originalImageDataRef.current = nextImage.original;
+    setProcessedImage(nextImage.processedUrl);
+    setBrushStrokes(nextImage.brushStrokes);
+    setUndoStack([]);
+    setRedoStack([]);
+  }, [redoStack, undoStack, brushStrokes, applyBrushStrokes, imageRedoStack, processedImage]);
 
   const downloadImage = useCallback(async () => {
     if (!canvasRef.current) return;
@@ -707,12 +785,16 @@ export function BackgroundRemover() {
           ctx.restore();
         }
 
-        // Draw crop area
+        // Draw crop area overlay (keep image visible inside box)
         if (cropArea && activeTool === 'crop') {
           ctx.save();
           ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
           ctx.fillRect(0, 0, canvas.width, canvas.height);
-          ctx.clearRect(cropArea.x, cropArea.y, cropArea.width, cropArea.height);
+          ctx.globalCompositeOperation = 'destination-out';
+          ctx.fillRect(cropArea.x, cropArea.y, cropArea.width, cropArea.height);
+          ctx.restore();
+
+          ctx.save();
           ctx.strokeStyle = '#3b82f6';
           ctx.lineWidth = 2 / (zoom / 100);
           ctx.strokeRect(cropArea.x, cropArea.y, cropArea.width, cropArea.height);
@@ -843,6 +925,8 @@ export function BackgroundRemover() {
                     <img
                       src={originalImage}
                       alt="Original"
+                      draggable={false}
+                      onDragStart={(e) => e.preventDefault()}
                       style={{
                         width: `${zoom}%`,
                         imageRendering: zoom > 100 ? 'pixelated' : 'auto',
@@ -867,6 +951,8 @@ export function BackgroundRemover() {
                     <img
                       src={originalImage}
                       alt="Original"
+                      draggable={false}
+                      onDragStart={(e) => e.preventDefault()}
                       style={{
                         width: `${zoom}%`,
                         imageRendering: zoom > 100 ? 'pixelated' : 'auto',
@@ -884,6 +970,8 @@ export function BackgroundRemover() {
                       <img
                         src={processedImage}
                         alt="Processed"
+                        draggable={false}
+                        onDragStart={(e) => e.preventDefault()}
                         style={{
                           width: `${zoom}%`,
                           imageRendering: zoom > 100 ? 'pixelated' : 'auto',
@@ -909,6 +997,8 @@ export function BackgroundRemover() {
                 {viewState === 'processed' && processedImage && (
                   <canvas
                     ref={canvasRef}
+                    draggable={false as any}
+                    onDragStart={(e) => e.preventDefault()}
                     style={{
                       width: `${zoom}%`,
                       imageRendering: zoom > 100 ? 'pixelated' : 'auto',
