@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useCallback, useEffect } from 'react';
+import { useState, useRef, useCallback, useEffect, useMemo } from 'react';
 import { ArrowLeft, Download, ZoomIn, ZoomOut, Maximize2, Crop, Paintbrush, Eraser, Undo, Redo } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ModernSlider } from '@/components/ui/modern-slider';
@@ -30,6 +30,7 @@ export function BackgroundRemover() {
   const [viewState, setViewState] = useState<ViewState>('original');
   const [swipePosition, setSwipePosition] = useState(0);
   const [displaySize, setDisplaySize] = useState<{ width: number; height: number } | null>(null);
+  const [containerSize, setContainerSize] = useState<{ width: number; height: number }>({ width: 0, height: 0 });
 
   // Zoom and pan state
   const [zoom, setZoom] = useState<number>(100);
@@ -70,6 +71,43 @@ export function BackgroundRemover() {
       workingCanvasRef.current = document.createElement('canvas');
     }
   }, []);
+
+  // Track preview container size so fit scale stays correct on resize.
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+    const updateSize = () => {
+      setContainerSize({ width: container.clientWidth, height: container.clientHeight });
+    };
+    updateSize();
+    const ro = new ResizeObserver(updateSize);
+    ro.observe(container);
+    return () => ro.disconnect();
+  }, [originalImage, processedImage, viewState]);
+
+  // Current intrinsic size used for scaling (keeps processed/cropped canvas aligned).
+  const currentSize = useMemo(() => {
+    if (viewState === 'processed') {
+      const canvas = canvasRef.current;
+      if (canvas && canvas.width && canvas.height) {
+        return { width: canvas.width, height: canvas.height };
+      }
+      if (processedImageDataRef.current) {
+        return { width: processedImageDataRef.current.width, height: processedImageDataRef.current.height };
+      }
+    }
+    if (displaySize) return displaySize;
+    return null;
+  }, [viewState, displaySize, processedImage]);
+
+  // Fit scale from intrinsic pixels to container pixels.
+  const fitScale = useMemo(() => {
+    if (!currentSize || !containerSize.width || !containerSize.height) return 1;
+    const margin = 0.98;
+    const scaleX = (containerSize.width * margin) / currentSize.width;
+    const scaleY = (containerSize.height * margin) / currentSize.height;
+    return Math.min(scaleX, scaleY);
+  }, [currentSize, containerSize]);
 
   // Track intrinsic image size for correct scaling/bounds
   useEffect(() => {
@@ -261,42 +299,16 @@ export function BackgroundRemover() {
   }, []);
 
   const handleZoomOut = useCallback(() => {
-    setZoom((prev) => Math.max(prev / 1.25, 25));
+    setZoom((prev) => Math.max(prev / 1.25, 5));
   }, []);
 
   const handleFitToScreen = useCallback(() => {
-    if (!containerRef.current) return;
-
-    const containerWidth = containerRef.current.clientWidth;
-    const containerHeight = containerRef.current.clientHeight;
-
-    let imageWidth = 0;
-    let imageHeight = 0;
-
-    if (viewState === 'processed' && processedImageDataRef.current) {
-      imageWidth = processedImageDataRef.current.width;
-      imageHeight = processedImageDataRef.current.height;
-    } else if (originalImageDataRef.current) {
-      imageWidth = originalImageDataRef.current.width;
-      imageHeight = originalImageDataRef.current.height;
-    } else if (canvasRef.current) {
-      imageWidth = canvasRef.current.width;
-      imageHeight = canvasRef.current.height;
-    }
-
-    if (!imageWidth || !imageHeight) return;
-
-    const margin = 0.98;
-    const scaleX = (containerWidth * margin) / imageWidth;
-    const scaleY = (containerHeight * margin) / imageHeight;
-    const scale = Math.min(scaleX, scaleY);
-
-    // zoom is interpreted as % of container width in our CSS,
-    // so convert desired pixel scale into that space.
-    const cssZoom = (imageWidth * scale / containerWidth) * 100;
-    setZoom(Math.round(cssZoom));
+    // Zoom is relative to fit-to-screen, so fit is always 100%.
+    setZoom(100);
     setPan({ x: 0, y: 0 });
-  }, [viewState]);
+  }, []);
+
+  // No auto-fit on load; matches dither editor behavior.
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -342,7 +354,7 @@ export function BackgroundRemover() {
 
       const delta = e.deltaY > 0 ? 0.9 : 1.1;
       const prevZoom = zoom;
-      const newZoom = Math.max(25, Math.min(1000, prevZoom * delta));
+      const newZoom = Math.max(5, Math.min(1000, prevZoom * delta));
 
       const centerX = rect.width / 2;
       const centerY = rect.height / 2;
@@ -849,14 +861,15 @@ export function BackgroundRemover() {
 
           ctx.save();
           ctx.strokeStyle = '#3b82f6';
-          ctx.lineWidth = 2 / (zoom / 100);
+          const actualScale = fitScale * (zoom / 100);
+          ctx.lineWidth = actualScale > 0 ? 2 / actualScale : 2;
           ctx.strokeRect(cropArea.x, cropArea.y, cropArea.width, cropArea.height);
           ctx.restore();
         }
       };
       img.src = processedImage;
     }
-  }, [viewState, processedImage, currentStroke, cropArea, activeTool, zoom]);
+  }, [viewState, processedImage, currentStroke, cropArea, activeTool, zoom, fitScale]);
 
   const getCursor = () => {
     if (activeTool === 'crop') return 'crosshair';
@@ -888,7 +901,7 @@ export function BackgroundRemover() {
               variant="ghost"
               size="icon"
               onClick={handleZoomOut}
-              disabled={zoom <= 25}
+              disabled={zoom <= 5}
             >
               <ZoomOut className="h-4 w-4" />
             </Button>
@@ -970,30 +983,22 @@ export function BackgroundRemover() {
               <div
                 className="absolute inset-0 flex items-center justify-center"
                 style={{
-                  transform: `translate(${pan.x}px, ${pan.y}px)`,
+                  transform: `translate(${pan.x}px, ${pan.y}px) scale(${fitScale * (zoom / 100)})`,
+                  transformOrigin: 'center center',
                 }}
               >
                 {viewState === 'original' && (
-                  <div
-                    className="relative inline-block"
-                    style={
-                      displaySize
-                        ? {
-                            width: `${(displaySize.width * zoom) / 100}px`,
-                            height: `${(displaySize.height * zoom) / 100}px`,
-                          }
-                        : undefined
-                    }
-                  >
+                  <div className="relative inline-block">
                     <img
                       src={originalImage}
                       alt="Original"
                       draggable={false}
                       onDragStart={(e) => e.preventDefault()}
                       style={{
-                        width: '100%',
-                        height: '100%',
                         imageRendering: zoom > 100 ? 'pixelated' : 'auto',
+                        maxWidth: 'none',
+                        height: 'auto',
+                        width: 'auto',
                       }}
                       className="object-contain max-w-none"
                       crossOrigin="anonymous"
@@ -1002,26 +1007,17 @@ export function BackgroundRemover() {
                 )}
 
                 {viewState === 'comparing' && processedImage && (
-                  <div
-                    className="relative inline-block"
-                    style={
-                      displaySize
-                        ? {
-                            width: `${(displaySize.width * zoom) / 100}px`,
-                            height: `${(displaySize.height * zoom) / 100}px`,
-                          }
-                        : undefined
-                    }
-                  >
+                  <div className="relative inline-block">
                     <img
                       src={originalImage}
                       alt="Original"
                       draggable={false}
                       onDragStart={(e) => e.preventDefault()}
                       style={{
-                        width: '100%',
-                        height: '100%',
                         imageRendering: zoom > 100 ? 'pixelated' : 'auto',
+                        maxWidth: 'none',
+                        height: 'auto',
+                        width: 'auto',
                       }}
                       className="object-contain max-w-none"
                       crossOrigin="anonymous"
@@ -1039,9 +1035,10 @@ export function BackgroundRemover() {
                         draggable={false}
                         onDragStart={(e) => e.preventDefault()}
                         style={{
-                          width: '100%',
-                          height: '100%',
                           imageRendering: zoom > 100 ? 'pixelated' : 'auto',
+                          maxWidth: 'none',
+                          height: 'auto',
+                          width: 'auto',
                         }}
                         className="object-contain max-w-none"
                       />
@@ -1067,9 +1064,9 @@ export function BackgroundRemover() {
                     draggable={false as any}
                     onDragStart={(e) => e.preventDefault()}
                     style={{
-                      width: `${zoom}%`,
                       imageRendering: zoom > 100 ? 'pixelated' : 'auto',
-                      background: 'repeating-conic-gradient(#e5e7eb 0% 25%, white 0% 50%) 50% / 20px 20px',
+                      background:
+                        'repeating-conic-gradient(#e5e7eb 0% 25%, white 0% 50%) 50% / 20px 20px',
                       maxWidth: 'none',
                     }}
                     className="rounded-lg shadow-lg"
