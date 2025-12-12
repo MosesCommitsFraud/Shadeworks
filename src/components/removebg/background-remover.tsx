@@ -656,7 +656,10 @@ export function BackgroundRemover() {
             if (px < 0 || px >= workingData.width || py < 0 || py >= workingData.height) continue;
 
             const idx = (py * workingData.width + px) * 4;
-            const alpha = (1 - dist / stroke.size) * (stroke.strength / 100);
+            // At 100% strength, fill entire circle uniformly; otherwise use gradient
+            const alpha = stroke.strength >= 100
+              ? 1.0
+              : (1 - dist / stroke.size) * (stroke.strength / 100);
 
             if (stroke.type === 'restore') {
               // Restore from original - blend the original image back in
@@ -703,7 +706,10 @@ export function BackgroundRemover() {
                 if (px < 0 || px >= workingData.width || py < 0 || py >= workingData.height) continue;
 
                 const idx = (py * workingData.width + px) * 4;
-                const alpha = (1 - dist / stroke.size) * (stroke.strength / 100);
+                // At 100% strength, fill entire circle uniformly; otherwise use gradient
+                const alpha = stroke.strength >= 100
+                  ? 1.0
+                  : (1 - dist / stroke.size) * (stroke.strength / 100);
 
                 if (stroke.type === 'restore') {
                   // Restore from original - blend the original image back in
