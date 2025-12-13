@@ -32,6 +32,9 @@ export function ModernSlider({
 
   const percentage = ((value - min) / (max - min)) * 100;
   const isActive = isHovering || isDragging;
+  const thumbWidth = isDragging ? 34 : isActive ? 30 : 28;
+  const thumbHeight = isDragging ? 18 : isActive ? 16 : 14;
+  const thumbOffsetX = Math.round(thumbWidth * 0.14) + 1;
 
   const updateValue = useCallback(
     (clientX: number) => {
@@ -114,22 +117,31 @@ export function ModernSlider({
             isDragging ? 'transition-none' : 'transition-[width] duration-150 ease-out'
           )}
           style={{ width: `${percentage}%` }}
+        />
+
+        {/* End-cap "thumb" */}
+        <svg
+          aria-hidden="true"
+          viewBox="0 0 100 40"
+          className={cn(
+            "pointer-events-none absolute z-20 block text-accent",
+            "transition-[opacity,transform,width,height] duration-200 ease-in-out",
+            "opacity-0",
+            isDragging ? "opacity-100" : "group-hover:opacity-100"
+          )}
+          style={{
+            left: `${percentage}%`,
+            top: "50%",
+            width: thumbWidth,
+            height: thumbHeight,
+            transform: `translate(${-thumbOffsetX}px, -50%)`,
+          }}
         >
-          {/* End-cap "thumb" */}
-          <div
-            className={cn(
-              'pointer-events-none absolute right-0 top-1/2 -translate-y-1/2 translate-x-2 rounded-full bg-accent',
-              'will-change-[opacity,width,height]',
-              'transition-[opacity,width,height] duration-150 ease-out',
-              'opacity-0',
-              isDragging ? 'opacity-100' : 'group-hover:opacity-100',
-              isActive ? 'h-3.5 w-8 shadow-sm' : 'h-3 w-7',
-              isDragging ? 'h-4 w-9' : null
-            )}
-          >
-            <div className="absolute inset-0 rounded-full bg-gradient-to-r from-white/25 to-white/0 opacity-60" />
-          </div>
-        </div>
+          <path
+            fill="currentColor"
+            d="M0 14C6 14 8 6 16 6C30 6 35 0 50 0H80C91 0 100 9 100 20C100 31 91 40 80 40H50C35 40 30 34 16 34C8 34 6 26 0 26Z"
+          />
+        </svg>
         {/* Hover effect */}
         <div
           className={cn(
