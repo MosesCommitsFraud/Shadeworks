@@ -53,6 +53,8 @@ export function BackgroundRemover() {
   const [imageRedoStack, setImageRedoStack] = useState<
     { processed: ImageData; original: ImageData; processedUrl: string; brushStrokes: BrushStroke[] }[]
   >([]);
+  const [cursorPosition, setCursorPosition] = useState<{ x: number; y: number } | null>(null);
+  const [screenCursorPosition, setScreenCursorPosition] = useState<{ x: number; y: number } | null>(null);
 
   // Crop state
   const [cropArea, setCropArea] = useState<{ x: number; y: number; width: number; height: number } | null>(null);
@@ -432,6 +434,21 @@ export function BackgroundRemover() {
   }, [activeTool, pan, brushSize, brushStrength, getCanvasCoords, viewState]);
 
   const handleMouseMove = useCallback((e: React.MouseEvent) => {
+    // Update cursor position for brush/erase tools
+    if ((activeTool === 'brush' || activeTool === 'erase') && viewState === 'processed') {
+      const coords = getCanvasCoords(e);
+      setCursorPosition(coords);
+
+      // Track screen position for overlay indicator
+      if (containerRef.current) {
+        const rect = containerRef.current.getBoundingClientRect();
+        setScreenCursorPosition({
+          x: e.clientX - rect.left,
+          y: e.clientY - rect.top,
+        });
+      }
+    }
+
     if (isPanning) {
       setPan({
         x: e.clientX - panStart.x,
@@ -467,7 +484,7 @@ export function BackgroundRemover() {
       setCropArea(null);
     }
 
-    if (isDrawing && currentStroke && currentStroke.points.length > 1) {
+    if (isDrawing && currentStroke && currentStroke.points.length >= 1) {
       const newStrokes = [...brushStrokes, currentStroke];
       setBrushStrokes(newStrokes);
       setUndoStack([...undoStack, brushStrokes]);
@@ -482,6 +499,17 @@ export function BackgroundRemover() {
       setIsDrawing(false);
     }
   }, [activeTool, cropArea, isDrawing, currentStroke, brushStrokes, undoStack]);
+
+  const handleMouseLeave = useCallback(() => {
+    setCursorPosition(null);
+    setScreenCursorPosition(null);
+  }, []);
+
+  // Clear cursor position when changing tools or view state
+  useEffect(() => {
+    setCursorPosition(null);
+    setScreenCursorPosition(null);
+  }, [activeTool, viewState]);
 
   const applyCrop = useCallback(async () => {
     if (!cropArea || !processedImage) return;
@@ -610,53 +638,101 @@ export function BackgroundRemover() {
 
     // Apply each stroke
     strokes.forEach((stroke) => {
-      stroke.points.forEach((point, i) => {
-        if (i === 0) return;
+      // Handle single-click strokes
+      if (stroke.points.length === 1) {
+        const point = stroke.points[0];
+        const x = Math.round(point.x);
+        const y = Math.round(point.y);
 
-        const prevPoint = stroke.points[i - 1];
-        const distance = Math.hypot(point.x - prevPoint.x, point.y - prevPoint.y);
-        const steps = Math.max(1, Math.ceil(distance / 2));
+        // Draw circle at this point
+        for (let dy = -stroke.size; dy <= stroke.size; dy++) {
+          for (let dx = -stroke.size; dx <= stroke.size; dx++) {
+            const dist = Math.hypot(dx, dy);
+            if (dist > stroke.size) continue;
 
-        for (let step = 0; step <= steps; step++) {
-          const t = steps > 0 ? step / steps : 0;
-          const x = Math.round(prevPoint.x + (point.x - prevPoint.x) * t);
-          const y = Math.round(prevPoint.y + (point.y - prevPoint.y) * t);
+            const px = x + dx;
+            const py = y + dy;
 
-          // Draw circle at this point
-          for (let dy = -stroke.size; dy <= stroke.size; dy++) {
-            for (let dx = -stroke.size; dx <= stroke.size; dx++) {
-              const dist = Math.hypot(dx, dy);
-              if (dist > stroke.size) continue;
+            if (px < 0 || px >= workingData.width || py < 0 || py >= workingData.height) continue;
 
-              const px = x + dx;
-              const py = y + dy;
+            const idx = (py * workingData.width + px) * 4;
+            // At 100% strength, fill entire circle uniformly; otherwise use gradient
+            const alpha = stroke.strength >= 100
+              ? 1.0
+              : (1 - dist / stroke.size) * (stroke.strength / 100);
 
-              if (px < 0 || px >= workingData.width || py < 0 || py >= workingData.height) continue;
+            if (stroke.type === 'restore') {
+              // Restore from original - blend the original image back in
+              if (originalImageDataRef.current) {
+                const origR = originalImageDataRef.current.data[idx];
+                const origG = originalImageDataRef.current.data[idx + 1];
+                const origB = originalImageDataRef.current.data[idx + 2];
+                const origA = originalImageDataRef.current.data[idx + 3];
 
-              const idx = (py * workingData.width + px) * 4;
-              const alpha = (1 - dist / stroke.size) * (stroke.strength / 100);
-
-              if (stroke.type === 'restore') {
-                // Restore from original - blend the original image back in
-                if (originalImageDataRef.current) {
-                  const origR = originalImageDataRef.current.data[idx];
-                  const origG = originalImageDataRef.current.data[idx + 1];
-                  const origB = originalImageDataRef.current.data[idx + 2];
-                  const origA = originalImageDataRef.current.data[idx + 3];
-
-                  workingData.data[idx] = Math.round(workingData.data[idx] * (1 - alpha) + origR * alpha);
-                  workingData.data[idx + 1] = Math.round(workingData.data[idx + 1] * (1 - alpha) + origG * alpha);
-                  workingData.data[idx + 2] = Math.round(workingData.data[idx + 2] * (1 - alpha) + origB * alpha);
-                  workingData.data[idx + 3] = Math.round(workingData.data[idx + 3] * (1 - alpha) + origA * alpha);
-                }
-              } else {
-                // Erase - reduce alpha channel only
-                workingData.data[idx + 3] = Math.round(workingData.data[idx + 3] * (1 - alpha));
+                workingData.data[idx] = Math.round(workingData.data[idx] * (1 - alpha) + origR * alpha);
+                workingData.data[idx + 1] = Math.round(workingData.data[idx + 1] * (1 - alpha) + origG * alpha);
+                workingData.data[idx + 2] = Math.round(workingData.data[idx + 2] * (1 - alpha) + origB * alpha);
+                workingData.data[idx + 3] = Math.round(workingData.data[idx + 3] * (1 - alpha) + origA * alpha);
               }
+            } else {
+              // Erase - reduce alpha channel only
+              workingData.data[idx + 3] = Math.round(workingData.data[idx + 3] * (1 - alpha));
             }
           }
         }
-      });
+      } else {
+        // Handle drag strokes (multiple points)
+        stroke.points.forEach((point, i) => {
+          if (i === 0) return;
+
+          const prevPoint = stroke.points[i - 1];
+          const distance = Math.hypot(point.x - prevPoint.x, point.y - prevPoint.y);
+          const steps = Math.max(1, Math.ceil(distance / 2));
+
+          for (let step = 0; step <= steps; step++) {
+            const t = steps > 0 ? step / steps : 0;
+            const x = Math.round(prevPoint.x + (point.x - prevPoint.x) * t);
+            const y = Math.round(prevPoint.y + (point.y - prevPoint.y) * t);
+
+            // Draw circle at this point
+            for (let dy = -stroke.size; dy <= stroke.size; dy++) {
+              for (let dx = -stroke.size; dx <= stroke.size; dx++) {
+                const dist = Math.hypot(dx, dy);
+                if (dist > stroke.size) continue;
+
+                const px = x + dx;
+                const py = y + dy;
+
+                if (px < 0 || px >= workingData.width || py < 0 || py >= workingData.height) continue;
+
+                const idx = (py * workingData.width + px) * 4;
+                // At 100% strength, fill entire circle uniformly; otherwise use gradient
+                const alpha = stroke.strength >= 100
+                  ? 1.0
+                  : (1 - dist / stroke.size) * (stroke.strength / 100);
+
+                if (stroke.type === 'restore') {
+                  // Restore from original - blend the original image back in
+                  if (originalImageDataRef.current) {
+                    const origR = originalImageDataRef.current.data[idx];
+                    const origG = originalImageDataRef.current.data[idx + 1];
+                    const origB = originalImageDataRef.current.data[idx + 2];
+                    const origA = originalImageDataRef.current.data[idx + 3];
+
+                    workingData.data[idx] = Math.round(workingData.data[idx] * (1 - alpha) + origR * alpha);
+                    workingData.data[idx + 1] = Math.round(workingData.data[idx + 1] * (1 - alpha) + origG * alpha);
+                    workingData.data[idx + 2] = Math.round(workingData.data[idx + 2] * (1 - alpha) + origB * alpha);
+                    workingData.data[idx + 3] = Math.round(workingData.data[idx + 3] * (1 - alpha) + origA * alpha);
+                  }
+                } else {
+                  // Erase - reduce alpha channel only
+                  workingData.data[idx + 3] = Math.round(workingData.data[idx + 3] * (1 - alpha));
+                }
+              }
+            }
+          }
+        });
+      }
     });
 
     canvas.width = workingData.width;
@@ -873,9 +949,19 @@ export function BackgroundRemover() {
 
   const getCursor = () => {
     if (activeTool === 'crop') return 'crosshair';
-    if (activeTool === 'brush' || activeTool === 'erase') return 'crosshair';
+    if ((activeTool === 'brush' || activeTool === 'erase') && screenCursorPosition) return 'none';
     return isPanning ? 'grabbing' : 'grab';
   };
+
+  // Calculate the screen-space brush size for the overlay
+  const screenBrushSize = useMemo(() => {
+    if (!screenCursorPosition || !canvasRef.current) return 0;
+    const canvas = canvasRef.current;
+    const rect = canvas.getBoundingClientRect();
+    if (!rect.width || !canvas.width) return 0;
+    // Convert canvas-space brush size to screen-space
+    return (brushSize * rect.width) / canvas.width;
+  }, [brushSize, screenCursorPosition]);
 
   return (
     <div className="flex flex-col h-screen bg-background select-none">
@@ -978,7 +1064,10 @@ export function BackgroundRemover() {
               onMouseDown={handleMouseDown}
               onMouseMove={handleMouseMove}
               onMouseUp={handleMouseUp}
-              onMouseLeave={handleMouseUp}
+              onMouseLeave={() => {
+                handleMouseUp();
+                handleMouseLeave();
+              }}
             >
               <div
                 className="absolute inset-0 flex items-center justify-center"
@@ -1087,6 +1176,23 @@ export function BackgroundRemover() {
                 <div className="absolute bottom-8 left-1/2 -translate-x-1/2 bg-destructive/10 border border-destructive text-destructive px-6 py-3 rounded-lg max-w-md z-50">
                   {error}
                 </div>
+              )}
+
+              {/* Brush cursor indicator overlay */}
+              {screenCursorPosition && (activeTool === 'brush' || activeTool === 'erase') && viewState === 'processed' && (
+                <div
+                  className="absolute pointer-events-none z-50"
+                  style={{
+                    left: screenCursorPosition.x,
+                    top: screenCursorPosition.y,
+                    width: screenBrushSize * 2,
+                    height: screenBrushSize * 2,
+                    marginLeft: -screenBrushSize,
+                    marginTop: -screenBrushSize,
+                    border: `2px dashed ${activeTool === 'brush' ? '#10b981' : '#ef4444'}`,
+                    borderRadius: '50%',
+                  }}
+                />
               )}
             </div>
 

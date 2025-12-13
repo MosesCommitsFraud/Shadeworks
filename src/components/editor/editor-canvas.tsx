@@ -160,7 +160,7 @@ export function EditorCanvas({
     // Get bounding box of all objects
     const group = new fabric.Group(objects);
     const boundingBox = group.getBoundingRect();
-    group.destroy();
+    group.removeAll();
 
     const containerWidth = containerRef.current?.clientWidth || 800;
     const containerHeight = containerRef.current?.clientHeight || 600;
