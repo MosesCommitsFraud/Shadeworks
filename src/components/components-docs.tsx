@@ -1,5 +1,6 @@
 "use client"
 
+import type React from "react"
 import { useMemo, useState } from "react"
 import { cn } from "@/lib/utils"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -76,9 +77,13 @@ function CodeBlock({ code }: { code: string }) {
         variant="secondary"
         className="absolute right-2 top-2"
         onClick={async () => {
-          await navigator.clipboard.writeText(code)
-          setCopied(true)
-          window.setTimeout(() => setCopied(false), 900)
+          try {
+            await navigator.clipboard.writeText(code)
+            setCopied(true)
+            window.setTimeout(() => setCopied(false), 900)
+          } catch {
+            setCopied(false)
+          }
         }}
       >
         {copied ? "Copied" : "Copy"}
@@ -141,4 +146,3 @@ export function ComponentsDocs() {
     </div>
   )
 }
-

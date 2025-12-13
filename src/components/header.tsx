@@ -59,9 +59,9 @@ export function Header() {
                 About
               </a>
 
-              <a href="/docs" className="text-sm font-medium transition-colors hover:text-accent">
-                Docs
-              </a>
+              <Link href="/components" className="text-sm font-medium transition-colors hover:text-accent">
+                Components
+              </Link>
           </div>
         </nav>
       </div>
