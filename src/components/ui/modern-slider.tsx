@@ -118,11 +118,13 @@ export function ModernSlider({
           {/* End-cap "thumb" */}
           <div
             className={cn(
-              'pointer-events-none absolute left-full top-1/2 -translate-y-1/2 -ml-1 rounded-full bg-accent shadow-sm',
-              'will-change-[transform,width,height]',
-              'transition-[width,height,transform,box-shadow] duration-200 ease-out',
-              isActive ? 'h-4 w-10 shadow-md' : 'h-3 w-7',
-              isDragging ? 'scale-105' : 'scale-100 group-hover:scale-105'
+              'pointer-events-none absolute right-0 top-1/2 -translate-y-1/2 translate-x-2 rounded-full bg-accent',
+              'will-change-[opacity,width,height]',
+              'transition-[opacity,width,height] duration-150 ease-out',
+              'opacity-0',
+              isDragging ? 'opacity-100' : 'group-hover:opacity-100',
+              isActive ? 'h-3.5 w-8 shadow-sm' : 'h-3 w-7',
+              isDragging ? 'h-4 w-9' : null
             )}
           >
             <div className="absolute inset-0 rounded-full bg-gradient-to-r from-white/25 to-white/0 opacity-60" />
