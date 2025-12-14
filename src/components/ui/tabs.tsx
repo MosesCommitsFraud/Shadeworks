@@ -64,7 +64,7 @@ const TabsList = React.forwardRef<
     >
       {activeTab && (
         <div
-          className="absolute z-0 top-0 left-0 rounded-md bg-secondary transition-all duration-300 ease-out"
+          className="absolute z-0 top-0 left-0 rounded-md bg-secondary transition-all duration-500 ease-out"
           style={highlightStyle}
         />
       )}
