@@ -1,6 +1,5 @@
 import Link from "next/link"
 import { Header } from "@/components/header"
-import { Footer } from "@/components/footer"
 import { ComponentsDocs } from "@/components/components-docs"
 import { Button } from "@/components/ui/button"
 
@@ -27,7 +26,6 @@ export default function ComponentsPage() {
           </div>
         </div>
       </main>
-      <Footer />
     </div>
   )
 }

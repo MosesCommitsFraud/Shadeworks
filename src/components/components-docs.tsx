@@ -27,6 +27,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { Label } from "@/components/ui/label"
+import { ArrowLeft, ArrowRight } from "lucide-react"
 
 type ComponentEntry = {
   id: string
@@ -270,6 +271,19 @@ export function ComponentsDocs() {
   const registry = useComponentRegistry()
   const [activeId, setActiveId] = useState(registry[0]?.id ?? "")
 
+  const currentIndex = registry.findIndex((entry) => entry.id === activeId)
+  const prevComponent = currentIndex > 0 ? registry[currentIndex - 1] : null
+  const nextComponent = currentIndex < registry.length - 1 ? registry[currentIndex + 1] : null
+
+  const scrollToTop = () => {
+    window.scrollTo({ top: 0, behavior: "smooth" })
+  }
+
+  const handleNavigate = (id: string) => {
+    setActiveId(id)
+    scrollToTop()
+  }
+
   return (
     <div className="grid gap-8 lg:grid-cols-[220px_1fr]">
       <aside className="sticky top-20 self-start">
@@ -284,7 +298,7 @@ export function ComponentsDocs() {
                   "rounded-md px-2 py-1 text-sm transition-colors hover:bg-muted text-left",
                   activeId === entry.id ? "bg-muted text-foreground" : "text-muted-foreground"
                 )}
-                onClick={() => setActiveId(entry.id)}
+                onClick={() => handleNavigate(entry.id)}
               >
                 {entry.name}
               </button>
@@ -314,6 +328,33 @@ export function ComponentsDocs() {
                   <CodeBlock code={entry.code} />
                 </CardContent>
               </Card>
+
+              {/* Navigation Buttons */}
+              <div className="flex items-center justify-between gap-4 mt-8">
+                {prevComponent ? (
+                  <Button
+                    variant="outline"
+                    onClick={() => handleNavigate(prevComponent.id)}
+                  >
+                    <ArrowLeft className="mr-2" />
+                    {prevComponent.name}
+                  </Button>
+                ) : (
+                  <div />
+                )}
+
+                {nextComponent ? (
+                  <Button
+                    variant="outline"
+                    onClick={() => handleNavigate(nextComponent.id)}
+                  >
+                    {nextComponent.name}
+                    <ArrowRight className="ml-2" />
+                  </Button>
+                ) : (
+                  <div />
+                )}
+              </div>
             </section>
           ))}
       </div>
