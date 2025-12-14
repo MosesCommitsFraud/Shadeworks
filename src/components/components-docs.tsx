@@ -277,45 +277,45 @@ export function ComponentsDocs() {
           <div className="text-sm font-medium text-foreground">Browse</div>
           <nav className="grid gap-1">
             {registry.map((entry) => (
-              <a
+              <button
                 key={entry.id}
-                href={`#${entry.id}`}
+                type="button"
                 className={cn(
-                  "rounded-md px-2 py-1 text-sm transition-colors hover:bg-muted",
+                  "rounded-md px-2 py-1 text-sm transition-colors hover:bg-muted text-left",
                   activeId === entry.id ? "bg-muted text-foreground" : "text-muted-foreground"
                 )}
                 onClick={() => setActiveId(entry.id)}
               >
                 {entry.name}
-              </a>
+              </button>
             ))}
           </nav>
         </div>
       </aside>
 
       <div className="space-y-8">
-        {registry.map((entry) => (
-          <section
-            key={entry.id}
-            id={entry.id}
-            className="scroll-mt-24"
-            onMouseEnter={() => setActiveId(entry.id)}
-            onFocus={() => setActiveId(entry.id)}
-          >
-            <Card>
-              <CardHeader className="space-y-1">
-                <CardTitle className="text-xl">{entry.name}</CardTitle>
-                <CardDescription>{entry.description}</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-5">
-                <div className="rounded-lg border bg-background p-5">
-                  <entry.Preview />
-                </div>
-                <CodeBlock code={entry.code} />
-              </CardContent>
-            </Card>
-          </section>
-        ))}
+        {registry
+          .filter((entry) => entry.id === activeId)
+          .map((entry) => (
+            <section
+              key={entry.id}
+              id={entry.id}
+              className="scroll-mt-24"
+            >
+              <Card>
+                <CardHeader className="space-y-1">
+                  <CardTitle className="text-xl">{entry.name}</CardTitle>
+                  <CardDescription>{entry.description}</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-5">
+                  <div className="rounded-lg border bg-background p-5">
+                    <entry.Preview />
+                  </div>
+                  <CodeBlock code={entry.code} />
+                </CardContent>
+              </Card>
+            </section>
+          ))}
       </div>
     </div>
   )
