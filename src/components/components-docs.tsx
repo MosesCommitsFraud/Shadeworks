@@ -53,18 +53,24 @@ function useComponentRegistry() {
       {
         id: "buttons",
         name: "Buttons",
-        description: "Baseline shadcn buttons (primary/secondary/ghost).",
+        description: "Baseline shadcn buttons with smooth click animations.",
         code: `<div className="flex gap-2">
   <Button>Primary</Button>
   <Button variant="secondary">Secondary</Button>
+  <Button variant="destructive">Destructive</Button>
+  <Button variant="outline">Outline</Button>
   <Button variant="ghost">Ghost</Button>
+  <Button variant="link">Link</Button>
 </div>`,
         Preview: function Preview() {
           return (
             <div className="flex flex-wrap gap-2">
               <Button>Primary</Button>
               <Button variant="secondary">Secondary</Button>
+              <Button variant="destructive">Destructive</Button>
+              <Button variant="outline">Outline</Button>
               <Button variant="ghost">Ghost</Button>
+              <Button variant="link">Link</Button>
             </div>
           )
         },
