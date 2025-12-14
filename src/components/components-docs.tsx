@@ -3,7 +3,7 @@
 import type React from "react"
 import { useMemo, useState } from "react"
 import { cn } from "@/lib/utils"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Slider } from "@/components/ui/slider"
 import {
@@ -27,6 +27,8 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { Label } from "@/components/ui/label"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { CodeBlock as StyledCodeBlock } from "@/components/ui/code-block"
 import { ArrowLeft, ArrowRight } from "lucide-react"
 
 type ComponentEntry = {
@@ -233,37 +235,128 @@ function useComponentRegistry() {
           )
         },
       },
-    ],
-    []
+      {
+        id: "tabs",
+        name: "Tabs",
+        description: "Tab navigation with moving highlight indicator and smooth content transitions.",
+        code: `<Tabs defaultValue="account">
+  <TabsList>
+    <TabsTrigger value="account">Account</TabsTrigger>
+    <TabsTrigger value="password">Password</TabsTrigger>
+  </TabsList>
+  <TabsContent value="account">
+    <div className="rounded-lg border bg-background p-6">
+      <p className="text-sm text-muted-foreground">
+        Account settings here.
+      </p>
+    </div>
+  </TabsContent>
+  <TabsContent value="password">
+    <div className="rounded-lg border bg-background p-6">
+      <p className="text-sm text-muted-foreground">
+        Password settings here.
+      </p>
+    </div>
+  </TabsContent>
+</Tabs>`,
+        Preview: function Preview() {
+          return (
+            <div className="max-w-md">
+              <Tabs defaultValue="account">
+                <TabsList>
+                  <TabsTrigger value="account">Account</TabsTrigger>
+                  <TabsTrigger value="password">Password</TabsTrigger>
+                </TabsList>
+                <TabsContent value="account">
+                  <div className="rounded-lg border bg-background p-6 space-y-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="name">Name</Label>
+                      <input
+                        id="name"
+                        className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm transition-all duration-200 focus:outline-none focus:border-foreground/20 focus:bg-muted/30"
+                        defaultValue="Pedro Duarte"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="username">Username</Label>
+                      <input
+                        id="username"
+                        className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm transition-all duration-200 focus:outline-none focus:border-foreground/20 focus:bg-muted/30"
+                        defaultValue="@peduarte"
+                      />
+                    </div>
+                    <Button>Save changes</Button>
+                  </div>
+                </TabsContent>
+                <TabsContent value="password">
+                  <div className="rounded-lg border bg-background p-6 space-y-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="current">Current password</Label>
+                      <input
+                        id="current"
+                        type="password"
+                        className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm transition-all duration-200 focus:outline-none focus:border-foreground/20 focus:bg-muted/30"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="new">New password</Label>
+                      <input
+                        id="new"
+                        type="password"
+                        className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm transition-all duration-200 focus:outline-none focus:border-foreground/20 focus:bg-muted/30"
+                      />
+                    </div>
+                    <Button>Save password</Button>
+                  </div>
+                </TabsContent>
+              </Tabs>
+            </div>
+          )
+        },
+      },
+      {
+        id: "code-block",
+        name: "Code Block",
+        description: "Styled code block with syntax highlighting, copy button, and optional filename header.",
+        code: `<StyledCodeBlock
+  code={\`function hello() {
+  console.log("Hello, World!")
+}\`}
+  language="tsx"
+  filename="example.tsx"
+/>`,
+        Preview: function Preview() {
+          const sampleCode = `'use client'
+
+import * as React from 'react'
+
+type MyComponentProps = {
+  myProps: string
+} & React.ComponentProps<'div'>
+
+function MyComponent(props: MyComponentProps) {
+  return (
+    <div {...props}>
+      <p>My Component</p>
+    </div>
   )
 }
 
-function CodeBlock({ code }: { code: string }) {
-  const [copied, setCopied] = useState(false)
+export { MyComponent, type MyComponentProps }`
 
-  return (
-    <div className="relative">
-      <pre className="overflow-x-auto rounded-lg border bg-muted/30 p-4 text-sm">
-        <code className="text-foreground/90">{code}</code>
-      </pre>
-      <Button
-        type="button"
-        size="sm"
-        variant="secondary"
-        className="absolute right-2 top-2"
-        onClick={async () => {
-          try {
-            await navigator.clipboard.writeText(code)
-            setCopied(true)
-            window.setTimeout(() => setCopied(false), 900)
-          } catch {
-            setCopied(false)
-          }
-        }}
-      >
-        {copied ? "Copied" : "Copy"}
-      </Button>
-    </div>
+          return (
+            <div className="max-w-2xl">
+              <StyledCodeBlock
+                code={sampleCode}
+                language="tsx"
+                filename="my-component.tsx"
+              />
+            </div>
+          )
+        },
+      },
+    ],
+    []
   )
 }
 
@@ -316,18 +409,33 @@ export function ComponentsDocs() {
               id={entry.id}
               className="scroll-mt-24"
             >
-              <Card>
-                <CardHeader className="space-y-1">
-                  <CardTitle className="text-xl">{entry.name}</CardTitle>
-                  <CardDescription>{entry.description}</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-5">
-                  <div className="rounded-lg border bg-background p-5">
-                    <entry.Preview />
-                  </div>
-                  <CodeBlock code={entry.code} />
-                </CardContent>
-              </Card>
+              <div className="space-y-6">
+                <Card>
+                  <CardHeader className="space-y-1">
+                    <CardTitle className="text-xl">{entry.name}</CardTitle>
+                    <CardDescription>{entry.description}</CardDescription>
+                  </CardHeader>
+                </Card>
+
+                <Tabs defaultValue="preview">
+                  <TabsList>
+                    <TabsTrigger value="preview">
+                      Preview
+                    </TabsTrigger>
+                    <TabsTrigger value="code">
+                      Code
+                    </TabsTrigger>
+                  </TabsList>
+                  <TabsContent value="preview">
+                    <div className="rounded-lg border bg-background p-6">
+                      <entry.Preview />
+                    </div>
+                  </TabsContent>
+                  <TabsContent value="code">
+                    <StyledCodeBlock code={entry.code} language="tsx" filename={`${entry.id}.tsx`} />
+                  </TabsContent>
+                </Tabs>
+              </div>
 
               {/* Navigation Buttons */}
               <div className="flex items-center justify-between gap-4 mt-8">

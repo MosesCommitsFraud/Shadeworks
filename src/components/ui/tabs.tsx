@@ -10,31 +10,112 @@ const Tabs = TabsPrimitive.Root
 const TabsList = React.forwardRef<
   React.ElementRef<typeof TabsPrimitive.List>,
   React.ComponentPropsWithoutRef<typeof TabsPrimitive.List>
->(({ className, ...props }, ref) => (
-  <TabsPrimitive.List
-    ref={ref}
-    className={cn(
-      "inline-flex h-9 items-center justify-center rounded-lg bg-muted p-1 text-muted-foreground",
-      className
-    )}
-    {...props}
-  />
-))
+>(({ className, children, ...props }, ref) => {
+  const [activeTab, setActiveTab] = React.useState<string>("")
+  const [highlightStyle, setHighlightStyle] = React.useState<React.CSSProperties>({})
+  const tabRefs = React.useRef<Map<string, HTMLButtonElement>>(new Map())
+  const listRef = React.useRef<HTMLDivElement>(null)
+
+  React.useEffect(() => {
+    const updateHighlight = () => {
+      const activeButton = tabRefs.current.get(activeTab)
+      if (activeButton && listRef.current) {
+        const listRect = listRef.current.getBoundingClientRect()
+        const buttonRect = activeButton.getBoundingClientRect()
+
+        setHighlightStyle({
+          width: buttonRect.width,
+          height: buttonRect.height,
+          transform: `translateX(${buttonRect.left - listRect.left}px)`,
+        })
+      }
+    }
+
+    updateHighlight()
+    window.addEventListener('resize', updateHighlight)
+    return () => window.removeEventListener('resize', updateHighlight)
+  }, [activeTab])
+
+  return (
+    <TabsPrimitive.List
+      ref={(node) => {
+        if (typeof ref === 'function') ref(node)
+        else if (ref) ref.current = node
+        if (node) (listRef as React.MutableRefObject<HTMLDivElement>).current = node
+      }}
+      className={cn(
+        "relative inline-flex h-9 w-fit items-center justify-center text-muted-foreground",
+        className
+      )}
+      {...props}
+    >
+      {activeTab && (
+        <div
+          className="absolute z-0 inset-y-0 left-0 rounded-lg bg-accent border border-transparent transition-all duration-300 ease-out"
+          style={highlightStyle}
+        />
+      )}
+      {React.Children.map(children, (child) => {
+        if (React.isValidElement(child)) {
+          return React.cloneElement(child as React.ReactElement<any>, {
+            onTabChange: setActiveTab,
+            registerRef: (value: string, ref: HTMLButtonElement | null) => {
+              if (ref) {
+                tabRefs.current.set(value, ref)
+              } else {
+                tabRefs.current.delete(value)
+              }
+            },
+          })
+        }
+        return child
+      })}
+    </TabsPrimitive.List>
+  )
+})
 TabsList.displayName = TabsPrimitive.List.displayName
 
 const TabsTrigger = React.forwardRef<
   React.ElementRef<typeof TabsPrimitive.Trigger>,
-  React.ComponentPropsWithoutRef<typeof TabsPrimitive.Trigger>
->(({ className, ...props }, ref) => (
-  <TabsPrimitive.Trigger
-    ref={ref}
-    className={cn(
-      "inline-flex items-center justify-center whitespace-nowrap rounded-md px-3 py-1 text-sm font-medium ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow",
-      className
-    )}
-    {...props}
-  />
-))
+  React.ComponentPropsWithoutRef<typeof TabsPrimitive.Trigger> & {
+    onTabChange?: (value: string) => void
+    registerRef?: (value: string, ref: HTMLButtonElement | null) => void
+  }
+>(({ className, onTabChange, registerRef, value, ...props }, ref) => {
+  const buttonRef = React.useRef<HTMLButtonElement>(null)
+
+  React.useEffect(() => {
+    if (value && registerRef) {
+      registerRef(value as string, buttonRef.current)
+    }
+    return () => {
+      if (value && registerRef) {
+        registerRef(value as string, null)
+      }
+    }
+  }, [value, registerRef])
+
+  return (
+    <TabsPrimitive.Trigger
+      ref={(node) => {
+        if (typeof ref === 'function') ref(node)
+        else if (ref) ref.current = node
+        if (node) (buttonRef as React.MutableRefObject<HTMLButtonElement>).current = node
+      }}
+      value={value}
+      className={cn(
+        "relative z-10 inline-flex h-[calc(100%-2px)] flex-1 items-center justify-center gap-1.5 rounded-md w-full px-3 py-1.5 text-sm font-medium whitespace-nowrap transition-colors duration-500 ease-in-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 data-[state=active]:text-foreground data-[state=inactive]:text-muted-foreground hover:text-foreground",
+        className
+      )}
+      onMouseDown={() => {
+        if (value && onTabChange) {
+          onTabChange(value as string)
+        }
+      }}
+      {...props}
+    />
+  )
+})
 TabsTrigger.displayName = TabsPrimitive.Trigger.displayName
 
 const TabsContent = React.forwardRef<
@@ -44,7 +125,7 @@ const TabsContent = React.forwardRef<
   <TabsPrimitive.Content
     ref={ref}
     className={cn(
-      "mt-2 ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+      "mt-4 ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 data-[state=active]:animate-in data-[state=active]:fade-in-0 data-[state=active]:zoom-in-95 transition-all duration-200",
       className
     )}
     {...props}
