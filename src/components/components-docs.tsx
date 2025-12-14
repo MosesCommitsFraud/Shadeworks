@@ -357,7 +357,7 @@ export { MyComponent, type MyComponentProps }`
 
 export function ComponentsDocs() {
   const registry = useComponentRegistry()
-  const [activeId, setActiveId] = useState(registry[0]?.id ?? "")
+  const [activeId, setActiveId] = useState("introduction")
 
   const currentIndex = registry.findIndex((entry) => entry.id === activeId)
   const prevComponent = currentIndex > 0 ? registry[currentIndex - 1] : null
@@ -381,11 +381,21 @@ export function ComponentsDocs() {
           <div>
             <div className="text-sm font-medium text-foreground mb-2">Sections</div>
             <nav className="grid gap-1 pl-2">
-              <div className="text-sm text-muted-foreground">Components</div>
+              <button
+                type="button"
+                className={cn(
+                  "rounded-md px-2 py-1 text-sm transition-colors hover:bg-muted text-left",
+                  activeId === "introduction" ? "bg-muted text-foreground" : "text-muted-foreground"
+                )}
+                onClick={() => handleNavigate("introduction")}
+              >
+                Introduction
+              </button>
             </nav>
           </div>
           <div>
-            <nav className="grid gap-1">
+            <div className="text-sm font-medium text-foreground mb-2">Components</div>
+            <nav className="grid gap-1 pl-2">
               {registry.map((entry) => (
                 <button
                   key={entry.id}
@@ -405,7 +415,19 @@ export function ComponentsDocs() {
       </aside>
 
       <div className="space-y-8">
-        {activeEntry && (
+        {activeId === "introduction" ? (
+          <section className="scroll-mt-24">
+            <div className="space-y-4">
+              <h2 className="text-2xl font-semibold tracking-tight">Introduction</h2>
+              <p className="text-muted-foreground">
+                A living documentation page for Shadeworks UI components you can reuse across tools.
+              </p>
+              <p className="text-muted-foreground">
+                Each component is designed with smooth animations, consistent styling, and a muted color palette. Browse the components in the sidebar to see interactive previews and copy the code snippets.
+              </p>
+            </div>
+          </section>
+        ) : activeEntry ? (
           <section
             key={activeEntry.id}
             id={activeEntry.id}
@@ -464,7 +486,7 @@ export function ComponentsDocs() {
               )}
             </div>
           </section>
-        )}
+        ) : null}
       </div>
     </div>
   )
