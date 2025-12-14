@@ -95,13 +95,11 @@ function MyComponent(props: MyComponentProps) {
 export { MyComponent, type MyComponentProps }`
 
           return (
-            <div className="max-w-2xl">
-              <StyledCodeBlock
-                code={sampleCode}
-                language="tsx"
-                filename="my-component.tsx"
-              />
-            </div>
+            <StyledCodeBlock
+              code={sampleCode}
+              language="tsx"
+              filename="my-component.tsx"
+            />
           )
         },
       },
@@ -220,7 +218,7 @@ export { MyComponent, type MyComponentProps }`
         Preview: function Preview() {
           const [value, setValue] = useState("floyd")
           return (
-            <div className="max-w-xs space-y-2">
+            <div className="w-80 space-y-2">
               <Label>Dithering Algorithm</Label>
               <Select value={value} onValueChange={setValue}>
                 <SelectTrigger>
@@ -258,7 +256,7 @@ export { MyComponent, type MyComponentProps }`
         Preview: function Preview() {
           const [value, setValue] = useState(55)
           return (
-            <div className="max-w-sm">
+            <div className="w-96">
               <Slider
                 label="Strength"
                 showValue
@@ -299,7 +297,7 @@ export { MyComponent, type MyComponentProps }`
 </Tabs>`,
         Preview: function Preview() {
           return (
-            <div className="max-w-md">
+            <div className="w-[450px]">
               <Tabs defaultValue="account">
                 <TabsList>
                   <TabsTrigger value="account">Account</TabsTrigger>
