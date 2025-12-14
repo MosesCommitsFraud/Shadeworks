@@ -15,6 +15,7 @@ interface SmoothSliderProps {
   onValueChange?: (value: number[]) => void
   label?: string
   showValue?: boolean
+  unit?: string
   className?: string
   disabled?: boolean
 }
@@ -29,6 +30,7 @@ export function SmoothSlider({
   onValueChange,
   label,
   showValue = false,
+  unit,
   className,
   disabled = false,
 }: SmoothSliderProps) {
@@ -155,7 +157,7 @@ export function SmoothSlider({
                 isDragging ? "text-foreground scale-110" : "text-muted-foreground",
               )}
             >
-              {Math.round(value)}
+              {Math.round(value)}{unit}
             </span>
           )}
         </div>

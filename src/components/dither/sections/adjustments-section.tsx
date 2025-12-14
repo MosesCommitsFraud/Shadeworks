@@ -1,6 +1,5 @@
 'use client';
 
-import { Label } from '@/components/ui/label';
 import { Slider } from '@/components/ui/slider';
 import { Button } from '@/components/ui/button';
 import type { AdjustmentSettings } from '@/lib/dither/types';
@@ -59,11 +58,9 @@ export function AdjustmentsSection({
 
       {/* Exposure */}
       <div className="space-y-2">
-        <div className="flex items-center justify-between">
-          <Label>Exposure</Label>
-          <span className="text-xs text-muted-foreground">{settings.exposure.toFixed(1)} stops</span>
-        </div>
         <Slider
+          label="Exposure"
+          showValue
           value={[settings.exposure * 50 + 100]}
           onValueChange={([value]) => onSettingsChange({ exposure: (value - 100) / 50 })}
           min={0}
@@ -78,11 +75,9 @@ export function AdjustmentsSection({
 
       {/* Brightness */}
       <div className="space-y-2">
-        <div className="flex items-center justify-between">
-          <Label>Brightness</Label>
-          <span className="text-xs text-muted-foreground">{settings.brightness}</span>
-        </div>
         <Slider
+          label="Brightness"
+          showValue
           value={[settings.brightness]}
           onValueChange={([value]) => onSettingsChange({ brightness: value })}
           min={-100}
@@ -94,11 +89,9 @@ export function AdjustmentsSection({
 
       {/* Contrast */}
       <div className="space-y-2">
-        <div className="flex items-center justify-between">
-          <Label>Contrast</Label>
-          <span className="text-xs text-muted-foreground">{settings.contrast}</span>
-        </div>
         <Slider
+          label="Contrast"
+          showValue
           value={[settings.contrast]}
           onValueChange={([value]) => onSettingsChange({ contrast: value })}
           min={-100}
@@ -117,11 +110,10 @@ export function AdjustmentsSection({
 
       {/* Hue */}
       <div className="space-y-2">
-        <div className="flex items-center justify-between">
-          <Label>Hue</Label>
-          <span className="text-xs text-muted-foreground">{settings.hue}°</span>
-        </div>
         <Slider
+          label="Hue"
+          showValue
+          unit="°"
           value={[settings.hue]}
           onValueChange={([value]) => onSettingsChange({ hue: value })}
           min={-180}
@@ -136,11 +128,9 @@ export function AdjustmentsSection({
 
       {/* Saturation */}
       <div className="space-y-2">
-        <div className="flex items-center justify-between">
-          <Label>Saturation</Label>
-          <span className="text-xs text-muted-foreground">{settings.saturation}</span>
-        </div>
         <Slider
+          label="Saturation"
+          showValue
           value={[settings.saturation]}
           onValueChange={([value]) => onSettingsChange({ saturation: value })}
           min={-100}
@@ -155,11 +145,9 @@ export function AdjustmentsSection({
 
       {/* Vibrance */}
       <div className="space-y-2">
-        <div className="flex items-center justify-between">
-          <Label>Vibrance</Label>
-          <span className="text-xs text-muted-foreground">{settings.vibrance}</span>
-        </div>
         <Slider
+          label="Vibrance"
+          showValue
           value={[settings.vibrance]}
           onValueChange={([value]) => onSettingsChange({ vibrance: value })}
           min={-100}
@@ -174,11 +162,9 @@ export function AdjustmentsSection({
 
       {/* Temperature */}
       <div className="space-y-2">
-        <div className="flex items-center justify-between">
-          <Label>Temperature</Label>
-          <span className="text-xs text-muted-foreground">{settings.temperature}</span>
-        </div>
         <Slider
+          label="Temperature"
+          showValue
           value={[settings.temperature]}
           onValueChange={([value]) => onSettingsChange({ temperature: value })}
           min={-100}
@@ -193,11 +179,9 @@ export function AdjustmentsSection({
 
       {/* Tint */}
       <div className="space-y-2">
-        <div className="flex items-center justify-between">
-          <Label>Tint</Label>
-          <span className="text-xs text-muted-foreground">{settings.tint}</span>
-        </div>
         <Slider
+          label="Tint"
+          showValue
           value={[settings.tint]}
           onValueChange={([value]) => onSettingsChange({ tint: value })}
           min={-100}
@@ -219,11 +203,9 @@ export function AdjustmentsSection({
 
       {/* Highlights */}
       <div className="space-y-2">
-        <div className="flex items-center justify-between">
-          <Label>Highlights</Label>
-          <span className="text-xs text-muted-foreground">{settings.highlights}</span>
-        </div>
         <Slider
+          label="Highlights"
+          showValue
           value={[settings.highlights]}
           onValueChange={([value]) => onSettingsChange({ highlights: value })}
           min={-100}
@@ -238,11 +220,9 @@ export function AdjustmentsSection({
 
       {/* Shadows */}
       <div className="space-y-2">
-        <div className="flex items-center justify-between">
-          <Label>Shadows</Label>
-          <span className="text-xs text-muted-foreground">{settings.shadows}</span>
-        </div>
         <Slider
+          label="Shadows"
+          showValue
           value={[settings.shadows]}
           onValueChange={([value]) => onSettingsChange({ shadows: value })}
           min={-100}
@@ -257,11 +237,9 @@ export function AdjustmentsSection({
 
       {/* Gamma */}
       <div className="space-y-2">
-        <div className="flex items-center justify-between">
-          <Label>Gamma</Label>
-          <span className="text-xs text-muted-foreground">{settings.gamma.toFixed(2)}</span>
-        </div>
         <Slider
+          label="Gamma"
+          showValue
           value={[settings.gamma * 100]}
           onValueChange={([value]) => onSettingsChange({ gamma: value / 100 })}
           min={50}
@@ -283,11 +261,10 @@ export function AdjustmentsSection({
 
       {/* Blur */}
       <div className="space-y-2">
-        <div className="flex items-center justify-between">
-          <Label>Blur</Label>
-          <span className="text-xs text-muted-foreground">{settings.blur}px</span>
-        </div>
         <Slider
+          label="Blur"
+          showValue
+          unit="px"
           value={[settings.blur]}
           onValueChange={([value]) => onSettingsChange({ blur: value })}
           min={0}
@@ -302,11 +279,10 @@ export function AdjustmentsSection({
 
       {/* Sharpen */}
       <div className="space-y-2">
-        <div className="flex items-center justify-between">
-          <Label>Sharpen</Label>
-          <span className="text-xs text-muted-foreground">{settings.sharpen}%</span>
-        </div>
         <Slider
+          label="Sharpen"
+          showValue
+          unit="%"
           value={[settings.sharpen]}
           onValueChange={([value]) => onSettingsChange({ sharpen: value })}
           min={0}
@@ -321,11 +297,10 @@ export function AdjustmentsSection({
 
       {/* Denoise */}
       <div className="space-y-2">
-        <div className="flex items-center justify-between">
-          <Label>Denoise</Label>
-          <span className="text-xs text-muted-foreground">{settings.denoise}%</span>
-        </div>
         <Slider
+          label="Denoise"
+          showValue
+          unit="%"
           value={[settings.denoise]}
           onValueChange={([value]) => onSettingsChange({ denoise: value })}
           min={0}
@@ -340,11 +315,10 @@ export function AdjustmentsSection({
 
       {/* Vignette */}
       <div className="space-y-2">
-        <div className="flex items-center justify-between">
-          <Label>Vignette</Label>
-          <span className="text-xs text-muted-foreground">{settings.vignette}%</span>
-        </div>
         <Slider
+          label="Vignette"
+          showValue
+          unit="%"
           value={[settings.vignette]}
           onValueChange={([value]) => onSettingsChange({ vignette: value })}
           min={0}

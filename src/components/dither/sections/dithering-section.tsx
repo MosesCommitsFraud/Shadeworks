@@ -162,6 +162,7 @@ export function DitheringSection({
               <Slider
                 label="Error Attenuation"
                 showValue
+                unit="%"
                 value={[(settings.errorAttenuation ?? 1.0) * 100]}
                 onValueChange={([value]) =>
                   onSettingsChange({ errorAttenuation: value / 100 })
@@ -181,6 +182,7 @@ export function DitheringSection({
               <Slider
                 label="Random Noise"
                 showValue
+                unit="%"
                 value={[(settings.randomNoise ?? 0) * 100]}
                 onValueChange={([value]) =>
                   onSettingsChange({ randomNoise: value / 100 })

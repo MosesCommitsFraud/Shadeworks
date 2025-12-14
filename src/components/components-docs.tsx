@@ -25,6 +25,7 @@ function useComponentRegistry() {
         code: `<Slider
   label="Strength"
   showValue
+  unit="%"
   value={[value]}
   onValueChange={([v]) => setValue(v)}
   min={0}
@@ -38,6 +39,7 @@ function useComponentRegistry() {
               <Slider
                 label="Strength"
                 showValue
+                unit="%"
                 value={[value]}
                 onValueChange={([v]) => setValue(v)}
                 min={0}

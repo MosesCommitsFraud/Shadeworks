@@ -1,6 +1,5 @@
 'use client';
 
-import { Label } from '@/components/ui/label';
 import {
   Select,
   SelectContent,
@@ -10,6 +9,7 @@ import {
 } from '@/components/ui/select';
 import { Slider } from '@/components/ui/slider';
 import { Separator } from '@/components/ui/separator';
+import { Label } from '@/components/ui/label';
 import type { ColorMode, ColorModeSettings } from '@/lib/dither/types';
 
 interface ColorModeSectionProps {
@@ -90,13 +90,9 @@ export function ColorModeSection({
         <>
           <Separator />
           <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <Label>Shades</Label>
-              <span className="text-xs text-muted-foreground">
-                {settings.shades ?? 16}
-              </span>
-            </div>
             <Slider
+              label="Shades"
+              showValue
               value={[settings.shades ?? 16]}
               onValueChange={([value]) => onSettingsChange({ shades: value })}
               min={2}
