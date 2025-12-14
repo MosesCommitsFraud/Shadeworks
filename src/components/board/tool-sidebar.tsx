@@ -5,6 +5,7 @@ import { useTheme } from 'next-themes';
 import { ChevronLeft, ChevronRight, Circle, Minus, Square, Type, Pencil, ArrowUpToLine, ArrowDownToLine, X, AlignLeft, AlignCenter, AlignRight } from 'lucide-react';
 import { Tool, COLORS, STROKE_WIDTHS, FONTS, FONT_SIZES, BoardElement } from '@/lib/board-types';
 import { cn } from '@/lib/utils';
+import { Slider } from '@/components/ui/slider';
 
 interface ToolSidebarProps {
   selectedTool: Tool;
@@ -444,24 +445,16 @@ export function ToolSidebar({
 
           {/* Opacity */}
           <div className="space-y-2">
-            <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-              Opacity
-            </label>
-            <div className="space-y-1">
-              <input
-                type="range"
-                min="0"
-                max="100"
-                value={opacity}
-                onChange={(e) => onOpacityChange(Number(e.target.value))}
-                className="w-full h-2 bg-secondary rounded-lg appearance-none cursor-pointer accent-accent"
-              />
-              <div className="flex justify-between text-xs text-muted-foreground">
-                <span>0%</span>
-                <span className="font-medium text-foreground">{opacity}%</span>
-                <span>100%</span>
-              </div>
-            </div>
+            <Slider
+              label="Opacity"
+              showValue
+              unit="%"
+              value={[opacity]}
+              onValueChange={([v]) => onOpacityChange(v)}
+              min={0}
+              max={100}
+              step={5}
+            />
           </div>
 
           {/* Layer Order (when elements are selected) */}

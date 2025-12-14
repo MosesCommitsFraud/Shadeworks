@@ -3,7 +3,7 @@
 import { useState, useRef, useCallback, useEffect, useMemo } from 'react';
 import { ArrowLeft, Download, ZoomIn, ZoomOut, Maximize2, Crop, Paintbrush, Eraser, Undo, Redo } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { ModernSlider } from '@/components/ui/modern-slider';
+import { Slider } from '@/components/ui/slider';
 import { useRouter } from 'next/navigation';
 
 type ViewState = 'original' | 'comparing' | 'processed';
@@ -1267,23 +1267,25 @@ export function BackgroundRemover() {
                     {/* Brush Settings */}
                     {(activeTool === 'brush' || activeTool === 'erase') && (
                       <div className="space-y-4 p-4 bg-muted/50 rounded-lg">
-                        <ModernSlider
+                        <Slider
                           label="Brush Size"
-                          value={brushSize}
-                          onChange={setBrushSize}
+                          showValue
+                          unit="px"
+                          value={[brushSize]}
+                          onValueChange={([v]) => setBrushSize(v)}
                           min={1}
                           max={100}
                           step={1}
-                          formatValue={(v) => `${v}px`}
                         />
-                        <ModernSlider
+                        <Slider
                           label="Brush Strength"
-                          value={brushStrength}
-                          onChange={setBrushStrength}
+                          showValue
+                          unit="%"
+                          value={[brushStrength]}
+                          onValueChange={([v]) => setBrushStrength(v)}
                           min={1}
                           max={100}
                           step={1}
-                          formatValue={(v) => `${v}%`}
                         />
                       </div>
                     )}
@@ -1331,39 +1333,42 @@ export function BackgroundRemover() {
                           </Button>
                         ))}
                       </div>
-                      <ModernSlider
+                      <Slider
                         label="Custom Scale"
-                        value={selectedScale}
-                        onChange={setSelectedScale}
-                        min={0.1}
-                        max={4}
-                        step={0.1}
-                        formatValue={(v) => `${Math.round(v * 100)}%`}
+                        showValue
+                        unit="%"
+                        value={[selectedScale * 100]}
+                        onValueChange={([v]) => setSelectedScale(v / 100)}
+                        min={10}
+                        max={400}
+                        step={10}
                       />
                     </div>
 
                     {/* Quality Settings */}
                     {selectedFormat === 'jpg' && (
-                      <ModernSlider
+                      <Slider
                         label="JPG Quality"
-                        value={jpgQuality}
-                        onChange={setJpgQuality}
+                        showValue
+                        unit="%"
+                        value={[jpgQuality]}
+                        onValueChange={([v]) => setJpgQuality(v)}
                         min={1}
                         max={100}
                         step={1}
-                        formatValue={(v) => `${v}%`}
                       />
                     )}
 
                     {selectedFormat === 'webp' && (
-                      <ModernSlider
+                      <Slider
                         label="WebP Quality"
-                        value={webpQuality}
-                        onChange={setWebpQuality}
+                        showValue
+                        unit="%"
+                        value={[webpQuality]}
+                        onValueChange={([v]) => setWebpQuality(v)}
                         min={1}
                         max={100}
                         step={1}
-                        formatValue={(v) => `${v}%`}
                       />
                     )}
 
