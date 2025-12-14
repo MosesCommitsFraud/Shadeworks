@@ -238,7 +238,7 @@ function useComponentRegistry() {
       {
         id: "tabs",
         name: "Tabs",
-        description: "Tab navigation with moving highlight indicator and smooth content transitions.",
+        description: "Tab navigation with moving secondary background highlight and smooth content transitions.",
         code: `<Tabs defaultValue="account">
   <TabsList>
     <TabsTrigger value="account">Account</TabsTrigger>

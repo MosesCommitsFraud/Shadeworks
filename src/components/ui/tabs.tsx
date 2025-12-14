@@ -15,6 +15,7 @@ const TabsList = React.forwardRef<
   const [highlightStyle, setHighlightStyle] = React.useState<React.CSSProperties>({})
   const tabRefs = React.useRef<Map<string, HTMLButtonElement>>(new Map())
   const listRef = React.useRef<HTMLDivElement>(null)
+  const initializedRef = React.useRef(false)
 
   React.useEffect(() => {
     const updateHighlight = () => {
@@ -31,7 +32,19 @@ const TabsList = React.forwardRef<
       }
     }
 
-    updateHighlight()
+    if (activeTab) {
+      updateHighlight()
+    } else if (!initializedRef.current && tabRefs.current.size > 0) {
+      // Initialize with first active tab if none set
+      const firstActive = Array.from(tabRefs.current.entries()).find(([_, button]) =>
+        button.getAttribute('data-state') === 'active'
+      )
+      if (firstActive) {
+        setActiveTab(firstActive[0])
+        initializedRef.current = true
+      }
+    }
+
     window.addEventListener('resize', updateHighlight)
     return () => window.removeEventListener('resize', updateHighlight)
   }, [activeTab])
@@ -44,14 +57,14 @@ const TabsList = React.forwardRef<
         if (node) (listRef as React.MutableRefObject<HTMLDivElement>).current = node
       }}
       className={cn(
-        "relative inline-flex h-9 w-fit items-center justify-center text-muted-foreground",
+        "relative inline-flex h-9 w-fit items-center justify-center gap-1 text-muted-foreground",
         className
       )}
       {...props}
     >
       {activeTab && (
         <div
-          className="absolute z-0 inset-y-0 left-0 rounded-lg bg-accent border border-transparent transition-all duration-300 ease-out"
+          className="absolute z-0 top-0 left-0 rounded-md bg-secondary transition-all duration-300 ease-out"
           style={highlightStyle}
         />
       )}
@@ -62,6 +75,18 @@ const TabsList = React.forwardRef<
             registerRef: (value: string, ref: HTMLButtonElement | null) => {
               if (ref) {
                 tabRefs.current.set(value, ref)
+                // Trigger initialization check after first ref is registered
+                if (!initializedRef.current) {
+                  setTimeout(() => {
+                    const firstActive = Array.from(tabRefs.current.entries()).find(([_, button]) =>
+                      button.getAttribute('data-state') === 'active'
+                    )
+                    if (firstActive && !activeTab) {
+                      setActiveTab(firstActive[0])
+                      initializedRef.current = true
+                    }
+                  }, 0)
+                }
               } else {
                 tabRefs.current.delete(value)
               }
@@ -104,7 +129,7 @@ const TabsTrigger = React.forwardRef<
       }}
       value={value}
       className={cn(
-        "relative z-10 inline-flex h-[calc(100%-2px)] flex-1 items-center justify-center gap-1.5 rounded-md w-full px-3 py-1.5 text-sm font-medium whitespace-nowrap transition-colors duration-500 ease-in-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 data-[state=active]:text-foreground data-[state=inactive]:text-muted-foreground hover:text-foreground",
+        "relative z-10 inline-flex h-full items-center justify-center gap-1.5 rounded-md px-3 py-1 text-sm font-medium whitespace-nowrap transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 data-[state=active]:text-foreground data-[state=inactive]:text-muted-foreground",
         className
       )}
       onMouseDown={() => {
