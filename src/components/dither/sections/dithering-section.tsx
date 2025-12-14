@@ -159,13 +159,9 @@ export function DitheringSection({
 
             {/* Error attenuation */}
             <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <Label>Error Attenuation</Label>
-                <span className="text-xs text-muted-foreground">
-                  {Math.round((settings.errorAttenuation ?? 1.0) * 100)}%
-                </span>
-              </div>
               <Slider
+                label="Error Attenuation"
+                showValue
                 value={[(settings.errorAttenuation ?? 1.0) * 100]}
                 onValueChange={([value]) =>
                   onSettingsChange({ errorAttenuation: value / 100 })
@@ -182,13 +178,9 @@ export function DitheringSection({
 
             {/* Random noise */}
             <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <Label>Random Noise</Label>
-                <span className="text-xs text-muted-foreground">
-                  {Math.round((settings.randomNoise ?? 0) * 100)}%
-                </span>
-              </div>
               <Slider
+                label="Random Noise"
+                showValue
                 value={[(settings.randomNoise ?? 0) * 100]}
                 onValueChange={([value]) =>
                   onSettingsChange({ randomNoise: value / 100 })
