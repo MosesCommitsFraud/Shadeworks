@@ -5,7 +5,7 @@ import { useMemo, useState } from "react"
 import { cn } from "@/lib/utils"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { ModernSlider } from "@/components/ui/modern-slider"
+import { Slider } from "@/components/ui/slider"
 
 type ComponentEntry = {
   id: string
@@ -19,22 +19,31 @@ function useComponentRegistry() {
   return useMemo<ComponentEntry[]>(
     () => [
       {
-        id: "modern-slider",
-        name: "Modern Slider",
-        description: "Custom slider with connected pill end-cap and smooth pointer dragging.",
-        code: `<ModernSlider
+        id: "slider",
+        name: "Slider",
+        description: "Smooth animated slider with track height transitions and glow effects.",
+        code: `<Slider
   label="Strength"
-  value={value}
+  showValue
+  value={[value]}
+  onValueChange={([v]) => setValue(v)}
   min={0}
   max={100}
   step={1}
-  onChange={setValue}
 />`,
         Preview: function Preview() {
           const [value, setValue] = useState(55)
           return (
             <div className="max-w-sm">
-              <ModernSlider label="Strength" value={value} min={0} max={100} step={1} onChange={setValue} />
+              <Slider
+                label="Strength"
+                showValue
+                value={[value]}
+                onValueChange={([v]) => setValue(v)}
+                min={0}
+                max={100}
+                step={1}
+              />
             </div>
           )
         },
