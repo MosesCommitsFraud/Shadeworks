@@ -6,6 +6,27 @@ import { cn } from "@/lib/utils"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Slider } from "@/components/ui/slider"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuGroup,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuShortcut,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+import { Label } from "@/components/ui/label"
 
 type ComponentEntry = {
   id: string
@@ -57,7 +78,6 @@ function useComponentRegistry() {
         code: `<div className="flex gap-2">
   <Button>Primary</Button>
   <Button variant="secondary">Secondary</Button>
-  <Button variant="destructive">Destructive</Button>
   <Button variant="outline">Outline</Button>
   <Button variant="ghost">Ghost</Button>
   <Button variant="link">Link</Button>
@@ -67,10 +87,147 @@ function useComponentRegistry() {
             <div className="flex flex-wrap gap-2">
               <Button>Primary</Button>
               <Button variant="secondary">Secondary</Button>
-              <Button variant="destructive">Destructive</Button>
               <Button variant="outline">Outline</Button>
               <Button variant="ghost">Ghost</Button>
               <Button variant="link">Link</Button>
+            </div>
+          )
+        },
+      },
+      {
+        id: "dropdown",
+        name: "Dropdown Menu",
+        description: "Action menu with smooth animations, nested submenus, and keyboard shortcut hints.",
+        code: `<DropdownMenu>
+  <DropdownMenuTrigger asChild>
+    <Button variant="outline">Open Menu</Button>
+  </DropdownMenuTrigger>
+  <DropdownMenuContent className="w-56">
+    <DropdownMenuLabel>My Account</DropdownMenuLabel>
+    <DropdownMenuGroup>
+      <DropdownMenuItem>
+        Profile
+        <DropdownMenuShortcut>⇧⌘P</DropdownMenuShortcut>
+      </DropdownMenuItem>
+      <DropdownMenuItem>
+        Settings
+        <DropdownMenuShortcut>⌘S</DropdownMenuShortcut>
+      </DropdownMenuItem>
+    </DropdownMenuGroup>
+    <DropdownMenuSeparator />
+    <DropdownMenuGroup>
+      <DropdownMenuSub>
+        <DropdownMenuSubTrigger>Share</DropdownMenuSubTrigger>
+        <DropdownMenuSubContent>
+          <DropdownMenuItem>Email</DropdownMenuItem>
+          <DropdownMenuItem>Message</DropdownMenuItem>
+        </DropdownMenuSubContent>
+      </DropdownMenuSub>
+    </DropdownMenuGroup>
+    <DropdownMenuSeparator />
+    <DropdownMenuItem>Support</DropdownMenuItem>
+    <DropdownMenuItem disabled>API</DropdownMenuItem>
+    <DropdownMenuSeparator />
+    <DropdownMenuItem>
+      Sign Out
+      <DropdownMenuShortcut>⇧⌘Q</DropdownMenuShortcut>
+    </DropdownMenuItem>
+  </DropdownMenuContent>
+</DropdownMenu>`,
+        Preview: function Preview() {
+          return (
+            <div className="flex items-center justify-center py-4">
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline">Open Menu</Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent className="w-56">
+                  <DropdownMenuLabel>My Account</DropdownMenuLabel>
+                  <DropdownMenuGroup>
+                    <DropdownMenuItem>
+                      Profile
+                      <DropdownMenuShortcut>⇧⌘P</DropdownMenuShortcut>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem>
+                      Billing
+                      <DropdownMenuShortcut>⌘B</DropdownMenuShortcut>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem>
+                      Settings
+                      <DropdownMenuShortcut>⌘S</DropdownMenuShortcut>
+                    </DropdownMenuItem>
+                  </DropdownMenuGroup>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuGroup>
+                    <DropdownMenuItem>Team</DropdownMenuItem>
+                    <DropdownMenuSub>
+                      <DropdownMenuSubTrigger>Share</DropdownMenuSubTrigger>
+                      <DropdownMenuSubContent>
+                        <DropdownMenuItem>Email</DropdownMenuItem>
+                        <DropdownMenuItem>Message</DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem>More...</DropdownMenuItem>
+                      </DropdownMenuSubContent>
+                    </DropdownMenuSub>
+                    <DropdownMenuItem>
+                      New Team
+                      <DropdownMenuShortcut>⌘+T</DropdownMenuShortcut>
+                    </DropdownMenuItem>
+                  </DropdownMenuGroup>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem>GitHub</DropdownMenuItem>
+                  <DropdownMenuItem>Support</DropdownMenuItem>
+                  <DropdownMenuItem disabled>API</DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem>
+                    Sign Out
+                    <DropdownMenuShortcut>⇧⌘Q</DropdownMenuShortcut>
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
+          )
+        },
+      },
+      {
+        id: "select",
+        name: "Select",
+        description: "Polished select with accent border highlights, smooth animations, and sliding text on hover.",
+        code: `<div className="space-y-2">
+  <Label>Dithering Algorithm</Label>
+  <Select value={value} onValueChange={setValue}>
+    <SelectTrigger>
+      <SelectValue placeholder="Choose an algorithm" />
+    </SelectTrigger>
+    <SelectContent>
+      <SelectItem value="floyd">Floyd-Steinberg</SelectItem>
+      <SelectItem value="atkinson">Atkinson</SelectItem>
+      <SelectItem value="ordered">Ordered (Bayer)</SelectItem>
+      <SelectItem value="stucki">Stucki</SelectItem>
+      <SelectItem value="sierra">Sierra</SelectItem>
+    </SelectContent>
+  </Select>
+</div>`,
+        Preview: function Preview() {
+          const [value, setValue] = useState("floyd")
+          return (
+            <div className="max-w-xs space-y-2">
+              <Label>Dithering Algorithm</Label>
+              <Select value={value} onValueChange={setValue}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Choose an algorithm" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="floyd">Floyd-Steinberg</SelectItem>
+                  <SelectItem value="atkinson">Atkinson</SelectItem>
+                  <SelectItem value="ordered">Ordered (Bayer)</SelectItem>
+                  <SelectItem value="stucki">Stucki</SelectItem>
+                  <SelectItem value="sierra">Sierra</SelectItem>
+                  <SelectItem value="jarvis">Jarvis-Judice-Ninke</SelectItem>
+                  <SelectItem value="burkes">Burkes</SelectItem>
+                  <SelectItem value="false">False Floyd-Steinberg</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
           )
         },
