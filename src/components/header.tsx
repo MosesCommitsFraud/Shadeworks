@@ -5,8 +5,9 @@ import { ChevronDown, Pencil, Grip, Eraser, ImageIcon } from "lucide-react"
 
 export function Header() {
   return (
-    <header className="border-b border-transparent sticky top-0 z-50">
-      <div className="max-w-6xl mx-auto px-4">
+    <header className="border-b border-transparent sticky top-0 z-50 relative isolate backdrop-blur supports-[backdrop-filter]:bg-black/10">
+      <div className="pointer-events-none absolute inset-x-0 top-0 h-24 bg-gradient-to-b from-black/90 via-black/60 to-transparent" />
+      <div className="max-w-6xl mx-auto px-4 relative z-10">
         <nav className="flex items-center justify-start gap-10 h-16">
           {/* Logo */}
           <Link href="/" className="flex items-center">
