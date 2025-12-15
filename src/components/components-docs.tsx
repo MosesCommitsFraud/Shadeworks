@@ -34,6 +34,7 @@ import {
   AccordionTrigger,
 } from "@/components/ui/accordion"
 import { CodeBlock as StyledCodeBlock } from "@/components/ui/code-block"
+import { Kbd, KbdGroup } from "@/components/ui/kbd"
 import { ArrowLeft, ArrowRight, Download, Heart, Settings } from "lucide-react"
 import { AnimateCursorApiReference, AnimateCursorFollowPreview, AnimateCursorMinimalPreview } from "@/components/animate-ui/docs/animate-cursor-docs"
 import { PropsTable, type PropRow } from "@/components/docs/props-table"
@@ -567,6 +568,200 @@ export function Example() {
               </div>
               <PropsTable title="DropdownMenuContent" rows={contentRows} />
               <PropsTable title="DropdownMenuItem" rows={itemRows} />
+            </div>
+          )
+        },
+      },
+      {
+        id: "kbd",
+        name: "Kbd",
+        description: "Keyboard key component for displaying keyboard shortcuts and key combinations.",
+        code: `'use client'
+
+import { Kbd, KbdGroup } from "@/components/ui/kbd"
+
+export function Example() {
+  return <Kbd>⌘</Kbd>
+}`,
+        previewVariants: [
+          {
+            id: "single",
+            name: "Single Keys",
+            description: "Individual keyboard keys.",
+            code: `<div className="flex flex-wrap gap-2">
+  <Kbd>⌘</Kbd>
+  <Kbd>Shift</Kbd>
+  <Kbd>Ctrl</Kbd>
+  <Kbd>Alt</Kbd>
+  <Kbd>Enter</Kbd>
+  <Kbd>Esc</Kbd>
+  <Kbd>Tab</Kbd>
+  <Kbd>Space</Kbd>
+</div>`,
+            Preview: function Preview() {
+              return (
+                <div className="flex flex-wrap gap-2">
+                  <Kbd>⌘</Kbd>
+                  <Kbd>Shift</Kbd>
+                  <Kbd>Ctrl</Kbd>
+                  <Kbd>Alt</Kbd>
+                  <Kbd>Enter</Kbd>
+                  <Kbd>Esc</Kbd>
+                  <Kbd>Tab</Kbd>
+                  <Kbd>Space</Kbd>
+                </div>
+              )
+            },
+          },
+          {
+            id: "combinations",
+            name: "Key Combinations",
+            description: "Multiple keys grouped together in a single pill.",
+            code: `<div className="flex flex-col gap-3">
+  <div className="flex items-center gap-2">
+    <span className="text-sm text-muted-foreground w-32">Copy</span>
+    <KbdGroup>⌘ C</KbdGroup>
+  </div>
+  <div className="flex items-center gap-2">
+    <span className="text-sm text-muted-foreground w-32">Paste</span>
+    <KbdGroup>⌘ V</KbdGroup>
+  </div>
+  <div className="flex items-center gap-2">
+    <span className="text-sm text-muted-foreground w-32">Save</span>
+    <KbdGroup>⌘ S</KbdGroup>
+  </div>
+  <div className="flex items-center gap-2">
+    <span className="text-sm text-muted-foreground w-32">Select All</span>
+    <KbdGroup>⌘ A</KbdGroup>
+  </div>
+</div>`,
+            Preview: function Preview() {
+              return (
+                <div className="flex flex-col gap-3">
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm text-muted-foreground w-32">Copy</span>
+                    <KbdGroup>⌘ C</KbdGroup>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm text-muted-foreground w-32">Paste</span>
+                    <KbdGroup>⌘ V</KbdGroup>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm text-muted-foreground w-32">Save</span>
+                    <KbdGroup>⌘ S</KbdGroup>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm text-muted-foreground w-32">Select All</span>
+                    <KbdGroup>⌘ A</KbdGroup>
+                  </div>
+                </div>
+              )
+            },
+          },
+          {
+            id: "inline",
+            name: "In Text",
+            description: "Keyboard shortcuts inline with text.",
+            code: `<div className="space-y-2">
+  <p className="text-sm text-muted-foreground">
+    Press <Kbd>⌘</Kbd> <Kbd>K</Kbd> to open the command palette.
+  </p>
+  <p className="text-sm text-muted-foreground">
+    Use <Kbd>Ctrl</Kbd> <Kbd>Shift</Kbd> <Kbd>P</Kbd> to show all commands.
+  </p>
+  <p className="text-sm text-muted-foreground">
+    Press <Kbd>Esc</Kbd> to dismiss this dialog.
+  </p>
+</div>`,
+            Preview: function Preview() {
+              return (
+                <div className="space-y-2">
+                  <p className="text-sm text-muted-foreground">
+                    Press <Kbd>⌘</Kbd> <Kbd>K</Kbd> to open the command palette.
+                  </p>
+                  <p className="text-sm text-muted-foreground">
+                    Use <Kbd>Ctrl</Kbd> <Kbd>Shift</Kbd> <Kbd>P</Kbd> to show all commands.
+                  </p>
+                  <p className="text-sm text-muted-foreground">
+                    Press <Kbd>Esc</Kbd> to dismiss this dialog.
+                  </p>
+                </div>
+              )
+            },
+          },
+        ],
+        Preview: function Preview() {
+          return (
+            <div className="flex flex-col gap-6">
+              <div className="flex flex-wrap gap-2">
+                <Kbd>⌘</Kbd>
+                <Kbd>Shift</Kbd>
+                <Kbd>Ctrl</Kbd>
+                <Kbd>Alt</Kbd>
+              </div>
+              <div className="flex flex-col gap-3">
+                <div className="flex items-center gap-2">
+                  <span className="text-sm text-muted-foreground w-24">Copy</span>
+                  <KbdGroup>⌘ C</KbdGroup>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-sm text-muted-foreground w-24">Paste</span>
+                  <KbdGroup>⌘ V</KbdGroup>
+                </div>
+              </div>
+            </div>
+          )
+        },
+        ApiReference: function ApiReference() {
+          const kbdRows: PropRow[] = [
+            {
+              prop: "children",
+              type: "React.ReactNode",
+              defaultValue: "—",
+              description: "The key label or symbol to display.",
+            },
+            {
+              prop: "className",
+              type: "string",
+              defaultValue: "—",
+              description: "Additional CSS classes to apply.",
+            },
+            {
+              prop: "...props",
+              type: `React.ComponentProps<"kbd">`,
+              defaultValue: "—",
+              description: "All standard kbd element props.",
+            },
+          ]
+
+          const groupRows: PropRow[] = [
+            {
+              prop: "children",
+              type: "React.ReactNode",
+              defaultValue: "—",
+              description: "Key combination content (e.g., '⌘ C' or '⌘ Shift S').",
+            },
+            {
+              prop: "className",
+              type: "string",
+              defaultValue: "—",
+              description: "Additional CSS classes to apply.",
+            },
+            {
+              prop: "...props",
+              type: `React.ComponentProps<"kbd">`,
+              defaultValue: "—",
+              description: "All standard kbd element props.",
+            },
+          ]
+
+          return (
+            <div className="space-y-6">
+              <div className="text-sm text-muted-foreground">
+                The Kbd component displays individual keyboard keys. Use KbdGroup to display key combinations in a single pill-shaped element.
+              </div>
+              <PropsTable title="Kbd" rows={kbdRows} />
+              <PropsTable title="KbdGroup" rows={groupRows} />
             </div>
           )
         },

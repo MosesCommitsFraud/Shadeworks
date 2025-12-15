@@ -200,7 +200,7 @@ function KbdBase({
     <kbd
       data-slot={dataSlot}
       className={cn(
-        "inline-flex items-center rounded-[8px] border border-white/0 bg-neutral-900/80 text-sm font-medium leading-none text-neutral-100 shadow-[0_1px_0_rgba(255,255,255,0.08)] backdrop-blur select-none",
+        "inline-flex items-center rounded-[8px] border border-white/3 bg-neutral-900/80 text-sm font-medium leading-none text-neutral-100 shadow-[0_1px_0_rgba(255,255,255,0.08)] backdrop-blur select-none",
         spacing,
         "[[data-slot=tooltip-content]_&]:bg-background/20 [[data-slot=tooltip-content]_&]:text-background",
         "dark:[[data-slot=tooltip-content]_&]:bg-background/10",
