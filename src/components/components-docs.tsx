@@ -1671,7 +1671,7 @@ export function ComponentsDocs() {
             />
           )}
           <div>
-            <div className="text-sm font-medium text-foreground mb-2">Sections</div>
+            <div className="relative z-10 text-sm font-medium text-foreground mb-2">Sections</div>
             <nav className="grid gap-1 pl-2">
               <button
                 ref={(el) => {
@@ -1680,7 +1680,7 @@ export function ComponentsDocs() {
                 }}
                 type="button"
                 className={cn(
-                  "relative z-10 rounded-md px-2 py-1 text-sm transition-colors hover:bg-muted/50 text-left",
+                  "relative z-10 rounded-md px-2 py-1 text-sm transition-colors hover:bg-secondary/60 text-left",
                   activeId === "introduction" ? "text-foreground" : "text-muted-foreground"
                 )}
                 onClick={() => handleNavigate("introduction")}
@@ -1690,7 +1690,7 @@ export function ComponentsDocs() {
             </nav>
           </div>
           <div>
-            <div className="text-sm font-medium text-foreground mb-2">Components</div>
+            <div className="relative z-10 text-sm font-medium text-foreground mb-2">Components</div>
             <nav className="grid gap-1 pl-2">
               {registry.map((entry) => (
                 <button
@@ -1701,7 +1701,7 @@ export function ComponentsDocs() {
                   }}
                   type="button"
                   className={cn(
-                    "relative z-10 rounded-md px-2 py-1 text-sm transition-colors hover:bg-muted/50 text-left",
+                    "relative z-10 rounded-md px-2 py-1 text-sm transition-colors hover:bg-secondary/60 text-left",
                     activeId === entry.id ? "text-foreground" : "text-muted-foreground"
                   )}
                   onClick={() => handleNavigate(entry.id)}
