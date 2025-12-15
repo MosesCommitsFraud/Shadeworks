@@ -14,7 +14,7 @@ type MacKey =
 type KbdProps = React.ComponentProps<"kbd"> & {
   /**
    * Optional list of keys to render.
-   * Falls back to parsing string children into individual tokens.
+   * Falls back to parsing string children into a single token.
    */
   keys?: Array<React.ReactNode>
 }
@@ -159,10 +159,9 @@ function normalizeKeys(keys?: Array<React.ReactNode>, children?: React.ReactNode
   }
 
   if (typeof children === "string") {
-    return children
-      .trim()
-      .split(/\s+/)
-      .filter(Boolean)
+    const trimmed = children.trim()
+    if (!trimmed) return []
+    return trimmed.split(/\s+/).filter(Boolean)
   }
 
   return React.Children.toArray(children)
@@ -174,7 +173,7 @@ function renderKey(key: React.ReactNode, index: number) {
 
     if (normalized) {
       const Icon = KEY_ICONS[normalized]
-      return <Icon className="h-3.5 w-3.5 shrink-0" key={`${normalized}-${index}`} />
+      return <Icon className="h-[1em] w-[1em] shrink-0" key={`${normalized}-${index}`} />
     }
 
     return (
@@ -201,7 +200,7 @@ function KbdBase({
     <kbd
       data-slot={dataSlot}
       className={cn(
-        "inline-flex items-center rounded-[8px] border border-white/5 bg-neutral-900/80 text-sm font-medium text-neutral-100 shadow-[0_1px_0_rgba(255,255,255,0.08)] backdrop-blur select-none",
+        "inline-flex items-center rounded-[8px] border border-white/0 bg-neutral-900/80 text-sm font-medium leading-none text-neutral-100 shadow-[0_1px_0_rgba(255,255,255,0.08)] backdrop-blur select-none",
         spacing,
         "[[data-slot=tooltip-content]_&]:bg-background/20 [[data-slot=tooltip-content]_&]:text-background",
         "dark:[[data-slot=tooltip-content]_&]:bg-background/10",
@@ -216,7 +215,7 @@ function KbdBase({
 
 function Kbd({ className, keys, children, ...props }: KbdProps) {
   return (
-    <KbdBase className={className} dataSlot="kbd" keys={keys} spacing="gap-0 px-1.5 py-1" {...props}>
+    <KbdBase className={className} dataSlot="kbd" keys={keys} spacing="gap-0.5 px-2 py-1" {...props}>
       {children}
     </KbdBase>
   )
