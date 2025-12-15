@@ -1,7 +1,7 @@
 "use client"
 
 import type React from "react"
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Slider } from "@/components/ui/slider"
@@ -1506,6 +1506,9 @@ export function ComponentsDocs() {
   const registry = useComponentRegistry()
   const [activeId, setActiveId] = useState("introduction")
   const [activePreviewVariantId, setActivePreviewVariantId] = useState<string>("")
+  const [highlightStyle, setHighlightStyle] = useState<React.CSSProperties>({})
+  const navRefs = useRef<Map<string, HTMLButtonElement>>(new Map())
+  const navContainerRef = useRef<HTMLDivElement>(null)
 
   const currentIndex = registry.findIndex((entry) => entry.id === activeId)
   const prevComponent = currentIndex > 0 ? registry[currentIndex - 1] : null
@@ -1530,18 +1533,51 @@ export function ComponentsDocs() {
     setActivePreviewVariantId(activeEntry.previewVariants[0].id)
   }, [activeId, activeEntry?.previewVariants])
 
+  useEffect(() => {
+    const updateHighlight = () => {
+      const activeButton = navRefs.current.get(activeId)
+      if (activeButton && navContainerRef.current) {
+        const containerRect = navContainerRef.current.getBoundingClientRect()
+        const buttonRect = activeButton.getBoundingClientRect()
+
+        setHighlightStyle({
+          width: buttonRect.width,
+          height: buttonRect.height,
+          transform: `translateY(${buttonRect.top - containerRect.top}px)`,
+        })
+      }
+    }
+
+    if (activeId) {
+      updateHighlight()
+    }
+
+    window.addEventListener('resize', updateHighlight)
+    return () => window.removeEventListener('resize', updateHighlight)
+  }, [activeId])
+
   return (
     <div className="grid gap-8 lg:grid-cols-[220px_1fr]">
       <aside className="sticky top-20 self-start">
-        <div className="space-y-4">
+        <div className="relative space-y-4" ref={navContainerRef}>
+          {activeId && (
+            <div
+              className="absolute z-0 top-0 left-0 rounded-md bg-secondary transition-all duration-500 ease-out"
+              style={highlightStyle}
+            />
+          )}
           <div>
             <div className="text-sm font-medium text-foreground mb-2">Sections</div>
             <nav className="grid gap-1 pl-2">
               <button
+                ref={(el) => {
+                  if (el) navRefs.current.set("introduction", el)
+                  else navRefs.current.delete("introduction")
+                }}
                 type="button"
                 className={cn(
-                  "rounded-md px-2 py-1 text-sm transition-colors hover:bg-muted text-left",
-                  activeId === "introduction" ? "bg-muted text-foreground" : "text-muted-foreground"
+                  "relative z-10 rounded-md px-2 py-1 text-sm transition-colors hover:bg-muted/50 text-left",
+                  activeId === "introduction" ? "text-foreground" : "text-muted-foreground"
                 )}
                 onClick={() => handleNavigate("introduction")}
               >
@@ -1555,10 +1591,14 @@ export function ComponentsDocs() {
               {registry.map((entry) => (
                 <button
                   key={entry.id}
+                  ref={(el) => {
+                    if (el) navRefs.current.set(entry.id, el)
+                    else navRefs.current.delete(entry.id)
+                  }}
                   type="button"
                   className={cn(
-                    "rounded-md px-2 py-1 text-sm transition-colors hover:bg-muted text-left",
-                    activeId === entry.id ? "bg-muted text-foreground" : "text-muted-foreground"
+                    "relative z-10 rounded-md px-2 py-1 text-sm transition-colors hover:bg-muted/50 text-left",
+                    activeId === entry.id ? "text-foreground" : "text-muted-foreground"
                   )}
                   onClick={() => handleNavigate(entry.id)}
                 >
