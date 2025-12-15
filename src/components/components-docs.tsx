@@ -587,52 +587,74 @@ export function Example() {
           {
             id: "single",
             name: "Single Keys",
-            description: "Individual keyboard keys.",
+            description: "Individual keyboard keys with Mac icons.",
             code: `<div className="flex flex-wrap gap-2">
   <Kbd>⌘</Kbd>
-  <Kbd>Shift</Kbd>
-  <Kbd>Ctrl</Kbd>
-  <Kbd>Alt</Kbd>
+  <Kbd>⇧</Kbd>
+  <Kbd>⌥</Kbd>
+  <Kbd>⌃</Kbd>
   <Kbd>Enter</Kbd>
   <Kbd>Esc</Kbd>
   <Kbd>Tab</Kbd>
   <Kbd>Space</Kbd>
+  <Kbd>A</Kbd>
+  <Kbd>K</Kbd>
 </div>`,
             Preview: function Preview() {
               return (
                 <div className="flex flex-wrap gap-2">
                   <Kbd>⌘</Kbd>
-                  <Kbd>Shift</Kbd>
-                  <Kbd>Ctrl</Kbd>
-                  <Kbd>Alt</Kbd>
+                  <Kbd>⇧</Kbd>
+                  <Kbd>⌥</Kbd>
+                  <Kbd>⌃</Kbd>
                   <Kbd>Enter</Kbd>
                   <Kbd>Esc</Kbd>
                   <Kbd>Tab</Kbd>
                   <Kbd>Space</Kbd>
+                  <Kbd>A</Kbd>
+                  <Kbd>K</Kbd>
                 </div>
               )
             },
           },
           {
-            id: "combinations",
-            name: "Key Combinations",
-            description: "Multiple keys grouped together in a single pill.",
+            id: "single-pill",
+            name: "Single Pill",
+            description: "All keys in one pill with plus signs between.",
             code: `<div className="flex flex-col gap-3">
   <div className="flex items-center gap-2">
     <span className="text-sm text-muted-foreground w-32">Copy</span>
-    <KbdGroup>⌘ C</KbdGroup>
+    <KbdGroup>
+      <span>⌘</span>
+      <span className="text-sm opacity-85">+</span>
+      <span>C</span>
+    </KbdGroup>
   </div>
   <div className="flex items-center gap-2">
     <span className="text-sm text-muted-foreground w-32">Paste</span>
-    <KbdGroup>⌘ V</KbdGroup>
+    <KbdGroup>
+      <span>⌘</span>
+      <span className="text-sm opacity-85">+</span>
+      <span>V</span>
+    </KbdGroup>
   </div>
   <div className="flex items-center gap-2">
     <span className="text-sm text-muted-foreground w-32">Save</span>
-    <KbdGroup>⌘ S</KbdGroup>
+    <KbdGroup>
+      <span>⌘</span>
+      <span className="text-sm opacity-85">+</span>
+      <span>S</span>
+    </KbdGroup>
   </div>
   <div className="flex items-center gap-2">
-    <span className="text-sm text-muted-foreground w-32">Select All</span>
-    <KbdGroup>⌘ A</KbdGroup>
+    <span className="text-sm text-muted-foreground w-32">Force Quit</span>
+    <KbdGroup>
+      <span>⌘</span>
+      <span className="text-sm opacity-85">+</span>
+      <span>⌥</span>
+      <span className="text-sm opacity-85">+</span>
+      <span>Esc</span>
+    </KbdGroup>
   </div>
 </div>`,
             Preview: function Preview() {
@@ -640,51 +662,119 @@ export function Example() {
                 <div className="flex flex-col gap-3">
                   <div className="flex items-center gap-2">
                     <span className="text-sm text-muted-foreground w-32">Copy</span>
-                    <KbdGroup>⌘ C</KbdGroup>
+                    <KbdGroup>
+                      <span>⌘</span>
+                      <span className="text-sm opacity-85">+</span>
+                      <span>C</span>
+                    </KbdGroup>
                   </div>
                   <div className="flex items-center gap-2">
                     <span className="text-sm text-muted-foreground w-32">Paste</span>
-                    <KbdGroup>⌘ V</KbdGroup>
+                    <KbdGroup>
+                      <span>⌘</span>
+                      <span className="text-sm opacity-85">+</span>
+                      <span>V</span>
+                    </KbdGroup>
                   </div>
                   <div className="flex items-center gap-2">
                     <span className="text-sm text-muted-foreground w-32">Save</span>
-                    <KbdGroup>⌘ S</KbdGroup>
+                    <KbdGroup>
+                      <span>⌘</span>
+                      <span className="text-sm opacity-85">+</span>
+                      <span>S</span>
+                    </KbdGroup>
                   </div>
                   <div className="flex items-center gap-2">
-                    <span className="text-sm text-muted-foreground w-32">Select All</span>
-                    <KbdGroup>⌘ A</KbdGroup>
+                    <span className="text-sm text-muted-foreground w-32">Force Quit</span>
+                    <KbdGroup>
+                      <span>⌘</span>
+                      <span className="text-sm opacity-85">+</span>
+                      <span>⌥</span>
+                      <span className="text-sm opacity-85">+</span>
+                      <span>Esc</span>
+                    </KbdGroup>
                   </div>
                 </div>
               )
             },
           },
           {
-            id: "inline",
-            name: "In Text",
-            description: "Keyboard shortcuts inline with text.",
-            code: `<div className="space-y-2">
-  <p className="text-sm text-muted-foreground">
-    Press <Kbd>⌘</Kbd> <Kbd>K</Kbd> to open the command palette.
-  </p>
-  <p className="text-sm text-muted-foreground">
-    Use <Kbd>Ctrl</Kbd> <Kbd>Shift</Kbd> <Kbd>P</Kbd> to show all commands.
-  </p>
-  <p className="text-sm text-muted-foreground">
-    Press <Kbd>Esc</Kbd> to dismiss this dialog.
-  </p>
+            id: "multiple-pills",
+            name: "Multiple Pills",
+            description: "Separate pills with plus signs between.",
+            code: `<div className="flex flex-col gap-3">
+  <div className="flex items-center gap-2">
+    <span className="text-sm text-muted-foreground w-32">Copy</span>
+    <div className="inline-flex items-center gap-1">
+      <Kbd>⌘</Kbd>
+      <span className="text-muted-foreground text-xs">+</span>
+      <Kbd>C</Kbd>
+    </div>
+  </div>
+  <div className="flex items-center gap-2">
+    <span className="text-sm text-muted-foreground w-32">Paste</span>
+    <div className="inline-flex items-center gap-1">
+      <Kbd>⌘</Kbd>
+      <span className="text-muted-foreground text-xs">+</span>
+      <Kbd>V</Kbd>
+    </div>
+  </div>
+  <div className="flex items-center gap-2">
+    <span className="text-sm text-muted-foreground w-32">Save</span>
+    <div className="inline-flex items-center gap-1">
+      <Kbd>⌘</Kbd>
+      <span className="text-muted-foreground text-xs">+</span>
+      <Kbd>S</Kbd>
+    </div>
+  </div>
+  <div className="flex items-center gap-2">
+    <span className="text-sm text-muted-foreground w-32">Force Quit</span>
+    <div className="inline-flex items-center gap-1">
+      <Kbd>⌘</Kbd>
+      <span className="text-muted-foreground text-xs">+</span>
+      <Kbd>⌥</Kbd>
+      <span className="text-muted-foreground text-xs">+</span>
+      <Kbd>Esc</Kbd>
+    </div>
+  </div>
 </div>`,
             Preview: function Preview() {
               return (
-                <div className="space-y-2">
-                  <p className="text-sm text-muted-foreground">
-                    Press <Kbd>⌘</Kbd> <Kbd>K</Kbd> to open the command palette.
-                  </p>
-                  <p className="text-sm text-muted-foreground">
-                    Use <Kbd>Ctrl</Kbd> <Kbd>Shift</Kbd> <Kbd>P</Kbd> to show all commands.
-                  </p>
-                  <p className="text-sm text-muted-foreground">
-                    Press <Kbd>Esc</Kbd> to dismiss this dialog.
-                  </p>
+                <div className="flex flex-col gap-3">
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm text-muted-foreground w-32">Copy</span>
+                    <div className="inline-flex items-center gap-1">
+                      <Kbd>⌘</Kbd>
+                      <span className="text-muted-foreground text-xs">+</span>
+                      <Kbd>C</Kbd>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm text-muted-foreground w-32">Paste</span>
+                    <div className="inline-flex items-center gap-1">
+                      <Kbd>⌘</Kbd>
+                      <span className="text-muted-foreground text-xs">+</span>
+                      <Kbd>V</Kbd>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm text-muted-foreground w-32">Save</span>
+                    <div className="inline-flex items-center gap-1">
+                      <Kbd>⌘</Kbd>
+                      <span className="text-muted-foreground text-xs">+</span>
+                      <Kbd>S</Kbd>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm text-muted-foreground w-32">Force Quit</span>
+                    <div className="inline-flex items-center gap-1">
+                      <Kbd>⌘</Kbd>
+                      <span className="text-muted-foreground text-xs">+</span>
+                      <Kbd>⌥</Kbd>
+                      <span className="text-muted-foreground text-xs">+</span>
+                      <Kbd>Esc</Kbd>
+                    </div>
+                  </div>
                 </div>
               )
             },
@@ -695,18 +785,28 @@ export function Example() {
             <div className="flex flex-col gap-6">
               <div className="flex flex-wrap gap-2">
                 <Kbd>⌘</Kbd>
-                <Kbd>Shift</Kbd>
-                <Kbd>Ctrl</Kbd>
-                <Kbd>Alt</Kbd>
+                <Kbd>⇧</Kbd>
+                <Kbd>⌥</Kbd>
+                <Kbd>⌃</Kbd>
+                <Kbd>A</Kbd>
+                <Kbd>K</Kbd>
               </div>
               <div className="flex flex-col gap-3">
                 <div className="flex items-center gap-2">
-                  <span className="text-sm text-muted-foreground w-24">Copy</span>
-                  <KbdGroup>⌘ C</KbdGroup>
+                  <span className="text-sm text-muted-foreground w-32">Single Pill</span>
+                  <KbdGroup>
+                    <span>⌘</span>
+                    <span className="text-sm opacity-85">+</span>
+                    <span>K</span>
+                  </KbdGroup>
                 </div>
                 <div className="flex items-center gap-2">
-                  <span className="text-sm text-muted-foreground w-24">Paste</span>
-                  <KbdGroup>⌘ V</KbdGroup>
+                  <span className="text-sm text-muted-foreground w-32">Multiple Pills</span>
+                  <div className="inline-flex items-center gap-1">
+                    <Kbd>⌘</Kbd>
+                    <span className="text-muted-foreground text-xs">+</span>
+                    <Kbd>K</Kbd>
+                  </div>
                 </div>
               </div>
             </div>
@@ -758,7 +858,11 @@ export function Example() {
           return (
             <div className="space-y-6">
               <div className="text-sm text-muted-foreground">
-                The Kbd component displays individual keyboard keys. Use KbdGroup to display key combinations in a single pill-shaped element.
+                The Kbd component displays individual keyboard keys. For key combinations, use either:
+                <ul className="list-disc list-inside mt-2 space-y-1">
+                  <li><strong>KbdGroup</strong>: All keys in a single pill with + signs between</li>
+                  <li><strong>Multiple Kbd</strong>: Separate pills with + signs between</li>
+                </ul>
               </div>
               <PropsTable title="Kbd" rows={kbdRows} />
               <PropsTable title="KbdGroup" rows={groupRows} />
