@@ -27,6 +27,12 @@ import {
 } from "@/components/ui/select"
 import { Label } from "@/components/ui/label"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion"
 import { CodeBlock as StyledCodeBlock } from "@/components/ui/code-block"
 import { ArrowLeft, ArrowRight, Download, Heart, Settings } from "lucide-react"
 import { AnimateCursorApiReference, AnimateCursorFollowPreview, AnimateCursorMinimalPreview } from "@/components/animate-ui/docs/animate-cursor-docs"
@@ -1068,6 +1074,225 @@ export function Example() {
                 `Tabs` itself is a re-export of Radix `TabsPrimitive.Root`; wrappers add highlight behavior in `TabsList` + `TabsTrigger`.
               </div>
               <PropsTable title="TabsTrigger" rows={triggerRows} />
+            </div>
+          )
+        },
+      },
+      {
+        id: "accordion",
+        name: "Accordion",
+        description: "Expandable sections with smooth animations, collapsible content, and support for single or multiple open items.",
+        code: `'use client'
+
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion"
+
+export function Example() {
+  return (
+    <Accordion type="single" collapsible>
+      <AccordionItem value="item-1">
+        <AccordionTrigger>Section 1</AccordionTrigger>
+        <AccordionContent>
+          Content for section 1.
+        </AccordionContent>
+      </AccordionItem>
+    </Accordion>
+  )
+}`,
+        previewVariants: [
+          {
+            id: "single",
+            name: "Single",
+            description: "Only one section can be open at a time.",
+            code: `<Accordion type="single" collapsible className="w-full">
+  <AccordionItem value="item-1">
+    <AccordionTrigger>Getting Started</AccordionTrigger>
+    <AccordionContent>
+      Begin by installing the required dependencies and setting up your project structure.
+    </AccordionContent>
+  </AccordionItem>
+  <AccordionItem value="item-2">
+    <AccordionTrigger>Configuration</AccordionTrigger>
+    <AccordionContent>
+      Configure your environment variables and customize the settings to match your needs.
+    </AccordionContent>
+  </AccordionItem>
+  <AccordionItem value="item-3">
+    <AccordionTrigger>Deployment</AccordionTrigger>
+    <AccordionContent>
+      Deploy your application to production using your preferred hosting platform.
+    </AccordionContent>
+  </AccordionItem>
+</Accordion>`,
+            Preview: function Preview() {
+              return (
+                <div className="w-full max-w-md">
+                  <Accordion type="single" collapsible className="w-full">
+                    <AccordionItem value="item-1">
+                      <AccordionTrigger>Getting Started</AccordionTrigger>
+                      <AccordionContent>
+                        Begin by installing the required dependencies and setting up your project structure.
+                      </AccordionContent>
+                    </AccordionItem>
+                    <AccordionItem value="item-2">
+                      <AccordionTrigger>Configuration</AccordionTrigger>
+                      <AccordionContent>
+                        Configure your environment variables and customize the settings to match your needs.
+                      </AccordionContent>
+                    </AccordionItem>
+                    <AccordionItem value="item-3">
+                      <AccordionTrigger>Deployment</AccordionTrigger>
+                      <AccordionContent>
+                        Deploy your application to production using your preferred hosting platform.
+                      </AccordionContent>
+                    </AccordionItem>
+                  </Accordion>
+                </div>
+              )
+            },
+          },
+          {
+            id: "multiple",
+            name: "Multiple",
+            description: "Multiple sections can be open simultaneously.",
+            code: `<Accordion type="multiple" className="w-full">
+  <AccordionItem value="item-1">
+    <AccordionTrigger>Features</AccordionTrigger>
+    <AccordionContent>
+      Smooth animations, keyboard navigation, and full accessibility support.
+    </AccordionContent>
+  </AccordionItem>
+  <AccordionItem value="item-2">
+    <AccordionTrigger>Customization</AccordionTrigger>
+    <AccordionContent>
+      Easily customize colors, spacing, and animations to match your design system.
+    </AccordionContent>
+  </AccordionItem>
+  <AccordionItem value="item-3">
+    <AccordionTrigger>Performance</AccordionTrigger>
+    <AccordionContent>
+      Built with React and optimized for performance with minimal re-renders.
+    </AccordionContent>
+  </AccordionItem>
+</Accordion>`,
+            Preview: function Preview() {
+              return (
+                <div className="w-full max-w-md">
+                  <Accordion type="multiple" className="w-full">
+                    <AccordionItem value="item-1">
+                      <AccordionTrigger>Features</AccordionTrigger>
+                      <AccordionContent>
+                        Smooth animations, keyboard navigation, and full accessibility support.
+                      </AccordionContent>
+                    </AccordionItem>
+                    <AccordionItem value="item-2">
+                      <AccordionTrigger>Customization</AccordionTrigger>
+                      <AccordionContent>
+                        Easily customize colors, spacing, and animations to match your design system.
+                      </AccordionContent>
+                    </AccordionItem>
+                    <AccordionItem value="item-3">
+                      <AccordionTrigger>Performance</AccordionTrigger>
+                      <AccordionContent>
+                        Built with React and optimized for performance with minimal re-renders.
+                      </AccordionContent>
+                    </AccordionItem>
+                  </Accordion>
+                </div>
+              )
+            },
+          },
+        ],
+        Preview: function Preview() {
+          return (
+            <div className="w-full max-w-md">
+              <Accordion type="single" collapsible className="w-full">
+                <AccordionItem value="item-1">
+                  <AccordionTrigger>Getting Started</AccordionTrigger>
+                  <AccordionContent>
+                    Begin by installing the required dependencies and setting up your project structure.
+                  </AccordionContent>
+                </AccordionItem>
+                <AccordionItem value="item-2">
+                  <AccordionTrigger>Configuration</AccordionTrigger>
+                  <AccordionContent>
+                    Configure your environment variables and customize the settings to match your needs.
+                  </AccordionContent>
+                </AccordionItem>
+                <AccordionItem value="item-3">
+                  <AccordionTrigger>Deployment</AccordionTrigger>
+                  <AccordionContent>
+                    Deploy your application to production using your preferred hosting platform.
+                  </AccordionContent>
+                </AccordionItem>
+              </Accordion>
+            </div>
+          )
+        },
+        ApiReference: function ApiReference() {
+          const rootRows: PropRow[] = [
+            {
+              prop: "type",
+              type: `"single" | "multiple"`,
+              defaultValue: "—",
+              description: "Whether one or multiple items can be open at once.",
+            },
+            {
+              prop: "collapsible",
+              type: "boolean",
+              defaultValue: "false",
+              description: "When type=\"single\", allows closing the open item.",
+            },
+            {
+              prop: "defaultValue",
+              type: "string | string[]",
+              defaultValue: "—",
+              description: "Initially open item(s).",
+            },
+            {
+              prop: "value",
+              type: "string | string[]",
+              defaultValue: "—",
+              description: "Controlled open item(s).",
+            },
+            {
+              prop: "onValueChange",
+              type: "(value: string | string[]) => void",
+              defaultValue: "—",
+              description: "Called when open items change.",
+            },
+          ]
+
+          const triggerRows: PropRow[] = [
+            {
+              prop: "...props",
+              type: "React.ComponentPropsWithoutRef<typeof AccordionPrimitive.Trigger>",
+              defaultValue: "—",
+              description: "All Radix trigger props (forwardRef).",
+            },
+          ]
+
+          const contentRows: PropRow[] = [
+            {
+              prop: "...props",
+              type: "React.ComponentPropsWithoutRef<typeof AccordionPrimitive.Content>",
+              defaultValue: "—",
+              description: "All Radix content props (forwardRef).",
+            },
+          ]
+
+          return (
+            <div className="space-y-6">
+              <div className="text-sm text-muted-foreground">
+                This component is built on top of `@radix-ui/react-accordion` primitives.
+              </div>
+              <PropsTable title="Accordion" rows={rootRows} />
+              <PropsTable title="AccordionTrigger" rows={triggerRows} />
+              <PropsTable title="AccordionContent" rows={contentRows} />
             </div>
           )
         },
