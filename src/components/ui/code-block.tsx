@@ -15,6 +15,58 @@ interface CodeBlockProps {
   className?: string
 }
 
+function ReactLogo({ className }: { className?: string }) {
+  return (
+    <svg
+      aria-hidden="true"
+      viewBox="0 0 24 24"
+      className={cn("h-5 w-5", className)}
+      fill="none"
+    >
+      <circle cx="12" cy="12" r="2.2" fill="currentColor" />
+      <g stroke="currentColor" strokeWidth="1.4">
+        <ellipse cx="12" cy="12" rx="9.5" ry="4.2" />
+        <ellipse cx="12" cy="12" rx="9.5" ry="4.2" transform="rotate(60 12 12)" />
+        <ellipse cx="12" cy="12" rx="9.5" ry="4.2" transform="rotate(120 12 12)" />
+      </g>
+    </svg>
+  )
+}
+
+function LanguageLogo({ language }: { language: string }) {
+  const normalized = language.trim().toLowerCase()
+
+  if (normalized === "tsx" || normalized === "jsx") {
+    return <ReactLogo className="text-[#61dafb]" />
+  }
+
+  const config =
+    normalized === "ts"
+      ? { label: "TS", bg: "bg-[#3178c6]" }
+      : normalized === "js" || normalized === "javascript"
+        ? { label: "JS", bg: "bg-[#f7df1e]", fg: "text-black" }
+        : normalized === "css"
+          ? { label: "CSS", bg: "bg-[#2965f1]" }
+          : normalized === "html"
+            ? { label: "HTML", bg: "bg-[#e34c26]" }
+            : normalized === "json"
+              ? { label: "{}", bg: "bg-muted" }
+              : { label: normalized.slice(0, 3).toUpperCase() || "TXT", bg: "bg-muted" }
+
+  return (
+    <span
+      aria-hidden="true"
+      className={cn(
+        "inline-flex h-5 items-center justify-center rounded px-1.5 text-[10px] font-bold tracking-wide",
+        config.bg,
+        config.fg ?? "text-white"
+      )}
+    >
+      {config.label}
+    </span>
+  )
+}
+
 export function CodeBlock({
   code,
   language = "tsx",
@@ -52,12 +104,8 @@ export function CodeBlock({
       {filename && (
         <div className="flex items-center justify-between border-b bg-muted/50 px-4 py-2">
           <div className="flex items-center gap-2">
-            <div className="flex gap-1.5">
-              <div className="size-3 rounded-full bg-muted-foreground/20" />
-              <div className="size-3 rounded-full bg-muted-foreground/20" />
-              <div className="size-3 rounded-full bg-muted-foreground/20" />
-            </div>
-            <span className="text-sm text-muted-foreground font-mono ml-2">
+            <LanguageLogo language={language} />
+            <span className="text-sm text-muted-foreground font-mono">
               {filename}
             </span>
           </div>
