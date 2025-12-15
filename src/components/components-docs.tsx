@@ -57,7 +57,9 @@ function useComponentRegistry() {
         id: "animate-cursor",
         name: "Cursor",
         description: "Animated cursor + optional follow label (Animate UI).",
-        code: `import { CursorProvider, Cursor } from "@/components/animate-ui/components/animate/cursor"
+        code: `'use client'
+
+import { CursorProvider, Cursor } from "@/components/animate-ui/components/animate/cursor"
 
 export function Demo() {
   return (
@@ -128,9 +130,15 @@ export function Example() {
       },
       {
         id: "buttons",
-        name: "Buttons",
+        name: "Button",
         description: "Interactive buttons with smooth click animations and multiple style variants.",
-        code: `<Button>Button</Button>`,
+        code: `'use client'
+
+import { Button } from "@/components/ui/button"
+
+export function Example() {
+  return <Button>Button</Button>
+}`,
         previewVariants: [
           {
             id: "wrap",
@@ -239,7 +247,13 @@ export function Example() {
         id: "code-block",
         name: "Code Block",
         description: "Styled code block with syntax highlighting, copy button, and optional filename header.",
-        code: `<CodeBlock code={\`console.log("Hello")\`} language="tsx" />`,
+        code: `'use client'
+
+import { CodeBlock } from "@/components/ui/code-block"
+
+export function Example() {
+  return <CodeBlock code={\`console.log("Hello")\`} language="tsx" />
+}`,
         previewVariants: [
           {
             id: "filename",
@@ -339,14 +353,28 @@ export { MyComponent, type MyComponentProps }`
         id: "dropdown",
         name: "Dropdown Menu",
         description: "Action menu with smooth animations, nested submenus, and keyboard shortcut hints.",
-        code: `<DropdownMenu>
-  <DropdownMenuTrigger asChild>
-    <Button variant="outline">Open</Button>
-  </DropdownMenuTrigger>
-  <DropdownMenuContent>
-    <DropdownMenuItem>Item</DropdownMenuItem>
-  </DropdownMenuContent>
-</DropdownMenu>`,
+        code: `'use client'
+
+import { Button } from "@/components/ui/button"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+
+export function Example() {
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button variant="outline">Open</Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent>
+        <DropdownMenuItem>Item</DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  )
+}`,
         previewVariants: [
           {
             id: "simple",
@@ -540,14 +568,31 @@ export { MyComponent, type MyComponentProps }`
         id: "select",
         name: "Select",
         description: "Polished select with border highlights, smooth animations, and sliding text on hover.",
-        code: `<Select>
-  <SelectTrigger>
-    <SelectValue placeholder="Select…" />
-  </SelectTrigger>
-  <SelectContent>
-    <SelectItem value="one">One</SelectItem>
-  </SelectContent>
-</Select>`,
+        code: `'use client'
+
+import { useState } from "react"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+
+export function Example() {
+  const [value, setValue] = useState("one")
+
+  return (
+    <Select value={value} onValueChange={setValue}>
+      <SelectTrigger>
+        <SelectValue placeholder="Select…" />
+      </SelectTrigger>
+      <SelectContent>
+        <SelectItem value="one">One</SelectItem>
+      </SelectContent>
+    </Select>
+  )
+}`,
         previewVariants: [
           {
             id: "compact",
@@ -700,7 +745,21 @@ export { MyComponent, type MyComponentProps }`
         id: "slider",
         name: "Slider",
         description: "Smooth animated slider with track height transitions and glow effects.",
-        code: `<Slider value={[50]} onValueChange={() => {}} />`,
+        code: `'use client'
+
+import { useState } from "react"
+import { Slider } from "@/components/ui/slider"
+
+export function Example() {
+  const [value, setValue] = useState(50)
+
+  return (
+    <Slider
+      value={[value]}
+      onValueChange={([v]) => setValue(v)}
+    />
+  )
+}`,
         previewVariants: [
           {
             id: "labeled",
@@ -789,12 +848,20 @@ export { MyComponent, type MyComponentProps }`
         id: "tabs",
         name: "Tabs",
         description: "Tab navigation with moving background highlight and smooth content transitions.",
-        code: `<Tabs defaultValue="one">
-  <TabsList>
-    <TabsTrigger value="one">One</TabsTrigger>
-  </TabsList>
-  <TabsContent value="one">Content</TabsContent>
-</Tabs>`,
+        code: `'use client'
+
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+
+export function Example() {
+  return (
+    <Tabs defaultValue="one">
+      <TabsList>
+        <TabsTrigger value="one">One</TabsTrigger>
+      </TabsList>
+      <TabsContent value="one">Content</TabsContent>
+    </Tabs>
+  )
+}`,
         previewVariants: [
           {
             id: "simple",
@@ -1154,7 +1221,7 @@ export function ComponentsDocs() {
                           </div>
                         </TabsContent>
                         <TabsContent value="code">
-                          <div className="w-full max-w-3xl">
+                          <div className="w-full">
                             <StyledCodeBlock
                               code={selectedVariant.code}
                               language="tsx"
@@ -1170,7 +1237,7 @@ export function ComponentsDocs() {
 
               <div className="space-y-3">
                 <h3 className="text-xl font-semibold tracking-tight">Usage</h3>
-                <div className="w-full max-w-3xl">
+                <div className="w-full">
                   <StyledCodeBlock code={activeEntry.code} language="tsx" filename={`${activeEntry.id}.tsx`} />
                 </div>
               </div>
