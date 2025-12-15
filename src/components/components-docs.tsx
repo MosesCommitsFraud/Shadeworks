@@ -58,7 +58,8 @@ type ComponentEntry = {
 
 function useComponentRegistry() {
   return useMemo<ComponentEntry[]>(
-    () => [
+    () => {
+      const entries: ComponentEntry[] = [
       {
         id: "animate-cursor",
         name: "Cursor",
@@ -1108,7 +1109,7 @@ export function Example() {
             id: "single",
             name: "Single",
             description: "Only one section can be open at a time.",
-            code: `<Accordion type="single" collapsible className="w-full">
+            code: `<Accordion type="single" collapsible defaultValue="item-1" className="w-full">
   <AccordionItem value="item-1">
     <AccordionTrigger>Getting Started</AccordionTrigger>
     <AccordionContent>
@@ -1131,7 +1132,7 @@ export function Example() {
             Preview: function Preview() {
               return (
                 <div className="w-full max-w-md">
-                  <Accordion type="single" collapsible className="w-full">
+                  <Accordion type="single" collapsible defaultValue="item-1" className="w-full">
                     <AccordionItem value="item-1">
                       <AccordionTrigger>Getting Started</AccordionTrigger>
                       <AccordionContent>
@@ -1210,7 +1211,7 @@ export function Example() {
         Preview: function Preview() {
           return (
             <div className="w-full max-w-md">
-              <Accordion type="single" collapsible className="w-full">
+              <Accordion type="single" collapsible defaultValue="item-1" className="w-full">
                 <AccordionItem value="item-1">
                   <AccordionTrigger>Getting Started</AccordionTrigger>
                   <AccordionContent>
@@ -1297,7 +1298,11 @@ export function Example() {
           )
         },
       },
-    ],
+    ]
+
+    // Automatically sort components alphabetically by name
+    return entries.sort((a, b) => a.name.localeCompare(b.name))
+  },
     []
   )
 }
