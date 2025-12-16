@@ -16,6 +16,9 @@ interface CanvasProps {
   opacity?: number;
   strokeStyle?: 'solid' | 'dashed' | 'dotted';
   lineCap?: 'butt' | 'round';
+  connectorStyle?: 'sharp' | 'curved' | 'elbow';
+  arrowStart?: NonNullable<BoardElement['arrowStart']>;
+  arrowEnd?: NonNullable<BoardElement['arrowEnd']>;
   cornerRadius?: number;
   fontFamily?: string;
   textAlign?: 'left' | 'center' | 'right';
@@ -106,9 +109,38 @@ function wrapText(text: string, maxWidth: number, fontSize: number): string[] {
   return lines.length > 0 ? lines : [''];
 }
 
+function getArrowHeadPoints(tip: Point, from: Point, size: number) {
+  const dx = tip.x - from.x;
+  const dy = tip.y - from.y;
+  const len = Math.hypot(dx, dy) || 1;
+  const angle = Math.atan2(dy, dx);
+  const spread = (28 * Math.PI) / 180;
+
+  const a1 = angle + Math.PI - spread;
+  const a2 = angle + Math.PI + spread;
+
+  return [
+    { x: tip.x + Math.cos(a1) * size, y: tip.y + Math.sin(a1) * size },
+    { x: tip.x + Math.cos(a2) * size, y: tip.y + Math.sin(a2) * size },
+  ];
+}
+
+function getMarkerBasis(tip: Point, from: Point) {
+  const dx = tip.x - from.x;
+  const dy = tip.y - from.y;
+  const len = Math.hypot(dx, dy) || 1;
+  const ux = dx / len;
+  const uy = dy / len;
+  const bx = -ux;
+  const by = -uy;
+  const px = -uy;
+  const py = ux;
+  return { ux, uy, bx, by, px, py };
+}
+
 // Get bounding box for any element
 function getBoundingBox(element: BoardElement): BoundingBox | null {
-  if (element.type === 'pen' || element.type === 'line') {
+  if (element.type === 'pen' || element.type === 'line' || element.type === 'arrow') {
     if (element.points.length === 0) return null;
     const xs = element.points.map(p => p.x);
     const ys = element.points.map(p => p.y);
@@ -214,6 +246,9 @@ export function Canvas({
   opacity = 100,
   strokeStyle = 'solid',
   lineCap = 'round',
+  connectorStyle = 'sharp',
+  arrowStart = 'arrow',
+  arrowEnd = 'arrow',
   cornerRadius = 0,
   fontFamily = 'var(--font-inter)',
   textAlign = 'left',
@@ -268,7 +303,7 @@ export function Canvas({
   // Line endpoint dragging state
   const [isDraggingLineEndpoint, setIsDraggingLineEndpoint] = useState(false);
   const [lineEndpointIndex, setLineEndpointIndex] = useState<number | null>(null);
-  const [isDraggingLineStroke, setIsDraggingLineStroke] = useState(false);
+  const [isDraggingConnectorCorner, setIsDraggingConnectorCorner] = useState(false);
 
   // Box selection state
   const [isBoxSelecting, setIsBoxSelecting] = useState(false);
@@ -440,19 +475,53 @@ export function Canvas({
     const toErase: string[] = [];
 
     elements.forEach((el) => {
-      if (el.type === 'pen' || el.type === 'line') {
+      if (el.type === 'pen' || el.type === 'line' || el.type === 'arrow') {
+        const getConnectorPoints = () => {
+          if ((el.type !== 'line' && el.type !== 'arrow') || el.points.length < 2) return el.points;
+
+          const start = el.points[0];
+          const end = el.points[el.points.length - 1];
+          if (el.points.length < 3) return [start, end];
+
+          const control = el.points[1];
+          const style = el.connectorStyle || 'sharp';
+          const route = el.elbowRoute || (Math.abs(end.x - start.x) >= Math.abs(end.y - start.y) ? 'vertical' : 'horizontal');
+
+          if (style === 'elbow') {
+            return route === 'vertical'
+              ? [start, { x: control.x, y: start.y }, { x: control.x, y: end.y }, end]
+              : [start, { x: start.x, y: control.y }, { x: end.x, y: control.y }, end];
+          }
+
+          if (style === 'curved') {
+            const segments = 12;
+            const pts: Point[] = [];
+            for (let i = 0; i <= segments; i++) {
+              const t = i / segments;
+              const mt = 1 - t;
+              const x = mt * mt * start.x + 2 * mt * t * control.x + t * t * end.x;
+              const y = mt * mt * start.y + 2 * mt * t * control.y + t * t * end.y;
+              pts.push({ x, y });
+            }
+            return pts;
+          }
+
+          return [start, control, end];
+        };
+
+        const pointsToCheck = el.type === 'pen' ? el.points : getConnectorPoints();
         // Check if eraser intersects with any segment of the path
         let isNear = false;
-        for (let i = 0; i < el.points.length - 1; i++) {
-          const distance = pointToLineDistance(point, el.points[i], el.points[i + 1]);
+        for (let i = 0; i < pointsToCheck.length - 1; i++) {
+          const distance = pointToLineDistance(point, pointsToCheck[i], pointsToCheck[i + 1]);
           if (distance < eraseRadius + (el.strokeWidth || 2)) {
             isNear = true;
             break;
           }
         }
         // Also check if eraser is near any single point (for pen strokes with single points)
-        if (!isNear && el.points.length === 1) {
-          isNear = Math.hypot(point.x - el.points[0].x, point.y - el.points[0].y) < eraseRadius;
+        if (!isNear && pointsToCheck.length === 1) {
+          isNear = Math.hypot(point.x - pointsToCheck[0].x, point.y - pointsToCheck[0].y) < eraseRadius;
         }
         if (isNear) toErase.push(el.id);
       } else if (el.type === 'rectangle' || el.type === 'ellipse') {
@@ -527,25 +596,46 @@ export function Canvas({
       return;
     }
 
-    // Handle line endpoint dragging
+    // Handle connector endpoint dragging (line/arrow)
     if (isDraggingLineEndpoint && lineEndpointIndex !== null && originalElements.length === 1) {
       const originalElement = originalElements[0];
-      if (originalElement.type === 'line' && originalElement.points.length === 2) {
+      if ((originalElement.type === 'line' || originalElement.type === 'arrow') && originalElement.points.length >= 2) {
         const newPoints = [...originalElement.points];
-        newPoints[lineEndpointIndex] = point;
+        if (lineEndpointIndex === 0) {
+          newPoints[0] = point;
+        } else {
+          newPoints[newPoints.length - 1] = point;
+        }
         onUpdateElement(originalElement.id, { points: newPoints });
       }
       return;
     }
 
-    // Handle line stroke width adjustment
-    if (isDraggingLineStroke && dragStart && originalElements.length === 1) {
+    // Handle connector corner dragging (line/arrow)
+    if (isDraggingConnectorCorner && originalElements.length === 1) {
       const originalElement = originalElements[0];
-      if (originalElement.type === 'line') {
-        const dy = point.y - dragStart.y;
-        const originalStrokeWidth = originalElement.strokeWidth || 2;
-        const newStrokeWidth = Math.max(1, Math.min(50, originalStrokeWidth + dy / 5));
-        onUpdateElement(originalElement.id, { strokeWidth: newStrokeWidth });
+      if ((originalElement.type === 'line' || originalElement.type === 'arrow') && originalElement.points.length >= 2) {
+        const pStart = originalElement.points[0];
+        const pEnd = originalElement.points[originalElement.points.length - 1];
+        const style = originalElement.connectorStyle ?? connectorStyle;
+        const elbowRoute =
+          originalElement.elbowRoute ??
+          (Math.abs(pEnd.x - pStart.x) >= Math.abs(pEnd.y - pStart.y) ? 'vertical' : 'horizontal');
+
+        let newPoints: Point[];
+        if (originalElement.points.length === 2) {
+          newPoints = [pStart, point, pEnd];
+        } else {
+          newPoints = [...originalElement.points];
+          newPoints[1] = point;
+        }
+
+        const updates: Partial<BoardElement> = { points: newPoints, connectorStyle: style };
+        if (style === 'elbow' && originalElement.elbowRoute === undefined) {
+          updates.elbowRoute = elbowRoute;
+        }
+
+        onUpdateElement(originalElement.id, updates);
       }
       return;
     }
@@ -556,7 +646,7 @@ export function Canvas({
       const dy = point.y - dragStart.y;
 
       originalElements.forEach(origEl => {
-        if (origEl.type === 'pen' || origEl.type === 'line') {
+        if (origEl.type === 'pen' || origEl.type === 'line' || origEl.type === 'arrow') {
           const newPoints = origEl.points.map(p => ({
             x: p.x + dx,
             y: p.y + dy,
@@ -679,7 +769,7 @@ export function Canvas({
           width: newWidth,
           height: newHeight,
         });
-      } else if (originalElement.type === 'pen' || originalElement.type === 'line' || originalElement.type === 'laser') {
+      } else if (originalElement.type === 'pen' || originalElement.type === 'line' || originalElement.type === 'arrow' || originalElement.type === 'laser') {
         const scaleX = newWidth / originalBounds.width;
         const scaleY = newHeight / originalBounds.height;
         const newPoints = originalElement.points.map(p => ({
@@ -728,7 +818,8 @@ export function Canvas({
         });
         break;
       }
-      case 'line': {
+      case 'line':
+      case 'arrow': {
         setCurrentElement({
           ...currentElement,
           points: [startPoint, point],
@@ -789,7 +880,7 @@ export function Canvas({
         break;
       }
     }
-  }, [isDrawing, currentElement, startPoint, tool, collaboration, getMousePosition, isPanning, panStart, elements, onDeleteElement, strokeWidth, isDragging, isResizing, selectedIds, dragStart, originalElements, originalBounds, resizeHandle, onUpdateElement, shiftPressed, isBoxSelecting, lassoPoints, lastMousePos, setLastMousePos, isDraggingLineEndpoint, lineEndpointIndex, isDraggingLineStroke, getElementsToErase]);
+  }, [isDrawing, currentElement, startPoint, tool, collaboration, getMousePosition, isPanning, panStart, elements, onDeleteElement, strokeWidth, isDragging, isResizing, selectedIds, dragStart, originalElements, originalBounds, resizeHandle, onUpdateElement, shiftPressed, isBoxSelecting, lassoPoints, lastMousePos, setLastMousePos, isDraggingLineEndpoint, lineEndpointIndex, isDraggingConnectorCorner, connectorStyle, getElementsToErase]);
 
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
     // Middle mouse button for panning
@@ -954,9 +1045,14 @@ export function Canvas({
       return;
     }
 
+    const elementType: BoardElement['type'] =
+      tool === 'arrow'
+        ? 'arrow'
+        : (tool as 'pen' | 'line' | 'rectangle' | 'ellipse' | 'text');
+
     const newElement: BoardElement = {
       id: uuid(),
-      type: tool as 'pen' | 'line' | 'rectangle' | 'ellipse' | 'text',
+      type: elementType,
       points: [point],
       strokeColor,
       strokeWidth,
@@ -964,6 +1060,12 @@ export function Canvas({
       strokeStyle,
       lineCap,
       cornerRadius,
+      ...(elementType === 'line' || elementType === 'arrow'
+        ? { connectorStyle }
+        : {}),
+      ...(elementType === 'arrow'
+        ? { arrowStart, arrowEnd }
+        : {}),
     };
 
     if (tool === 'pen') {
@@ -980,7 +1082,7 @@ export function Canvas({
 
     setCurrentElement(newElement);
     setIsDrawing(true);
-  }, [tool, strokeColor, strokeWidth, fillColor, opacity, strokeStyle, lineCap, cornerRadius, fillPattern, getMousePosition, elements, pan, selectedBounds, selectedElements, selectedIds, shiftPressed, onStartTransform, getElementsToErase, onDeleteElement]);
+  }, [tool, strokeColor, strokeWidth, fillColor, opacity, strokeStyle, lineCap, connectorStyle, arrowStart, arrowEnd, cornerRadius, fillPattern, getMousePosition, elements, pan, selectedBounds, selectedElements, selectedIds, shiftPressed, onStartTransform, getElementsToErase, onDeleteElement]);
 
   const handleMouseUp = useCallback(() => {
     if (isPanning) {
@@ -1034,9 +1136,8 @@ export function Canvas({
       return;
     }
 
-    if (isDraggingLineStroke) {
-      setIsDraggingLineStroke(false);
-      setDragStart(null);
+    if (isDraggingConnectorCorner) {
+      setIsDraggingConnectorCorner(false);
       setOriginalElements([]);
       return;
     }
@@ -1127,7 +1228,7 @@ export function Canvas({
 
         onAddElement(finalElement);
         elementAdded = true;
-      } else if (currentElement.type === 'line' && currentElement.points.length === 2) {
+      } else if ((currentElement.type === 'line' || currentElement.type === 'arrow') && currentElement.points.length >= 2) {
         onAddElement(currentElement);
         elementAdded = true;
       } else if (currentElement.type === 'laser' && currentElement.points.length > 1) {
@@ -1161,7 +1262,7 @@ export function Canvas({
     setCurrentElement(null);
     setStartPoint(null);
     setLassoPoints([]);
-  }, [currentElement, isDrawing, onAddElement, isPanning, isDragging, isResizing, isBoxSelecting, selectionBox, elements, tool, lassoPoints, onDeleteElement, onToolChange, lastMousePos, startPoint, textInputRef, setTextInput, setTextValue, setIsDrawing, setStartPoint, setSelectedIds, isDraggingLineEndpoint, isDraggingLineStroke, eraserMarkedIds]);
+  }, [currentElement, isDrawing, onAddElement, isPanning, isDragging, isResizing, isBoxSelecting, selectionBox, elements, tool, lassoPoints, onDeleteElement, onToolChange, lastMousePos, startPoint, textInputRef, setTextInput, setTextValue, setIsDrawing, setStartPoint, setSelectedIds, isDraggingLineEndpoint, isDraggingConnectorCorner, eraserMarkedIds]);
 
   const handleTextSubmit = useCallback(() => {
     if (textInput && textValue.trim()) {
@@ -1411,52 +1512,363 @@ export function Canvas({
           </g>
         );
       }
-      case 'line': {
+      case 'line':
+      case 'arrow': {
         if (element.points.length < 2) return null;
+        const isArrow = element.type === 'arrow';
         const elOpacity = (element.opacity ?? 100) / 100;
         const elStrokeStyle = element.strokeStyle || 'solid';
         const elLineCap = element.lineCap || 'round';
         const strokeDasharray = elStrokeStyle === 'dashed' ? '10,10' : elStrokeStyle === 'dotted' ? '2,6' : 'none';
-        // Create a wider invisible hitbox for easier clicking (minimum 16px)
         const hitboxWidth = Math.max(element.strokeWidth * 6, 16);
+
+        const start = element.points[0];
+        const end = element.points[element.points.length - 1];
+        const hasCorner = element.points.length >= 3;
+        const style = element.connectorStyle || 'sharp';
+        const route = element.elbowRoute || (Math.abs(end.x - start.x) >= Math.abs(end.y - start.y) ? 'vertical' : 'horizontal');
+        const control = hasCorner ? element.points[1] : null;
+
+        let pathD: string | null = null;
+        let polyPoints: Point[] | null = null;
+
+        if (hasCorner && control) {
+          if (style === 'curved') {
+            pathD = `M ${start.x} ${start.y} Q ${control.x} ${control.y} ${end.x} ${end.y}`;
+          } else if (style === 'elbow') {
+            polyPoints =
+              route === 'vertical'
+                ? [start, { x: control.x, y: start.y }, { x: control.x, y: end.y }, end]
+                : [start, { x: start.x, y: control.y }, { x: end.x, y: control.y }, end];
+          } else {
+            polyPoints = [start, control, end];
+          }
+        }
+
+        const markerSize = Math.max(6, element.strokeWidth * 3);
+        const markerStart = element.arrowStart || 'none';
+        const markerEnd = element.arrowEnd || 'arrow';
+
+        const arrowTangentForEnd = () => {
+          if (pathD && control) return { tip: end, from: control };
+          if (polyPoints && polyPoints.length >= 2) return { tip: end, from: polyPoints[polyPoints.length - 2] };
+          return { tip: end, from: start };
+        };
+        const arrowTangentForStart = () => {
+          if (pathD && control) return { tip: start, from: control };
+          if (polyPoints && polyPoints.length >= 2) return { tip: start, from: polyPoints[1] };
+          return { tip: start, from: end };
+        };
+
+        const markerOpacity = isMarkedForDeletion ? elOpacity * 0.3 : elOpacity;
+
+        const renderMarker = (marker: NonNullable<BoardElement['arrowEnd']>, tip: Point, from: Point) => {
+          if (marker === 'none') return null;
+
+          const { bx, by, px, py } = getMarkerBasis(tip, from);
+          const size = markerSize;
+          const stroke = element.strokeColor;
+          const strokeWidth = Math.max(1.5, element.strokeWidth);
+          const outlineStrokeWidth = Math.min(strokeWidth, 6);
+
+          const line = (x2: number, y2: number) => (
+            <line
+              x1={tip.x}
+              y1={tip.y}
+              x2={x2}
+              y2={y2}
+              stroke={stroke}
+              strokeWidth={strokeWidth}
+              strokeLinecap={elLineCap}
+              opacity={markerOpacity}
+            />
+          );
+
+          const bar = () => {
+            const half = size * 0.65;
+            const x1 = tip.x + px * half;
+            const y1 = tip.y + py * half;
+            const x2 = tip.x - px * half;
+            const y2 = tip.y - py * half;
+            return (
+              <line
+                x1={x1}
+                y1={y1}
+                x2={x2}
+                y2={y2}
+                stroke={stroke}
+                strokeWidth={strokeWidth}
+                strokeLinecap={elLineCap}
+                opacity={markerOpacity}
+              />
+            );
+          };
+
+          const crowfoot = (many: boolean) => {
+            const back = size * 1.05;
+            const spread = size * 0.85;
+            const baseX = tip.x + bx * back;
+            const baseY = tip.y + by * back;
+
+            const l1 = line(baseX + px * spread, baseY + py * spread);
+            const l2 = line(baseX - px * spread, baseY - py * spread);
+            if (!many) return (
+              <g pointerEvents="none">
+                {l1}
+                {l2}
+              </g>
+            );
+            const lMid = line(baseX, baseY);
+            return (
+              <g pointerEvents="none">
+                {l1}
+                {lMid}
+                {l2}
+              </g>
+            );
+          };
+
+          if (marker === 'arrow') {
+            const [pA, pB] = getArrowHeadPoints(tip, from, size);
+            return (
+              <g pointerEvents="none">
+                {line(pA.x, pA.y)}
+                {line(pB.x, pB.y)}
+              </g>
+            );
+          }
+
+          if (marker === 'triangle' || marker === 'triangle-outline') {
+            const back = size * 1.1;
+            const spread = size * 0.85;
+            const baseX = tip.x + bx * back;
+            const baseY = tip.y + by * back;
+            const p1 = { x: baseX + px * spread, y: baseY + py * spread };
+            const p2 = { x: baseX - px * spread, y: baseY - py * spread };
+            return (
+              <polygon
+                pointerEvents="none"
+                points={`${tip.x},${tip.y} ${p1.x},${p1.y} ${p2.x},${p2.y}`}
+                fill={marker === 'triangle' ? stroke : 'none'}
+                stroke={marker === 'triangle-outline' ? stroke : 'none'}
+                strokeWidth={marker === 'triangle-outline' ? outlineStrokeWidth : undefined}
+                strokeLinejoin="round"
+                opacity={markerOpacity}
+              />
+            );
+          }
+
+          if (marker === 'diamond' || marker === 'diamond-outline') {
+            const back1 = size * 0.9;
+            const back2 = size * 1.8;
+            const spread = size * 0.75;
+            const midX = tip.x + bx * back1;
+            const midY = tip.y + by * back1;
+            const rearX = tip.x + bx * back2;
+            const rearY = tip.y + by * back2;
+            const left = { x: midX + px * spread, y: midY + py * spread };
+            const right = { x: midX - px * spread, y: midY - py * spread };
+            return (
+              <polygon
+                pointerEvents="none"
+                points={`${tip.x},${tip.y} ${left.x},${left.y} ${rearX},${rearY} ${right.x},${right.y}`}
+                fill={marker === 'diamond' ? stroke : 'none'}
+                stroke={marker === 'diamond-outline' ? stroke : 'none'}
+                strokeWidth={marker === 'diamond-outline' ? outlineStrokeWidth : undefined}
+                strokeLinejoin="round"
+                opacity={markerOpacity}
+              />
+            );
+          }
+
+          if (marker === 'circle' || marker === 'circle-outline') {
+            const back = size * 0.9;
+            const r = Math.max(3, size * 0.55);
+            const cx = tip.x + bx * back;
+            const cy = tip.y + by * back;
+            return (
+              <circle
+                pointerEvents="none"
+                cx={cx}
+                cy={cy}
+                r={r}
+                fill={marker === 'circle' ? stroke : 'none'}
+                stroke={marker === 'circle-outline' ? stroke : 'none'}
+                strokeWidth={marker === 'circle-outline' ? outlineStrokeWidth : undefined}
+                opacity={markerOpacity}
+              />
+            );
+          }
+
+          if (marker === 'bar') return <g pointerEvents="none">{bar()}</g>;
+          if (marker === 'crowfoot-one') return <g pointerEvents="none">{crowfoot(false)}</g>;
+          if (marker === 'crowfoot-many') return <g pointerEvents="none">{crowfoot(true)}</g>;
+          if (marker === 'crowfoot-one-many') {
+            const barOffset = size * 0.45;
+            const movedTip = { x: tip.x + bx * barOffset, y: tip.y + by * barOffset };
+            const movedFrom = { x: from.x + bx * barOffset, y: from.y + by * barOffset };
+            return (
+              <g pointerEvents="none">
+                {/* Bar close to the tip */}
+                {(() => {
+                  const { px: mpx, py: mpy } = getMarkerBasis(movedTip, movedFrom);
+                  const half = size * 0.65;
+                  return (
+                    <line
+                      x1={movedTip.x + mpx * half}
+                      y1={movedTip.y + mpy * half}
+                      x2={movedTip.x - mpx * half}
+                      y2={movedTip.y - mpy * half}
+                      stroke={stroke}
+                      strokeWidth={strokeWidth}
+                      strokeLinecap={elLineCap}
+                      opacity={markerOpacity}
+                    />
+                  );
+                })()}
+                {/* Crowfoot further back */}
+                {(() => {
+                  const back = size * 1.3;
+                  const spread = size * 0.85;
+                  const baseX = tip.x + bx * back;
+                  const baseY = tip.y + by * back;
+                  return (
+                    <>
+                      {line(baseX + px * spread, baseY + py * spread)}
+                      {line(baseX, baseY)}
+                      {line(baseX - px * spread, baseY - py * spread)}
+                    </>
+                  );
+                })()}
+              </g>
+            );
+          }
+
+          return null;
+        };
+
         return (
           <g key={element.id}>
             {/* Invisible wider hitbox for easier clicking */}
-            <line
-              data-element-id={element.id}
-              x1={element.points[0].x}
-              y1={element.points[0].y}
-              x2={element.points[1].x}
-              y2={element.points[1].y}
-              stroke="transparent"
-              strokeWidth={hitboxWidth}
-              strokeLinecap={elLineCap}
-              pointerEvents="stroke"
-            />
-            {/* Visible line */}
-            <line
-              x1={element.points[0].x}
-              y1={element.points[0].y}
-              x2={element.points[1].x}
-              y2={element.points[1].y}
-              stroke={element.strokeColor}
-              strokeWidth={element.strokeWidth}
-              strokeLinecap={elLineCap}
-              strokeDasharray={strokeDasharray}
-              opacity={isMarkedForDeletion ? elOpacity * 0.3 : elOpacity}
-              pointerEvents="none"
-            />
-            {isMarkedForDeletion && (
+            {!hasCorner ? (
               <line
-                x1={element.points[0].x}
-                y1={element.points[0].y}
-                x2={element.points[1].x}
-                y2={element.points[1].y}
-                stroke="rgba(0, 0, 0, 0.7)"
+                data-element-id={element.id}
+                x1={start.x}
+                y1={start.y}
+                x2={end.x}
+                y2={end.y}
+                stroke="transparent"
+                strokeWidth={hitboxWidth}
+                strokeLinecap={elLineCap}
+                pointerEvents="stroke"
+              />
+            ) : pathD ? (
+              <path
+                data-element-id={element.id}
+                d={pathD}
+                fill="none"
+                stroke="transparent"
+                strokeWidth={hitboxWidth}
+                strokeLinecap={elLineCap}
+                strokeLinejoin="round"
+                pointerEvents="stroke"
+              />
+            ) : (
+              <polyline
+                data-element-id={element.id}
+                points={(polyPoints || []).map(p => `${p.x},${p.y}`).join(' ')}
+                fill="none"
+                stroke="transparent"
+                strokeWidth={hitboxWidth}
+                strokeLinecap={elLineCap}
+                strokeLinejoin="round"
+                pointerEvents="stroke"
+              />
+            )}
+
+            {/* Visible connector */}
+            {!hasCorner ? (
+              <line
+                x1={start.x}
+                y1={start.y}
+                x2={end.x}
+                y2={end.y}
+                stroke={element.strokeColor}
                 strokeWidth={element.strokeWidth}
                 strokeLinecap={elLineCap}
+                strokeDasharray={strokeDasharray}
+                opacity={isMarkedForDeletion ? elOpacity * 0.3 : elOpacity}
                 pointerEvents="none"
               />
+            ) : pathD ? (
+              <path
+                d={pathD}
+                fill="none"
+                stroke={element.strokeColor}
+                strokeWidth={element.strokeWidth}
+                strokeLinecap={elLineCap}
+                strokeLinejoin="round"
+                strokeDasharray={strokeDasharray}
+                opacity={isMarkedForDeletion ? elOpacity * 0.3 : elOpacity}
+                pointerEvents="none"
+              />
+            ) : (
+              <polyline
+                points={(polyPoints || []).map(p => `${p.x},${p.y}`).join(' ')}
+                fill="none"
+                stroke={element.strokeColor}
+                strokeWidth={element.strokeWidth}
+                strokeLinecap={elLineCap}
+                strokeLinejoin="round"
+                strokeDasharray={strokeDasharray}
+                opacity={isMarkedForDeletion ? elOpacity * 0.3 : elOpacity}
+                pointerEvents="none"
+              />
+            )}
+
+            {/* Arrowheads */}
+            {isArrow && (() => {
+              const { tip, from } = arrowTangentForStart();
+              return renderMarker(markerStart, tip, from);
+            })()}
+            {isArrow && (() => {
+              const { tip, from } = arrowTangentForEnd();
+              return renderMarker(markerEnd, tip, from);
+            })()}
+
+            {isMarkedForDeletion && (
+              !hasCorner ? (
+                <line
+                  x1={start.x}
+                  y1={start.y}
+                  x2={end.x}
+                  y2={end.y}
+                  stroke="rgba(0, 0, 0, 0.7)"
+                  strokeWidth={element.strokeWidth}
+                  strokeLinecap={elLineCap}
+                  pointerEvents="none"
+                />
+              ) : pathD ? (
+                <path
+                  d={pathD}
+                  fill="none"
+                  stroke="rgba(0, 0, 0, 0.7)"
+                  strokeWidth={element.strokeWidth}
+                  strokeLinecap={elLineCap}
+                  strokeLinejoin="round"
+                  pointerEvents="none"
+                />
+              ) : (
+                <polyline
+                  points={(polyPoints || []).map(p => `${p.x},${p.y}`).join(' ')}
+                  fill="none"
+                  stroke="rgba(0, 0, 0, 0.6)"
+                  strokeWidth={element.strokeWidth}
+                  strokeLinecap={elLineCap}
+                  strokeLinejoin="round"
+                  pointerEvents="none"
+                />
+              )
             )}
           </g>
         );
@@ -1879,14 +2291,25 @@ export function Canvas({
     }
   };
 
-  // Render line-specific control points
-  const renderLineControls = useCallback((element: BoardElement) => {
+  // Render connector (line/arrow) control points
+  const renderConnectorControls = useCallback((element: BoardElement) => {
     if (element.points.length < 2) return null;
 
-    const p1 = element.points[0];
-    const p2 = element.points[1];
-    const midX = (p1.x + p2.x) / 2;
-    const midY = (p1.y + p2.y) / 2;
+    const start = element.points[0];
+    const end = element.points[element.points.length - 1];
+    const midX = (start.x + end.x) / 2;
+    const midY = (start.y + end.y) / 2;
+
+    const style = element.connectorStyle ?? connectorStyle;
+    const route = element.elbowRoute ?? (Math.abs(end.x - start.x) >= Math.abs(end.y - start.y) ? 'vertical' : 'horizontal');
+    const control = element.points.length >= 3 ? element.points[1] : { x: midX, y: midY };
+
+    const handlePos =
+      style === 'elbow'
+        ? route === 'vertical'
+          ? { x: control.x, y: midY }
+          : { x: midX, y: control.y }
+        : control;
 
     const dotSize = 8;
 
@@ -1898,33 +2321,79 @@ export function Canvas({
       setOriginalElements([{ ...element }]);
     };
 
-    const handleStrokeMouseDown = (e: React.MouseEvent) => {
+    const handleCornerMouseDown = (e: React.MouseEvent) => {
       e.stopPropagation();
-      const point = getMousePosition(e);
       onStartTransform?.();
-      setIsDraggingLineStroke(true);
-      setDragStart(point);
+      setIsDraggingConnectorCorner(true);
       setOriginalElements([{ ...element }]);
     };
 
+    const elbowPoints =
+      style === 'elbow' && element.points.length >= 3
+        ? route === 'vertical'
+          ? [
+              start,
+              { x: control.x, y: start.y },
+              { x: control.x, y: end.y },
+              end,
+            ]
+          : [
+              start,
+              { x: start.x, y: control.y },
+              { x: end.x, y: control.y },
+              end,
+            ]
+        : null;
+
     return (
       <g>
-        {/* Dashed line connecting the endpoints */}
-        <line
-          x1={p1.x}
-          y1={p1.y}
-          x2={p2.x}
-          y2={p2.y}
-          stroke="var(--accent)"
-          strokeWidth={2}
-          strokeDasharray="5,5"
-          pointerEvents="none"
-        />
+        {/* Dashed preview of the connector */}
+        {style === 'curved' && element.points.length >= 3 ? (
+          <path
+            d={`M ${start.x} ${start.y} Q ${control.x} ${control.y} ${end.x} ${end.y}`}
+            fill="none"
+            stroke="var(--accent)"
+            strokeWidth={2}
+            strokeDasharray="5,5"
+            pointerEvents="none"
+          />
+        ) : elbowPoints ? (
+          <polyline
+            points={elbowPoints.map(p => `${p.x},${p.y}`).join(' ')}
+            fill="none"
+            stroke="var(--accent)"
+            strokeWidth={2}
+            strokeDasharray="5,5"
+            strokeLinejoin="round"
+            pointerEvents="none"
+          />
+        ) : element.points.length >= 3 ? (
+          <polyline
+            points={[start, control, end].map(p => `${p.x},${p.y}`).join(' ')}
+            fill="none"
+            stroke="var(--accent)"
+            strokeWidth={2}
+            strokeDasharray="5,5"
+            strokeLinejoin="round"
+            pointerEvents="none"
+          />
+        ) : (
+          <line
+            x1={start.x}
+            y1={start.y}
+            x2={end.x}
+            y2={end.y}
+            stroke="var(--accent)"
+            strokeWidth={2}
+            strokeDasharray="5,5"
+            pointerEvents="none"
+          />
+        )}
 
         {/* Endpoint dots */}
         <circle
-          cx={p1.x}
-          cy={p1.y}
+          cx={start.x}
+          cy={start.y}
           r={dotSize / 2}
           fill="var(--accent)"
           stroke="var(--background)"
@@ -1933,8 +2402,8 @@ export function Canvas({
           onMouseDown={(e) => handleEndpointMouseDown(e, 0)}
         />
         <circle
-          cx={p2.x}
-          cy={p2.y}
+          cx={end.x}
+          cy={end.y}
           r={dotSize / 2}
           fill="var(--accent)"
           stroke="var(--background)"
@@ -1943,22 +2412,22 @@ export function Canvas({
           onMouseDown={(e) => handleEndpointMouseDown(e, 1)}
         />
 
-        {/* Middle control for stroke width */}
+        {/* Middle control for corner */}
         <rect
-          x={midX - dotSize / 2}
-          y={midY - dotSize / 2}
+          x={handlePos.x - dotSize / 2}
+          y={handlePos.y - dotSize / 2}
           width={dotSize}
           height={dotSize}
           fill="var(--accent)"
           stroke="var(--background)"
           strokeWidth={2}
           rx={2}
-          style={{ cursor: 'ns-resize' }}
-          onMouseDown={handleStrokeMouseDown}
+          style={{ cursor: 'move' }}
+          onMouseDown={handleCornerMouseDown}
         />
       </g>
     );
-  }, [onStartTransform, getMousePosition]);
+  }, [onStartTransform, connectorStyle]);
 
   // Render selection box with handles
   const renderSelectionBox = () => {
@@ -1967,8 +2436,8 @@ export function Canvas({
     // For single line selection, use line-specific controls instead
     if (selectedIds.length === 1) {
       const selectedElement = elements.find(el => el.id === selectedIds[0]);
-      if (selectedElement?.type === 'line') {
-        return renderLineControls(selectedElement);
+      if (selectedElement && (selectedElement.type === 'line' || selectedElement.type === 'arrow')) {
+        return renderConnectorControls(selectedElement);
       }
     }
 
@@ -2076,6 +2545,7 @@ export function Canvas({
     switch (tool) {
       case 'pen':
       case 'line':
+      case 'arrow':
       case 'rectangle':
       case 'ellipse':
         return 'crosshair';

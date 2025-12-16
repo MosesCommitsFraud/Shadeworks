@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { useTheme } from 'next-themes';
 import { ChevronLeft, ChevronRight, Circle, Minus, Square, Type, Pencil, ArrowUpToLine, ArrowDownToLine, X, AlignLeft, AlignCenter, AlignRight } from 'lucide-react';
 import { Tool, COLORS, STROKE_WIDTHS, FONTS, FONT_SIZES, BoardElement } from '@/lib/board-types';
@@ -22,6 +22,12 @@ interface ToolSidebarProps {
   onStrokeStyleChange: (style: 'solid' | 'dashed' | 'dotted') => void;
   cornerRadius: number;
   onCornerRadiusChange: (radius: number) => void;
+  connectorStyle?: 'sharp' | 'curved' | 'elbow';
+  onConnectorStyleChange?: (style: 'sharp' | 'curved' | 'elbow') => void;
+  arrowStart?: NonNullable<BoardElement['arrowStart']>;
+  onArrowStartChange?: (end: NonNullable<BoardElement['arrowStart']>) => void;
+  arrowEnd?: NonNullable<BoardElement['arrowEnd']>;
+  onArrowEndChange?: (end: NonNullable<BoardElement['arrowEnd']>) => void;
   fontFamily: string;
   onFontFamilyChange: (font: string) => void;
   textAlign: 'left' | 'center' | 'right';
@@ -44,7 +50,7 @@ interface ToolSidebarProps {
 }
 
 // Tools that have adjustable properties
-const ADJUSTABLE_TOOLS: Tool[] = ['pen', 'line', 'rectangle', 'ellipse', 'text'];
+const ADJUSTABLE_TOOLS: Tool[] = ['pen', 'line', 'arrow', 'rectangle', 'ellipse', 'text'];
 
 export function ToolSidebar({
   selectedTool,
@@ -60,6 +66,12 @@ export function ToolSidebar({
   onStrokeStyleChange,
   cornerRadius,
   onCornerRadiusChange,
+  connectorStyle = 'sharp',
+  onConnectorStyleChange,
+  arrowStart = 'arrow',
+  onArrowStartChange,
+  arrowEnd = 'arrow',
+  onArrowEndChange,
   fontFamily,
   onFontFamilyChange,
   textAlign,
@@ -86,6 +98,148 @@ export function ToolSidebar({
   const [showFillColorPicker, setShowFillColorPicker] = useState(false);
   const [customStrokeColor, setCustomStrokeColor] = useState(strokeColor);
   const [customFillColor, setCustomFillColor] = useState(fillColor);
+  const [openArrowEndMenu, setOpenArrowEndMenu] = useState<'start' | 'end' | null>(null);
+  const [arrowEndMenuPos, setArrowEndMenuPos] = useState<{ left: number; top: number } | null>(null);
+  const arrowStartButtonRef = useRef<HTMLButtonElement | null>(null);
+  const arrowEndButtonRef = useRef<HTMLButtonElement | null>(null);
+
+  const arrowEndOptions = useMemo(
+    () =>
+      [
+        { id: 'arrow', label: 'Arrow' },
+        { id: 'triangle', label: 'Triangle' },
+        { id: 'triangle-outline', label: 'Triangle Outline' },
+        { id: 'diamond', label: 'Diamond' },
+        { id: 'diamond-outline', label: 'Diamond Outline' },
+        { id: 'circle', label: 'Circle' },
+        { id: 'circle-outline', label: 'Circle Outline' },
+        { id: 'bar', label: 'Bar' },
+        { id: 'crowfoot-one', label: 'One Crow’s Foot' },
+        { id: 'crowfoot-many', label: 'Many Crow’s Foot' },
+        { id: 'crowfoot-one-many', label: 'One + Many' },
+      ] as Array<{ id: NonNullable<BoardElement['arrowEnd']>; label: string }>,
+    []
+  );
+
+  const renderArrowEndPreview = (endType: NonNullable<BoardElement['arrowEnd']>) => {
+    const stroke = 'currentColor';
+    const sw = 1.8;
+    const cx = 18;
+    const cy = 10;
+
+    switch (endType) {
+      case 'arrow':
+        return (
+          <svg width="28" height="20" viewBox="0 0 28 20" className="text-foreground">
+            <line x1="3" y1={cy} x2="20" y2={cy} stroke={stroke} strokeWidth={sw} strokeLinecap="round" />
+            <line x1="20" y1={cy} x2="14.5" y2="6.5" stroke={stroke} strokeWidth={sw} strokeLinecap="round" />
+            <line x1="20" y1={cy} x2="14.5" y2="13.5" stroke={stroke} strokeWidth={sw} strokeLinecap="round" />
+          </svg>
+        );
+      case 'triangle':
+        return (
+          <svg width="28" height="20" viewBox="0 0 28 20" className="text-foreground">
+            <line x1="3" y1={cy} x2="13" y2={cy} stroke={stroke} strokeWidth={sw} strokeLinecap="round" />
+            <polygon points="13,5 23,10 13,15" fill={stroke} />
+          </svg>
+        );
+      case 'triangle-outline':
+        return (
+          <svg width="28" height="20" viewBox="0 0 28 20" className="text-foreground">
+            <line x1="3" y1={cy} x2="13" y2={cy} stroke={stroke} strokeWidth={sw} strokeLinecap="round" />
+            <polygon points="13,5 23,10 13,15" fill="none" stroke={stroke} strokeWidth={sw} strokeLinejoin="round" />
+          </svg>
+        );
+      case 'diamond':
+        return (
+          <svg width="28" height="20" viewBox="0 0 28 20" className="text-foreground">
+            <line x1="3" y1={cy} x2="12.5" y2={cy} stroke={stroke} strokeWidth={sw} strokeLinecap="round" />
+            <polygon points="12.5,10 17.5,5 22.5,10 17.5,15" fill={stroke} />
+          </svg>
+        );
+      case 'diamond-outline':
+        return (
+          <svg width="28" height="20" viewBox="0 0 28 20" className="text-foreground">
+            <line x1="3" y1={cy} x2="12.5" y2={cy} stroke={stroke} strokeWidth={sw} strokeLinecap="round" />
+            <polygon points="12.5,10 17.5,5 22.5,10 17.5,15" fill="none" stroke={stroke} strokeWidth={sw} strokeLinejoin="round" />
+          </svg>
+        );
+      case 'circle':
+        return (
+          <svg width="28" height="20" viewBox="0 0 28 20" className="text-foreground">
+            <line x1="3" y1={cy} x2="13" y2={cy} stroke={stroke} strokeWidth={sw} strokeLinecap="round" />
+            <circle cx={cx} cy={cy} r="4.2" fill={stroke} />
+          </svg>
+        );
+      case 'circle-outline':
+        return (
+          <svg width="28" height="20" viewBox="0 0 28 20" className="text-foreground">
+            <line x1="3" y1={cy} x2="13" y2={cy} stroke={stroke} strokeWidth={sw} strokeLinecap="round" />
+            <circle cx={cx} cy={cy} r="4.2" fill="none" stroke={stroke} strokeWidth={sw} />
+          </svg>
+        );
+      case 'bar':
+        return (
+          <svg width="28" height="20" viewBox="0 0 28 20" className="text-foreground">
+            <line x1="3" y1={cy} x2="16" y2={cy} stroke={stroke} strokeWidth={sw} strokeLinecap="round" />
+            <line x1={cx} y1="4.5" x2={cx} y2="15.5" stroke={stroke} strokeWidth={sw} strokeLinecap="round" />
+          </svg>
+        );
+      case 'crowfoot-one':
+        return (
+          <svg width="28" height="20" viewBox="0 0 28 20" className="text-foreground">
+            <line x1="3" y1={cy} x2="14" y2={cy} stroke={stroke} strokeWidth={sw} strokeLinecap="round" />
+            <line x1="23" y1={cy} x2="16" y2="6" stroke={stroke} strokeWidth={sw} strokeLinecap="round" />
+            <line x1="23" y1={cy} x2="16" y2="14" stroke={stroke} strokeWidth={sw} strokeLinecap="round" />
+          </svg>
+        );
+      case 'crowfoot-many':
+        return (
+          <svg width="28" height="20" viewBox="0 0 28 20" className="text-foreground">
+            <line x1="3" y1={cy} x2="14" y2={cy} stroke={stroke} strokeWidth={sw} strokeLinecap="round" />
+            <line x1="23" y1={cy} x2="16" y2="5.5" stroke={stroke} strokeWidth={sw} strokeLinecap="round" />
+            <line x1="23" y1={cy} x2="16" y2={cy} stroke={stroke} strokeWidth={sw} strokeLinecap="round" />
+            <line x1="23" y1={cy} x2="16" y2="14.5" stroke={stroke} strokeWidth={sw} strokeLinecap="round" />
+          </svg>
+        );
+      case 'crowfoot-one-many':
+        return (
+          <svg width="28" height="20" viewBox="0 0 28 20" className="text-foreground">
+            <line x1="3" y1={cy} x2="12" y2={cy} stroke={stroke} strokeWidth={sw} strokeLinecap="round" />
+            <line x1="14.5" y1="4.5" x2="14.5" y2="15.5" stroke={stroke} strokeWidth={sw} strokeLinecap="round" />
+            <line x1="23" y1={cy} x2="16" y2="5.5" stroke={stroke} strokeWidth={sw} strokeLinecap="round" />
+            <line x1="23" y1={cy} x2="16" y2={cy} stroke={stroke} strokeWidth={sw} strokeLinecap="round" />
+            <line x1="23" y1={cy} x2="16" y2="14.5" stroke={stroke} strokeWidth={sw} strokeLinecap="round" />
+          </svg>
+        );
+      default:
+        return (
+          <svg width="28" height="20" viewBox="0 0 28 20" className="text-foreground">
+            <line x1="3" y1={cy} x2="23" y2={cy} stroke={stroke} strokeWidth={sw} strokeLinecap="round" />
+          </svg>
+        );
+    }
+  };
+
+  const openArrowMenu = (which: 'start' | 'end') => {
+    const ref = which === 'start' ? arrowStartButtonRef : arrowEndButtonRef;
+    const rect = ref.current?.getBoundingClientRect();
+    if (!rect) {
+      setOpenArrowEndMenu(which);
+      return;
+    }
+
+    const menuWidth = 260;
+    const padding = 8;
+    const left = Math.min(
+      Math.max(padding, rect.right - menuWidth),
+      window.innerWidth - menuWidth - padding
+    );
+    const top = Math.min(Math.max(padding, rect.bottom + 8), window.innerHeight - padding);
+
+    setArrowEndMenuPos({ left, top });
+    setOpenArrowEndMenu(which);
+  };
 
   // Don't show sidebar for non-adjustable tools
   if (!ADJUSTABLE_TOOLS.includes(selectedTool) && selectedElements.length === 0) {
@@ -121,6 +275,14 @@ export function ToolSidebar({
     : selectedTool === 'text';
 
   const showStrokeWidthAndStyle = !isTextTool;
+
+  const showConnectorControls = hasSelectedElements
+    ? selectedElements.some(el => el.type === 'line' || el.type === 'arrow')
+    : selectedTool === 'line' || selectedTool === 'arrow';
+
+  const showArrowControls = hasSelectedElements
+    ? selectedElements.some(el => el.type === 'arrow')
+    : selectedTool === 'arrow';
 
   return (
     <>
@@ -473,6 +635,107 @@ export function ToolSidebar({
             </div>
           )}
 
+          {/* Connector corner style (line/arrow) */}
+          {showConnectorControls && onConnectorStyleChange && (
+            <div className="space-y-2">
+              <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                Corner
+              </label>
+              <div className="grid grid-cols-3 gap-2">
+                <button
+                  onClick={() => onConnectorStyleChange('sharp')}
+                  className={cn(
+                    'h-10 rounded-sm border-2 transition-all duration-200 flex items-center justify-center hover:bg-secondary/50 gap-2',
+                    connectorStyle === 'sharp' ? 'border-accent bg-secondary/50' : 'border-border/50'
+                  )}
+                  title="Sharp corner"
+                >
+                  <svg width="24" height="16" viewBox="0 0 24 16" className="text-foreground">
+                    <polyline points="2,14 10,6 22,2" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                </button>
+                <button
+                  onClick={() => onConnectorStyleChange('curved')}
+                  className={cn(
+                    'h-10 rounded-sm border-2 transition-all duration-200 flex items-center justify-center hover:bg-secondary/50 gap-2',
+                    connectorStyle === 'curved' ? 'border-accent bg-secondary/50' : 'border-border/50'
+                  )}
+                  title="Curved"
+                >
+                  <svg width="24" height="16" viewBox="0 0 24 16" className="text-foreground">
+                    <path d="M 2 14 Q 10 4 22 2" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                  </svg>
+                </button>
+                <button
+                  onClick={() => onConnectorStyleChange('elbow')}
+                  className={cn(
+                    'h-10 rounded-sm border-2 transition-all duration-200 flex items-center justify-center hover:bg-secondary/50 gap-2',
+                    connectorStyle === 'elbow' ? 'border-accent bg-secondary/50' : 'border-border/50'
+                  )}
+                  title="Elbow"
+                >
+                  <svg width="24" height="16" viewBox="0 0 24 16" className="text-foreground">
+                    <polyline points="2,14 14,14 14,2 22,2" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Arrow ends (arrow tool) */}
+          {showArrowControls && onArrowStartChange && onArrowEndChange && (
+            <div className="space-y-2">
+              <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                Arrow Ends
+              </label>
+              <div className="grid grid-cols-2 gap-2">
+                <div className="space-y-1 relative">
+                  <div className="text-[10px] text-muted-foreground uppercase tracking-wider">Start</div>
+                  <button
+                    type="button"
+                    ref={arrowStartButtonRef}
+                    onClick={() => {
+                      if (openArrowEndMenu === 'start') {
+                        setOpenArrowEndMenu(null);
+                        return;
+                      }
+                      openArrowMenu('start');
+                    }}
+                    className={cn(
+                      'h-10 w-full rounded-sm border-2 transition-all duration-200 flex items-center justify-center hover:bg-secondary/50',
+                      openArrowEndMenu === 'start' ? 'border-accent bg-secondary/50' : 'border-border/50'
+                    )}
+                    title="Start marker"
+                  >
+                    {renderArrowEndPreview(arrowStart)}
+                  </button>
+                </div>
+
+                <div className="space-y-1 relative">
+                  <div className="text-[10px] text-muted-foreground uppercase tracking-wider">End</div>
+                  <button
+                    type="button"
+                    ref={arrowEndButtonRef}
+                    onClick={() => {
+                      if (openArrowEndMenu === 'end') {
+                        setOpenArrowEndMenu(null);
+                        return;
+                      }
+                      openArrowMenu('end');
+                    }}
+                    className={cn(
+                      'h-10 w-full rounded-sm border-2 transition-all duration-200 flex items-center justify-center hover:bg-secondary/50',
+                      openArrowEndMenu === 'end' ? 'border-accent bg-secondary/50' : 'border-border/50'
+                    )}
+                    title="End marker"
+                  >
+                    {renderArrowEndPreview(arrowEnd)}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Fill Pattern (for pen tool) */}
           {(selectedTool === 'pen' || selectedElements.some(el => el.type === 'pen')) && (
             <div className="space-y-2">
@@ -733,6 +996,42 @@ export function ToolSidebar({
                   Apply Color
                 </button>
               </div>
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* Arrow End Picker Menu - Outside overflow container */}
+      {openArrowEndMenu && arrowEndMenuPos && (
+        <>
+          <div className="fixed inset-0 z-[9998]" onClick={() => setOpenArrowEndMenu(null)} />
+          <div
+            className="fixed z-[9999] w-[260px] bg-card/95 backdrop-blur-md border border-border rounded-sm shadow-2xl p-2"
+            style={{ left: arrowEndMenuPos.left, top: arrowEndMenuPos.top }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="grid grid-cols-2 gap-1">
+              {arrowEndOptions.map((opt) => {
+                const isSelected = openArrowEndMenu === 'start' ? arrowStart === opt.id : arrowEnd === opt.id;
+                return (
+                  <button
+                    key={`${openArrowEndMenu}-${opt.id}`}
+                    type="button"
+                    onClick={() => {
+                      if (openArrowEndMenu === 'start') onArrowStartChange?.(opt.id);
+                      else onArrowEndChange?.(opt.id);
+                      setOpenArrowEndMenu(null);
+                    }}
+                    className={cn(
+                      'h-10 rounded-sm border-2 transition-all duration-150 flex items-center justify-center hover:bg-secondary/60',
+                      isSelected ? 'border-accent bg-secondary/50' : 'border-border/50'
+                    )}
+                    title={opt.label}
+                  >
+                    {renderArrowEndPreview(opt.id)}
+                  </button>
+                );
+              })}
             </div>
           </div>
         </>

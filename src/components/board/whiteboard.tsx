@@ -35,6 +35,9 @@ export function Whiteboard({ roomId }: WhiteboardProps) {
   const [opacity, setOpacity] = useState(100);
   const [strokeStyle, setStrokeStyle] = useState<'solid' | 'dashed' | 'dotted'>('solid');
   const [lineCap, setLineCap] = useState<'butt' | 'round'>('round');
+  const [connectorStyle, setConnectorStyle] = useState<'sharp' | 'curved' | 'elbow'>('sharp');
+  const [arrowStart, setArrowStart] = useState<NonNullable<BoardElement['arrowStart']>>('arrow');
+  const [arrowEnd, setArrowEnd] = useState<NonNullable<BoardElement['arrowEnd']>>('arrow');
   const [cornerRadius, setCornerRadius] = useState(0);
   const [fontFamily, setFontFamily] = useState('var(--font-inter)');
   const [textAlign, setTextAlign] = useState<'left' | 'center' | 'right'>('left');
@@ -378,7 +381,7 @@ export function Whiteboard({ roomId }: WhiteboardProps) {
       if (element.type === 'text' || element.type === 'rectangle' || element.type === 'ellipse' || element.type === 'frame') {
         centerX = (element.x ?? 0) + (element.width ?? 0) / 2;
         centerY = (element.y ?? 0) + (element.height ?? 0) / 2;
-      } else if (element.type === 'pen' || element.type === 'line') {
+      } else if (element.type === 'pen' || element.type === 'line' || element.type === 'arrow') {
         const xs = element.points.map(p => p.x);
         const ys = element.points.map(p => p.y);
         centerX = (Math.min(...xs) + Math.max(...xs)) / 2;
@@ -584,6 +587,42 @@ export function Whiteboard({ roomId }: WhiteboardProps) {
     setLineCap(cap);
   }, [selectedElements, saveToUndoStack, handleUpdateElement]);
 
+  const handleConnectorStyleChange = useCallback((style: 'sharp' | 'curved' | 'elbow') => {
+    if (selectedElements.length > 0) {
+      saveToUndoStack();
+      selectedElements.forEach((el) => {
+        if (el.type === 'line' || el.type === 'arrow') {
+          handleUpdateElement(el.id, { connectorStyle: style });
+        }
+      });
+    }
+    setConnectorStyle(style);
+  }, [selectedElements, saveToUndoStack, handleUpdateElement]);
+
+  const handleArrowStartChange = useCallback((end: NonNullable<BoardElement['arrowStart']>) => {
+    if (selectedElements.length > 0) {
+      saveToUndoStack();
+      selectedElements.forEach((el) => {
+        if (el.type === 'arrow') {
+          handleUpdateElement(el.id, { arrowStart: end });
+        }
+      });
+    }
+    setArrowStart(end);
+  }, [selectedElements, saveToUndoStack, handleUpdateElement]);
+
+  const handleArrowEndChange = useCallback((end: NonNullable<BoardElement['arrowEnd']>) => {
+    if (selectedElements.length > 0) {
+      saveToUndoStack();
+      selectedElements.forEach((el) => {
+        if (el.type === 'arrow') {
+          handleUpdateElement(el.id, { arrowEnd: end });
+        }
+      });
+    }
+    setArrowEnd(end);
+  }, [selectedElements, saveToUndoStack, handleUpdateElement]);
+
   const handleMoveForward = useCallback(() => {
     if (selectedElements.length === 0) return;
     saveToUndoStack();
@@ -622,6 +661,15 @@ export function Whiteboard({ roomId }: WhiteboardProps) {
       }
       if (firstElement.lineCap !== undefined) {
         setLineCap(firstElement.lineCap);
+      }
+      if (firstElement.connectorStyle !== undefined) {
+        setConnectorStyle(firstElement.connectorStyle);
+      }
+      if (firstElement.arrowStart !== undefined) {
+        setArrowStart(firstElement.arrowStart);
+      }
+      if (firstElement.arrowEnd !== undefined) {
+        setArrowEnd(firstElement.arrowEnd);
       }
       if (firstElement.cornerRadius !== undefined) {
         setCornerRadius(firstElement.cornerRadius);
@@ -762,6 +810,12 @@ export function Whiteboard({ roomId }: WhiteboardProps) {
         onStrokeStyleChange={handleStrokeStyleChange}
         lineCap={lineCap}
         onLineCapChange={handleLineCapChange}
+        connectorStyle={connectorStyle}
+        onConnectorStyleChange={handleConnectorStyleChange}
+        arrowStart={arrowStart}
+        onArrowStartChange={handleArrowStartChange}
+        arrowEnd={arrowEnd}
+        onArrowEndChange={handleArrowEndChange}
         cornerRadius={cornerRadius}
         onCornerRadiusChange={handleCornerRadiusChange}
         fontFamily={fontFamily}
@@ -791,6 +845,9 @@ export function Whiteboard({ roomId }: WhiteboardProps) {
         opacity={opacity}
         strokeStyle={strokeStyle}
         lineCap={lineCap}
+        connectorStyle={connectorStyle}
+        arrowStart={arrowStart}
+        arrowEnd={arrowEnd}
         cornerRadius={cornerRadius}
         fontFamily={fontFamily}
         textAlign={textAlign}

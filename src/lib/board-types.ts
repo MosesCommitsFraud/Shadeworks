@@ -1,4 +1,14 @@
-export type Tool = 'select' | 'pen' | 'line' | 'rectangle' | 'ellipse' | 'eraser' | 'text' | 'laser' | 'lasso';
+export type Tool =
+  | 'select'
+  | 'pen'
+  | 'line'
+  | 'arrow'
+  | 'rectangle'
+  | 'ellipse'
+  | 'eraser'
+  | 'text'
+  | 'laser'
+  | 'lasso';
 
 export interface Point {
   x: number;
@@ -7,7 +17,7 @@ export interface Point {
 
 export interface BoardElement {
   id: string;
-  type: 'pen' | 'line' | 'rectangle' | 'ellipse' | 'text' | 'frame' | 'web-embed' | 'laser';
+  type: 'pen' | 'line' | 'arrow' | 'rectangle' | 'ellipse' | 'text' | 'frame' | 'web-embed' | 'laser';
   points: Point[];
   strokeColor: string;
   strokeWidth: number;
@@ -33,6 +43,35 @@ export interface BoardElement {
   strokeStyle?: 'solid' | 'dashed' | 'dotted';
   cornerRadius?: number;
   lineCap?: 'butt' | 'round';
+  // Connector (line/arrow) properties
+  connectorStyle?: 'sharp' | 'curved' | 'elbow';
+  elbowRoute?: 'vertical' | 'horizontal';
+  arrowStart?:
+    | 'none'
+    | 'arrow'
+    | 'triangle'
+    | 'triangle-outline'
+    | 'diamond'
+    | 'diamond-outline'
+    | 'circle'
+    | 'circle-outline'
+    | 'bar'
+    | 'crowfoot-one'
+    | 'crowfoot-many'
+    | 'crowfoot-one-many';
+  arrowEnd?:
+    | 'none'
+    | 'arrow'
+    | 'triangle'
+    | 'triangle-outline'
+    | 'diamond'
+    | 'diamond-outline'
+    | 'circle'
+    | 'circle-outline'
+    | 'bar'
+    | 'crowfoot-one'
+    | 'crowfoot-many'
+    | 'crowfoot-one-many';
   // Text properties
   fontFamily?: string;
   textAlign?: 'left' | 'center' | 'right';
@@ -112,4 +151,3 @@ export interface ShadeworksFile {
     viewBackgroundColor?: string;
   };
 }
-

@@ -4,6 +4,7 @@ import {
   MousePointer2,
   Pencil,
   Minus,
+  ArrowRight,
   Square,
   Circle,
   Eraser,
@@ -45,6 +46,7 @@ const tools: { id: Tool; icon: React.ElementType; label: string; hotkey: number 
   { id: 'select', icon: MousePointer2, label: 'Select', hotkey: 'V' },
   { id: 'pen', icon: Pencil, label: 'Pen', hotkey: 1 },
   { id: 'line', icon: Minus, label: 'Line', hotkey: 2 },
+  { id: 'arrow', icon: ArrowRight, label: 'Arrow', hotkey: 9 },
   { id: 'rectangle', icon: Square, label: 'Rectangle', hotkey: 3 },
   { id: 'ellipse', icon: Circle, label: 'Ellipse', hotkey: 4 },
   { id: 'text', icon: Type, label: 'Text', hotkey: 5 },
@@ -93,13 +95,11 @@ export function Toolbar({
         return;
       }
 
-      // Number keys 1-8 for tools (skip select which is index 0)
+      // Number keys 1-9 for tools
       const num = parseInt(e.key);
-      if (num >= 1 && num <= 8) {
-        const tool = tools[num]; // num corresponds to index (1=pen at index 1, 2=line at index 2, etc)
-        if (tool) {
-          onToolChange(tool.id);
-        }
+      if (num >= 1 && num <= 9) {
+        const matchedTool = tools.find((t) => t.hotkey === num);
+        if (matchedTool) onToolChange(matchedTool.id);
       }
     };
 
@@ -194,4 +194,3 @@ export function Toolbar({
     </div>
   );
 }
-
