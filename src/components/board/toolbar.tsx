@@ -110,14 +110,14 @@ export function Toolbar({
   return (
     <div className="absolute top-4 left-1/2 -translate-x-1/2 z-50 flex items-stretch gap-2">
       {/* Main Tools */}
-      <div className="flex items-center gap-1 bg-card/95 backdrop-blur-md border border-border rounded-xl p-1.5 shadow-2xl">
+      <div className="flex items-center gap-1 bg-card/95 backdrop-blur-md border border-border rounded-sm p-1.5 shadow-2xl">
         {tools.map((tool) => (
           <Tooltip key={tool.id}>
             <TooltipTrigger asChild>
               <button
                 onClick={() => onToolChange(tool.id)}
                 className={cn(
-                  'p-2 rounded-lg transition-all duration-200',
+                  'p-2 rounded-sm transition-all duration-200',
                   'hover:bg-secondary/80',
                   selectedTool === tool.id
                     ? 'bg-accent text-accent-foreground shadow-lg'
@@ -135,27 +135,10 @@ export function Toolbar({
             </TooltipContent>
           </Tooltip>
         ))}
-
-        <div className="w-px h-5 bg-border mx-1" />
-
-        {/* Clear Canvas */}
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <button
-              onClick={onClear}
-              className="p-2 rounded-lg hover:bg-destructive/20 text-muted-foreground hover:text-destructive transition-all duration-200"
-            >
-              <Trash2 className="w-4 h-4" />
-            </button>
-          </TooltipTrigger>
-          <TooltipContent>
-            <span>Clear Canvas</span>
-          </TooltipContent>
-        </Tooltip>
       </div>
 
       {/* Collaboration Panel */}
-      <div className="flex items-center gap-2 bg-card/95 backdrop-blur-md border border-border rounded-xl px-2 py-1.5 shadow-2xl">
+      <div className="flex items-center gap-2 bg-card/95 backdrop-blur-md border border-border rounded-sm px-2 py-1.5 shadow-2xl">
         {/* Your Name */}
         <div className="flex items-center gap-2 px-1">
           {/* Status indicator */}
@@ -189,7 +172,7 @@ export function Toolbar({
         <button
           onClick={copyInviteLink}
           className={cn(
-            'flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg transition-all duration-200',
+            'flex items-center gap-1.5 px-2.5 py-1.5 rounded-sm transition-all duration-200',
             copied
               ? 'bg-green-500/20 text-green-400'
               : 'hover:bg-secondary/80 text-muted-foreground hover:text-foreground'
