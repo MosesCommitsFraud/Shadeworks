@@ -34,6 +34,10 @@ interface ToolSidebarProps {
   onLineHeightChange: (height: number) => void;
   fillPattern?: 'none' | 'solid' | 'criss-cross';
   onFillPatternChange?: (pattern: 'none' | 'solid' | 'criss-cross') => void;
+  lineCap?: 'butt' | 'round' | 'square';
+  onLineCapChange?: (cap: 'butt' | 'round' | 'square') => void;
+  lineJoin?: 'miter' | 'round' | 'bevel';
+  onLineJoinChange?: (join: 'miter' | 'round' | 'bevel') => void;
   selectedElements?: BoardElement[];
   onBringToFront?: () => void;
   onSendToBack?: () => void;
@@ -68,6 +72,10 @@ export function ToolSidebar({
   onLineHeightChange,
   fillPattern = 'none',
   onFillPatternChange,
+  lineCap = 'round',
+  onLineCapChange,
+  lineJoin = 'round',
+  onLineJoinChange,
   selectedElements = [],
   onBringToFront,
   onSendToBack,
@@ -122,11 +130,11 @@ export function ToolSidebar({
           isCollapsed ? 'translate-x-[calc(100%-3rem)]' : 'translate-x-0'
         )}
       >
-        <div className="relative bg-card/95 backdrop-blur-md border border-border rounded-2xl shadow-2xl overflow-hidden">
+        <div className="relative bg-card/95 backdrop-blur-md border border-border rounded-sm shadow-2xl overflow-hidden">
         {/* Collapse/Expand Button */}
         <button
           onClick={() => setIsCollapsed(!isCollapsed)}
-          className="absolute -left-10 top-1/2 -translate-y-1/2 w-8 h-16 bg-card/95 backdrop-blur-md border border-border rounded-l-xl hover:bg-accent/20 transition-colors flex items-center justify-center"
+          className="absolute -left-10 top-1/2 -translate-y-1/2 w-8 h-16 bg-card/95 backdrop-blur-md border border-border rounded-l-sm hover:bg-accent/20 transition-colors flex items-center justify-center"
         >
           {isCollapsed ? (
             <ChevronLeft className="w-4 h-4 text-muted-foreground" />
@@ -160,7 +168,7 @@ export function ToolSidebar({
                   key={color}
                   onClick={() => onStrokeColorChange(color)}
                   className={cn(
-                    'w-7 h-7 rounded-lg border-2 transition-all duration-200 hover:scale-110 hover:shadow-lg',
+                    'w-7 h-7 rounded-sm border-2 transition-all duration-200 hover:scale-110 hover:shadow-lg',
                     strokeColor === color
                       ? 'border-accent shadow-lg scale-105'
                       : 'border-border/50'
@@ -172,7 +180,7 @@ export function ToolSidebar({
               {/* Custom color picker */}
               <button
                 onClick={() => setShowStrokeColorPicker(true)}
-                className="w-7 h-7 rounded-lg border-2 border-border/50 cursor-pointer transition-all duration-200 hover:scale-110 hover:shadow-lg overflow-hidden"
+                className="w-7 h-7 rounded-sm border-2 border-border/50 cursor-pointer transition-all duration-200 hover:scale-110 hover:shadow-lg overflow-hidden"
                 title="Custom color"
               >
                 <div
@@ -197,7 +205,7 @@ export function ToolSidebar({
                   <button
                     onClick={() => onFillColorChange('transparent')}
                     className={cn(
-                      'w-7 h-7 rounded-lg border-2 transition-all duration-200 hover:scale-110 hover:shadow-lg relative',
+                      'w-7 h-7 rounded-sm border-2 transition-all duration-200 hover:scale-110 hover:shadow-lg relative',
                       fillColor === 'transparent'
                         ? 'border-accent shadow-lg scale-105'
                         : 'border-border/50'
@@ -218,7 +226,7 @@ export function ToolSidebar({
                       key={`fill-${color}`}
                       onClick={() => onFillColorChange(color)}
                       className={cn(
-                        'w-7 h-7 rounded-lg border-2 transition-all duration-200 hover:scale-110 hover:shadow-lg',
+                        'w-7 h-7 rounded-sm border-2 transition-all duration-200 hover:scale-110 hover:shadow-lg',
                         fillColor === color
                           ? 'border-accent shadow-lg scale-105'
                           : 'border-border/50'
@@ -230,7 +238,7 @@ export function ToolSidebar({
                   {/* Custom color picker */}
                   <button
                     onClick={() => setShowFillColorPicker(true)}
-                    className="w-7 h-7 rounded-lg border-2 border-border/50 cursor-pointer transition-all duration-200 hover:scale-110 hover:shadow-lg overflow-hidden"
+                    className="w-7 h-7 rounded-sm border-2 border-border/50 cursor-pointer transition-all duration-200 hover:scale-110 hover:shadow-lg overflow-hidden"
                     title="Custom fill color"
                   >
                     <div
@@ -257,7 +265,7 @@ export function ToolSidebar({
                     key={font.value}
                     onClick={() => onFontFamilyChange(font.value)}
                     className={cn(
-                      'h-8 rounded-md border transition-all duration-200 flex items-center justify-center text-xs hover:bg-secondary/50',
+                      'h-8 rounded-sm border transition-all duration-200 flex items-center justify-center text-xs hover:bg-secondary/50',
                       fontFamily === font.value
                         ? 'border-accent bg-secondary/50'
                         : 'border-border/50'
@@ -296,7 +304,7 @@ export function ToolSidebar({
                 <button
                   onClick={() => onTextAlignChange('left')}
                   className={cn(
-                    'h-8 w-8 rounded-md border transition-all duration-200 flex items-center justify-center hover:bg-secondary/50',
+                    'h-8 w-8 rounded-sm border transition-all duration-200 flex items-center justify-center hover:bg-secondary/50',
                     textAlign === 'left' ? 'border-accent bg-secondary/50' : 'border-border/50'
                   )}
                 >
@@ -305,7 +313,7 @@ export function ToolSidebar({
                 <button
                   onClick={() => onTextAlignChange('center')}
                   className={cn(
-                    'h-8 w-8 rounded-md border transition-all duration-200 flex items-center justify-center hover:bg-secondary/50',
+                    'h-8 w-8 rounded-sm border transition-all duration-200 flex items-center justify-center hover:bg-secondary/50',
                     textAlign === 'center' ? 'border-accent bg-secondary/50' : 'border-border/50'
                   )}
                 >
@@ -314,7 +322,7 @@ export function ToolSidebar({
                 <button
                   onClick={() => onTextAlignChange('right')}
                   className={cn(
-                    'h-8 w-8 rounded-md border transition-all duration-200 flex items-center justify-center hover:bg-secondary/50',
+                    'h-8 w-8 rounded-sm border transition-all duration-200 flex items-center justify-center hover:bg-secondary/50',
                     textAlign === 'right' ? 'border-accent bg-secondary/50' : 'border-border/50'
                   )}
                 >
@@ -366,7 +374,7 @@ export function ToolSidebar({
                     key={width}
                     onClick={() => onStrokeWidthChange(width)}
                     className={cn(
-                      'flex-1 h-10 rounded-lg border-2 transition-all duration-200 flex items-center justify-center hover:bg-secondary/50',
+                      'flex-1 h-10 rounded-sm border-2 transition-all duration-200 flex items-center justify-center hover:bg-secondary/50',
                       strokeWidth === width
                         ? 'border-accent bg-secondary/50'
                         : 'border-border/50'
@@ -392,7 +400,7 @@ export function ToolSidebar({
                 <button
                   onClick={() => onStrokeStyleChange('solid')}
                   className={cn(
-                    'h-10 rounded-lg border-2 transition-all duration-200 flex items-center justify-center hover:bg-secondary/50',
+                    'h-10 rounded-sm border-2 transition-all duration-200 flex items-center justify-center hover:bg-secondary/50',
                     strokeStyle === 'solid'
                       ? 'border-accent bg-secondary/50'
                       : 'border-border/50'
@@ -403,7 +411,7 @@ export function ToolSidebar({
                 <button
                   onClick={() => onStrokeStyleChange('dashed')}
                   className={cn(
-                    'h-10 rounded-lg border-2 transition-all duration-200 flex items-center justify-center hover:bg-secondary/50',
+                    'h-10 rounded-sm border-2 transition-all duration-200 flex items-center justify-center hover:bg-secondary/50',
                     strokeStyle === 'dashed'
                       ? 'border-accent bg-secondary/50'
                       : 'border-border/50'
@@ -414,7 +422,7 @@ export function ToolSidebar({
                 <button
                   onClick={() => onStrokeStyleChange('dotted')}
                   className={cn(
-                    'h-10 rounded-lg border-2 transition-all duration-200 flex items-center justify-center hover:bg-secondary/50',
+                    'h-10 rounded-sm border-2 transition-all duration-200 flex items-center justify-center hover:bg-secondary/50',
                     strokeStyle === 'dotted'
                       ? 'border-accent bg-secondary/50'
                       : 'border-border/50'
@@ -426,18 +434,124 @@ export function ToolSidebar({
             </div>
           )}
 
+          {/* Line Cap (not for text tool) */}
+          {showStrokeWidthAndStyle && onLineCapChange && (
+            <div className="space-y-2">
+              <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                Line Cap
+              </label>
+              <div className="grid grid-cols-3 gap-1">
+                <button
+                  onClick={() => onLineCapChange('butt')}
+                  className={cn(
+                    'h-8 rounded-sm border-2 transition-all duration-200 flex items-center justify-center hover:bg-secondary/50',
+                    lineCap === 'butt'
+                      ? 'border-accent bg-secondary/50'
+                      : 'border-border/50'
+                  )}
+                  title="Butt (flat)"
+                >
+                  <svg width="28" height="20" viewBox="0 0 28 20" className="text-foreground">
+                    <line x1="4" y1="10" x2="24" y2="10" stroke="currentColor" strokeWidth="6" strokeLinecap="butt" />
+                  </svg>
+                </button>
+                <button
+                  onClick={() => onLineCapChange('round')}
+                  className={cn(
+                    'h-8 rounded-sm border-2 transition-all duration-200 flex items-center justify-center hover:bg-secondary/50',
+                    lineCap === 'round'
+                      ? 'border-accent bg-secondary/50'
+                      : 'border-border/50'
+                  )}
+                  title="Round"
+                >
+                  <svg width="28" height="20" viewBox="0 0 28 20" className="text-foreground">
+                    <line x1="4" y1="10" x2="24" y2="10" stroke="currentColor" strokeWidth="6" strokeLinecap="round" />
+                  </svg>
+                </button>
+                <button
+                  onClick={() => onLineCapChange('square')}
+                  className={cn(
+                    'h-8 rounded-sm border-2 transition-all duration-200 flex items-center justify-center hover:bg-secondary/50',
+                    lineCap === 'square'
+                      ? 'border-accent bg-secondary/50'
+                      : 'border-border/50'
+                  )}
+                  title="Square"
+                >
+                  <svg width="28" height="20" viewBox="0 0 28 20" className="text-foreground">
+                    <line x1="4" y1="10" x2="24" y2="10" stroke="currentColor" strokeWidth="6" strokeLinecap="square" />
+                  </svg>
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Line Join (not for text tool) */}
+          {showStrokeWidthAndStyle && onLineJoinChange && (
+            <div className="space-y-2">
+              <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                Line Join
+              </label>
+              <div className="grid grid-cols-3 gap-1">
+                <button
+                  onClick={() => onLineJoinChange('miter')}
+                  className={cn(
+                    'h-8 rounded-sm border-2 transition-all duration-200 flex items-center justify-center hover:bg-secondary/50',
+                    lineJoin === 'miter'
+                      ? 'border-accent bg-secondary/50'
+                      : 'border-border/50'
+                  )}
+                  title="Miter (sharp)"
+                >
+                  <svg width="24" height="20" viewBox="0 0 24 20" className="text-foreground">
+                    <polyline points="4,16 12,4 20,16" fill="none" stroke="currentColor" strokeWidth="4" strokeLinejoin="miter" strokeLinecap="butt" />
+                  </svg>
+                </button>
+                <button
+                  onClick={() => onLineJoinChange('round')}
+                  className={cn(
+                    'h-8 rounded-sm border-2 transition-all duration-200 flex items-center justify-center hover:bg-secondary/50',
+                    lineJoin === 'round'
+                      ? 'border-accent bg-secondary/50'
+                      : 'border-border/50'
+                  )}
+                  title="Round"
+                >
+                  <svg width="24" height="20" viewBox="0 0 24 20" className="text-foreground">
+                    <polyline points="4,16 12,4 20,16" fill="none" stroke="currentColor" strokeWidth="4" strokeLinejoin="round" strokeLinecap="butt" />
+                  </svg>
+                </button>
+                <button
+                  onClick={() => onLineJoinChange('bevel')}
+                  className={cn(
+                    'h-8 rounded-sm border-2 transition-all duration-200 flex items-center justify-center hover:bg-secondary/50',
+                    lineJoin === 'bevel'
+                      ? 'border-accent bg-secondary/50'
+                      : 'border-border/50'
+                  )}
+                  title="Bevel (flat)"
+                >
+                  <svg width="24" height="20" viewBox="0 0 24 20" className="text-foreground">
+                    <polyline points="4,16 12,4 20,16" fill="none" stroke="currentColor" strokeWidth="4" strokeLinejoin="bevel" strokeLinecap="butt" />
+                  </svg>
+                </button>
+              </div>
+            </div>
+          )}
+
           {/* Fill Pattern (for pen tool) */}
           {(selectedTool === 'pen' || selectedElements.some(el => el.type === 'pen')) && (
             <div className="space-y-2">
               <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
                 Fill Pattern
               </label>
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-3 gap-1">
                 {/* None button */}
                 <button
                   onClick={() => onFillPatternChange?.('none')}
                   className={cn(
-                    'h-10 rounded-lg border-2 transition-all duration-200 flex items-center justify-center hover:bg-secondary/50',
+                    'h-8 rounded-sm border-2 transition-all duration-200 flex items-center justify-center hover:bg-secondary/50',
                     fillPattern === 'none' ? 'border-accent bg-secondary/50' : 'border-border/50'
                   )}
                 >
@@ -448,29 +562,27 @@ export function ToolSidebar({
                 <button
                   onClick={() => onFillPatternChange?.('solid')}
                   className={cn(
-                    'h-10 rounded-lg border-2 transition-all duration-200 flex items-center justify-center hover:bg-secondary/50',
+                    'h-8 rounded-sm border-2 transition-all duration-200 flex items-center justify-center hover:bg-secondary/50',
                     fillPattern === 'solid' ? 'border-accent bg-secondary/50' : 'border-border/50'
                   )}
                 >
-                  <div className="w-8 h-8 rounded bg-foreground/30" />
+                  <div className="w-6 h-6 rounded-sm bg-foreground/30" />
                 </button>
 
                 {/* Criss-cross button */}
                 <button
                   onClick={() => onFillPatternChange?.('criss-cross')}
                   className={cn(
-                    'h-10 rounded-lg border-2 transition-all duration-200 flex items-center justify-center hover:bg-secondary/50',
+                    'h-8 rounded-sm border-2 transition-all duration-200 flex items-center justify-center hover:bg-secondary/50',
                     fillPattern === 'criss-cross' ? 'border-accent bg-secondary/50' : 'border-border/50'
                   )}
                 >
-                  <svg width="24" height="24" viewBox="0 0 24 24" className="text-foreground">
-                    <pattern id="criss-cross-preview" width="12" height="12" patternUnits="userSpaceOnUse">
-                      <line x1="0" y1="0" x2="12" y2="12" stroke="currentColor" strokeWidth="1" opacity="0.6" strokeLinecap="round"/>
-                      <line x1="0" y1="12" x2="12" y2="0" stroke="currentColor" strokeWidth="1" opacity="0.6" strokeLinecap="round"/>
-                      <line x1="-3" y1="0" x2="9" y2="12" stroke="currentColor" strokeWidth="0.8" opacity="0.4" strokeLinecap="round"/>
-                      <line x1="-3" y1="12" x2="9" y2="0" stroke="currentColor" strokeWidth="0.8" opacity="0.4" strokeLinecap="round"/>
+                  <svg width="20" height="20" viewBox="0 0 20 20" className="text-foreground">
+                    <pattern id="criss-cross-preview" width="10" height="10" patternUnits="userSpaceOnUse">
+                      <line x1="0" y1="0" x2="10" y2="10" stroke="currentColor" strokeWidth="1" opacity="0.6" strokeLinecap="round"/>
+                      <line x1="0" y1="10" x2="10" y2="0" stroke="currentColor" strokeWidth="1" opacity="0.6" strokeLinecap="round"/>
                     </pattern>
-                    <rect width="24" height="24" fill="url(#criss-cross-preview)" />
+                    <rect width="20" height="20" fill="url(#criss-cross-preview)" />
                   </svg>
                 </button>
               </div>
@@ -516,14 +628,14 @@ export function ToolSidebar({
               <div className="grid grid-cols-2 gap-2">
                 <button
                   onClick={onBringToFront}
-                  className="flex items-center justify-center gap-2 px-3 py-2.5 rounded-lg border-2 border-border/50 hover:border-accent hover:bg-secondary/50 transition-all duration-200"
+                  className="flex items-center justify-center gap-2 px-3 py-2.5 rounded-sm border-2 border-border/50 hover:border-accent hover:bg-secondary/50 transition-all duration-200"
                 >
                   <ArrowUpToLine className="w-4 h-4" />
                   <span className="text-xs font-medium">Front</span>
                 </button>
                 <button
                   onClick={onSendToBack}
-                  className="flex items-center justify-center gap-2 px-3 py-2.5 rounded-lg border-2 border-border/50 hover:border-accent hover:bg-secondary/50 transition-all duration-200"
+                  className="flex items-center justify-center gap-2 px-3 py-2.5 rounded-sm border-2 border-border/50 hover:border-accent hover:bg-secondary/50 transition-all duration-200"
                 >
                   <ArrowDownToLine className="w-4 h-4" />
                   <span className="text-xs font-medium">Back</span>
@@ -540,7 +652,7 @@ export function ToolSidebar({
         <>
           <div className="fixed inset-0 z-[9998] bg-black/50" onClick={() => setShowStrokeColorPicker(false)} />
           <div
-            className="fixed right-80 top-1/2 -translate-y-1/2 z-[9999] bg-card border border-border rounded-xl p-6 shadow-2xl w-80"
+            className="fixed right-80 top-1/2 -translate-y-1/2 z-[9999] bg-card border border-border rounded-sm p-6 shadow-2xl w-80"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between mb-4">
@@ -560,7 +672,7 @@ export function ToolSidebar({
                     type="color"
                     value={customStrokeColor}
                     onChange={(e) => setCustomStrokeColor(e.target.value)}
-                    className="w-32 h-32 rounded-lg cursor-pointer border-2 border-border/50"
+                    className="w-32 h-32 rounded-sm cursor-pointer border-2 border-border/50"
                   />
                 </div>
               </div>
@@ -577,7 +689,7 @@ export function ToolSidebar({
                       setCustomStrokeColor(value);
                     }
                   }}
-                  className="w-full px-3 py-2 bg-secondary/50 border-2 border-border/50 rounded-lg text-foreground font-mono text-sm focus:border-accent focus:outline-none transition-colors"
+                  className="w-full px-3 py-2 bg-secondary/50 border-2 border-border/50 rounded-sm text-foreground font-mono text-sm focus:border-accent focus:outline-none transition-colors"
                   placeholder="#FFFFFF"
                 />
               </div>
@@ -586,7 +698,7 @@ export function ToolSidebar({
                   Preview
                 </label>
                 <div
-                  className="w-full h-16 rounded-lg border-2 border-border/50"
+                  className="w-full h-16 rounded-sm border-2 border-border/50"
                   style={{ backgroundColor: customStrokeColor }}
                 />
               </div>
@@ -596,7 +708,7 @@ export function ToolSidebar({
                     onStrokeColorChange(customStrokeColor);
                     setShowStrokeColorPicker(false);
                   }}
-                  className="flex-1 px-4 py-2.5 bg-accent text-accent-foreground rounded-lg font-medium hover:bg-accent/90 transition-colors"
+                  className="flex-1 px-4 py-2.5 bg-accent text-accent-foreground rounded-sm font-medium hover:bg-accent/90 transition-colors"
                 >
                   Apply Color
                 </button>
@@ -611,7 +723,7 @@ export function ToolSidebar({
         <>
           <div className="fixed inset-0 z-[9998] bg-black/50" onClick={() => setShowFillColorPicker(false)} />
           <div
-            className="fixed right-80 top-1/2 -translate-y-1/2 z-[9999] bg-card border border-border rounded-xl p-6 shadow-2xl w-80"
+            className="fixed right-80 top-1/2 -translate-y-1/2 z-[9999] bg-card border border-border rounded-sm p-6 shadow-2xl w-80"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between mb-4">
@@ -631,7 +743,7 @@ export function ToolSidebar({
                     type="color"
                     value={customFillColor === 'transparent' ? '#ffffff' : customFillColor}
                     onChange={(e) => setCustomFillColor(e.target.value)}
-                    className="w-32 h-32 rounded-lg cursor-pointer border-2 border-border/50"
+                    className="w-32 h-32 rounded-sm cursor-pointer border-2 border-border/50"
                   />
                 </div>
               </div>
@@ -648,7 +760,7 @@ export function ToolSidebar({
                       setCustomFillColor(value);
                     }
                   }}
-                  className="w-full px-3 py-2 bg-secondary/50 border-2 border-border/50 rounded-lg text-foreground font-mono text-sm focus:border-accent focus:outline-none transition-colors"
+                  className="w-full px-3 py-2 bg-secondary/50 border-2 border-border/50 rounded-sm text-foreground font-mono text-sm focus:border-accent focus:outline-none transition-colors"
                   placeholder="#FFFFFF"
                 />
               </div>
@@ -657,7 +769,7 @@ export function ToolSidebar({
                   Preview
                 </label>
                 <div
-                  className="w-full h-16 rounded-lg border-2 border-border/50"
+                  className="w-full h-16 rounded-sm border-2 border-border/50"
                   style={{ backgroundColor: customFillColor === 'transparent' ? '#ffffff' : customFillColor }}
                 />
               </div>
@@ -669,7 +781,7 @@ export function ToolSidebar({
                     }
                     setShowFillColorPicker(false);
                   }}
-                  className="flex-1 px-4 py-2.5 bg-accent text-accent-foreground rounded-lg font-medium hover:bg-accent/90 transition-colors"
+                  className="flex-1 px-4 py-2.5 bg-accent text-accent-foreground rounded-sm font-medium hover:bg-accent/90 transition-colors"
                 >
                   Apply Color
                 </button>

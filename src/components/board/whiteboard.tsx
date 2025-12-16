@@ -34,6 +34,8 @@ export function Whiteboard({ roomId }: WhiteboardProps) {
   const [fillColor, setFillColor] = useState('transparent');
   const [opacity, setOpacity] = useState(100);
   const [strokeStyle, setStrokeStyle] = useState<'solid' | 'dashed' | 'dotted'>('solid');
+  const [lineCap, setLineCap] = useState<'butt' | 'round' | 'square'>('round');
+  const [lineJoin, setLineJoin] = useState<'miter' | 'round' | 'bevel'>('round');
   const [cornerRadius, setCornerRadius] = useState(0);
   const [fontFamily, setFontFamily] = useState('var(--font-inter)');
   const [textAlign, setTextAlign] = useState<'left' | 'center' | 'right'>('left');
@@ -573,6 +575,26 @@ export function Whiteboard({ roomId }: WhiteboardProps) {
     setFillPattern(pattern);
   }, [selectedElements, saveToUndoStack, handleUpdateElement]);
 
+  const handleLineCapChange = useCallback((cap: 'butt' | 'round' | 'square') => {
+    if (selectedElements.length > 0) {
+      saveToUndoStack();
+      selectedElements.forEach((el) => {
+        handleUpdateElement(el.id, { lineCap: cap });
+      });
+    }
+    setLineCap(cap);
+  }, [selectedElements, saveToUndoStack, handleUpdateElement]);
+
+  const handleLineJoinChange = useCallback((join: 'miter' | 'round' | 'bevel') => {
+    if (selectedElements.length > 0) {
+      saveToUndoStack();
+      selectedElements.forEach((el) => {
+        handleUpdateElement(el.id, { lineJoin: join });
+      });
+    }
+    setLineJoin(join);
+  }, [selectedElements, saveToUndoStack, handleUpdateElement]);
+
   // Sync sidebar properties with selected elements
   useEffect(() => {
     if (selectedElements.length > 0) {
@@ -588,6 +610,12 @@ export function Whiteboard({ roomId }: WhiteboardProps) {
       }
       if (firstElement.strokeStyle !== undefined) {
         setStrokeStyle(firstElement.strokeStyle);
+      }
+      if (firstElement.lineCap !== undefined) {
+        setLineCap(firstElement.lineCap);
+      }
+      if (firstElement.lineJoin !== undefined) {
+        setLineJoin(firstElement.lineJoin);
       }
       if (firstElement.cornerRadius !== undefined) {
         setCornerRadius(firstElement.cornerRadius);
@@ -726,6 +754,10 @@ export function Whiteboard({ roomId }: WhiteboardProps) {
         onOpacityChange={handleOpacityChange}
         strokeStyle={strokeStyle}
         onStrokeStyleChange={handleStrokeStyleChange}
+        lineCap={lineCap}
+        onLineCapChange={handleLineCapChange}
+        lineJoin={lineJoin}
+        onLineJoinChange={handleLineJoinChange}
         cornerRadius={cornerRadius}
         onCornerRadiusChange={handleCornerRadiusChange}
         fontFamily={fontFamily}
@@ -752,6 +784,8 @@ export function Whiteboard({ roomId }: WhiteboardProps) {
         fillColor={fillColor}
         opacity={opacity}
         strokeStyle={strokeStyle}
+        lineCap={lineCap}
+        lineJoin={lineJoin}
         cornerRadius={cornerRadius}
         fontFamily={fontFamily}
         textAlign={textAlign}

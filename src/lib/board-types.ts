@@ -32,6 +32,8 @@ export interface BoardElement {
   opacity?: number;
   strokeStyle?: 'solid' | 'dashed' | 'dotted';
   cornerRadius?: number;
+  lineCap?: 'butt' | 'round' | 'square';
+  lineJoin?: 'miter' | 'round' | 'bevel';
   // Text properties
   fontFamily?: string;
   textAlign?: 'left' | 'center' | 'right';
@@ -84,7 +86,7 @@ export const FONTS = [
   { name: 'Lobster', value: 'var(--font-lobster)' },
 ];
 
-export const FONT_SIZES = [12, 16, 20, 24, 32, 48, 64];
+export const FONT_SIZES = [8, 10, 12, 14, 16, 18, 20, 24, 28, 32, 36, 40, 48, 56, 64, 72, 80, 96];
 
 export const DEFAULT_PEN_FILL_COLOR = '#d1d5db';
 

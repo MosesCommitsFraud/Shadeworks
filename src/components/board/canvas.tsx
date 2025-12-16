@@ -15,6 +15,8 @@ interface CanvasProps {
   fillColor?: string;
   opacity?: number;
   strokeStyle?: 'solid' | 'dashed' | 'dotted';
+  lineCap?: 'butt' | 'round' | 'square';
+  lineJoin?: 'miter' | 'round' | 'bevel';
   cornerRadius?: number;
   fontFamily?: string;
   textAlign?: 'left' | 'center' | 'right';
@@ -212,6 +214,8 @@ export function Canvas({
   fillColor = 'transparent',
   opacity = 100,
   strokeStyle = 'solid',
+  lineCap = 'round',
+  lineJoin = 'round',
   cornerRadius = 0,
   fontFamily = 'var(--font-inter)',
   textAlign = 'left',
@@ -945,6 +949,8 @@ export function Canvas({
         timestamp: Date.now(),
         opacity,
         strokeStyle,
+        lineCap,
+        lineJoin,
       };
       setCurrentElement(newElement);
       setIsDrawing(true);
@@ -959,6 +965,8 @@ export function Canvas({
       strokeWidth,
       opacity,
       strokeStyle,
+      lineCap,
+      lineJoin,
       cornerRadius,
     };
 
@@ -976,7 +984,7 @@ export function Canvas({
 
     setCurrentElement(newElement);
     setIsDrawing(true);
-  }, [tool, strokeColor, strokeWidth, fillColor, opacity, strokeStyle, cornerRadius, fillPattern, getMousePosition, elements, pan, selectedBounds, selectedElements, selectedIds, shiftPressed, onStartTransform, getElementsToErase, onDeleteElement]);
+  }, [tool, strokeColor, strokeWidth, fillColor, opacity, strokeStyle, lineCap, lineJoin, cornerRadius, fillPattern, getMousePosition, elements, pan, selectedBounds, selectedElements, selectedIds, shiftPressed, onStartTransform, getElementsToErase, onDeleteElement]);
 
   const handleMouseUp = useCallback(() => {
     if (isPanning) {
@@ -1353,6 +1361,8 @@ export function Canvas({
         // For dashed/dotted strokes, use polyline with stroke
         const strokeDasharray = elStrokeStyle === 'dashed' ? '10,10' : elStrokeStyle === 'dotted' ? '2,6' : 'none';
         const points = element.points.map(p => `${p.x},${p.y}`).join(' ');
+        const elLineCap = element.lineCap || 'round';
+        const elLineJoin = element.lineJoin || 'round';
         // Create a wider invisible hitbox for easier clicking (minimum 16px)
         const hitboxWidth = Math.max(element.strokeWidth * 6, 16);
         return (
@@ -1375,8 +1385,8 @@ export function Canvas({
               points={points}
               stroke="transparent"
               strokeWidth={hitboxWidth}
-              strokeLinecap="round"
-              strokeLinejoin="round"
+              strokeLinecap={elLineCap}
+              strokeLinejoin={elLineJoin}
               fill="none"
               pointerEvents="stroke"
             />
@@ -1385,8 +1395,8 @@ export function Canvas({
               points={points}
               stroke={element.strokeColor}
               strokeWidth={element.strokeWidth}
-              strokeLinecap="round"
-              strokeLinejoin="round"
+              strokeLinecap={elLineCap}
+              strokeLinejoin={elLineJoin}
               strokeDasharray={strokeDasharray}
               fill="none"
               opacity={isMarkedForDeletion ? elOpacity * 0.3 : elOpacity}
@@ -1397,8 +1407,8 @@ export function Canvas({
                 points={points}
                 stroke="rgba(0, 0, 0, 0.6)"
                 strokeWidth={element.strokeWidth}
-                strokeLinecap="round"
-                strokeLinejoin="round"
+                strokeLinecap={elLineCap}
+                strokeLinejoin={elLineJoin}
                 fill="none"
                 pointerEvents="none"
               />
@@ -1410,6 +1420,7 @@ export function Canvas({
         if (element.points.length < 2) return null;
         const elOpacity = (element.opacity ?? 100) / 100;
         const elStrokeStyle = element.strokeStyle || 'solid';
+        const elLineCap = element.lineCap || 'round';
         const strokeDasharray = elStrokeStyle === 'dashed' ? '10,10' : elStrokeStyle === 'dotted' ? '2,6' : 'none';
         // Create a wider invisible hitbox for easier clicking (minimum 16px)
         const hitboxWidth = Math.max(element.strokeWidth * 6, 16);
@@ -1424,7 +1435,7 @@ export function Canvas({
               y2={element.points[1].y}
               stroke="transparent"
               strokeWidth={hitboxWidth}
-              strokeLinecap="round"
+              strokeLinecap={elLineCap}
               pointerEvents="stroke"
             />
             {/* Visible line */}
@@ -1435,7 +1446,7 @@ export function Canvas({
               y2={element.points[1].y}
               stroke={element.strokeColor}
               strokeWidth={element.strokeWidth}
-              strokeLinecap="round"
+              strokeLinecap={elLineCap}
               strokeDasharray={strokeDasharray}
               opacity={isMarkedForDeletion ? elOpacity * 0.3 : elOpacity}
               pointerEvents="none"
@@ -1448,7 +1459,7 @@ export function Canvas({
                 y2={element.points[1].y}
                 stroke="rgba(0, 0, 0, 0.7)"
                 strokeWidth={element.strokeWidth}
-                strokeLinecap="round"
+                strokeLinecap={elLineCap}
                 pointerEvents="none"
               />
             )}
