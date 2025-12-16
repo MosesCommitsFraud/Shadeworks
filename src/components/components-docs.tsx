@@ -38,8 +38,10 @@ import { Kbd, KbdGroup } from "@/components/ui/kbd"
 import {
   Sheet,
   SheetContent,
+  SheetDescription,
   SheetHeader,
   SheetTitle,
+  SheetTrigger,
 } from "@/components/ui/sheet"
 import { ArrowLeft, ArrowRight, Download, Heart, Settings } from "lucide-react"
 import { AnimateCursorApiReference, AnimateCursorFollowPreview, AnimateCursorMinimalPreview } from "@/components/animate-ui/docs/animate-cursor-docs"
@@ -1600,6 +1602,205 @@ export function Example() {
               <PropsTable title="AccordionTrigger" rows={triggerRows} />
               <PropsTable title="AccordionContent" rows={contentRows} />
             </div>
+          )
+        },
+      },
+      {
+        id: "sheet",
+        name: "Sheet",
+        description: "A slide-out panel (drawer) that slides in from the side of the screen. Perfect for mobile navigation menus or side panels.",
+        code: `'use client'
+
+import { useState } from "react"
+import { Button } from "@/components/ui/button"
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from "@/components/ui/sheet"
+
+export function Demo() {
+  return (
+    <Sheet>
+      <SheetTrigger asChild>
+        <Button variant="outline">Open Menu</Button>
+      </SheetTrigger>
+      <SheetContent side="left">
+        <SheetHeader>
+          <SheetTitle>Navigation</SheetTitle>
+          <SheetDescription>
+            A side drawer for navigation or additional content.
+          </SheetDescription>
+        </SheetHeader>
+        <div className="py-4">
+          <nav className="flex flex-col gap-2">
+            <a href="#" className="px-2 py-1 text-sm hover:bg-secondary rounded-md">
+              Home
+            </a>
+            <a href="#" className="px-2 py-1 text-sm hover:bg-secondary rounded-md">
+              About
+            </a>
+            <a href="#" className="px-2 py-1 text-sm hover:bg-secondary rounded-md">
+              Services
+            </a>
+            <a href="#" className="px-2 py-1 text-sm hover:bg-secondary rounded-md">
+              Contact
+            </a>
+          </nav>
+        </div>
+      </SheetContent>
+    </Sheet>
+  )
+}`,
+        previewVariants: [
+          {
+            id: "left",
+            name: "Left Side",
+            description: "Sheet slides in from the left side.",
+            code: `import { Button } from "@/components/ui/button"
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from "@/components/ui/sheet"
+
+export function Example() {
+  return (
+    <Sheet>
+      <SheetTrigger asChild>
+        <Button variant="outline">Open Left</Button>
+      </SheetTrigger>
+      <SheetContent side="left">
+        <SheetHeader>
+          <SheetTitle>Left Menu</SheetTitle>
+          <SheetDescription>
+            This drawer slides in from the left.
+          </SheetDescription>
+        </SheetHeader>
+        <div className="py-4">
+          <p className="text-sm text-muted-foreground">Content goes here.</p>
+        </div>
+      </SheetContent>
+    </Sheet>
+  )
+}`,
+            Preview: function Preview() {
+              return (
+                <Sheet>
+                  <SheetTrigger asChild>
+                    <Button variant="outline">Open Left</Button>
+                  </SheetTrigger>
+                  <SheetContent side="left">
+                    <SheetHeader>
+                      <SheetTitle>Left Menu</SheetTitle>
+                    </SheetHeader>
+                    <div className="py-4">
+                      <nav className="flex flex-col gap-2">
+                        <a href="#" className="px-2 py-1 text-sm hover:bg-secondary rounded-md">
+                          Home
+                        </a>
+                        <a href="#" className="px-2 py-1 text-sm hover:bg-secondary rounded-md">
+                          About
+                        </a>
+                        <a href="#" className="px-2 py-1 text-sm hover:bg-secondary rounded-md">
+                          Services
+                        </a>
+                      </nav>
+                    </div>
+                  </SheetContent>
+                </Sheet>
+              )
+            },
+          },
+          {
+            id: "right",
+            name: "Right Side",
+            description: "Sheet slides in from the right side (default).",
+            code: `import { Button } from "@/components/ui/button"
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from "@/components/ui/sheet"
+
+export function Example() {
+  return (
+    <Sheet>
+      <SheetTrigger asChild>
+        <Button variant="outline">Open Right</Button>
+      </SheetTrigger>
+      <SheetContent side="right">
+        <SheetHeader>
+          <SheetTitle>Right Panel</SheetTitle>
+          <SheetDescription>
+            This drawer slides in from the right.
+          </SheetDescription>
+        </SheetHeader>
+        <div className="py-4">
+          <p className="text-sm text-muted-foreground">Content goes here.</p>
+        </div>
+      </SheetContent>
+    </Sheet>
+  )
+}`,
+            Preview: function Preview() {
+              return (
+                <Sheet>
+                  <SheetTrigger asChild>
+                    <Button variant="outline">Open Right</Button>
+                  </SheetTrigger>
+                  <SheetContent side="right">
+                    <SheetHeader>
+                      <SheetTitle>Right Panel</SheetTitle>
+                    </SheetHeader>
+                    <div className="py-4">
+                      <p className="text-sm text-muted-foreground">
+                        This is a right-side drawer. Perfect for settings panels or detailed views.
+                      </p>
+                    </div>
+                  </SheetContent>
+                </Sheet>
+              )
+            },
+          },
+        ],
+        Preview: function Preview() {
+          return (
+            <Sheet>
+              <SheetTrigger asChild>
+                <Button variant="outline">Open Menu</Button>
+              </SheetTrigger>
+              <SheetContent side="left">
+                <SheetHeader>
+                  <SheetTitle>Navigation</SheetTitle>
+                </SheetHeader>
+                <div className="py-4">
+                  <nav className="flex flex-col gap-2">
+                    <a href="#" className="px-2 py-1 text-sm hover:bg-secondary rounded-md">
+                      Home
+                    </a>
+                    <a href="#" className="px-2 py-1 text-sm hover:bg-secondary rounded-md">
+                      About
+                    </a>
+                    <a href="#" className="px-2 py-1 text-sm hover:bg-secondary rounded-md">
+                      Services
+                    </a>
+                    <a href="#" className="px-2 py-1 text-sm hover:bg-secondary rounded-md">
+                      Contact
+                    </a>
+                  </nav>
+                </div>
+              </SheetContent>
+            </Sheet>
           )
         },
       },
