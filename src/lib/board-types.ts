@@ -41,7 +41,7 @@ export interface BoardElement {
   // Layer order
   zIndex?: number;
   // Pattern fill properties
-  fillPattern?: 'none' | 'solid' | 'criss-cross' | 'diagonal';
+  fillPattern?: 'none' | 'solid' | 'criss-cross';
   isClosed?: boolean;
 }
 

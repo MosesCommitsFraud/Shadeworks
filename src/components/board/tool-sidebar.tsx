@@ -32,8 +32,8 @@ interface ToolSidebarProps {
   onLetterSpacingChange: (spacing: number) => void;
   lineHeight: number;
   onLineHeightChange: (height: number) => void;
-  fillPattern?: 'none' | 'solid' | 'grid' | 'slashes';
-  onFillPatternChange?: (pattern: 'none' | 'solid' | 'grid' | 'slashes') => void;
+  fillPattern?: 'none' | 'solid' | 'criss-cross';
+  onFillPatternChange?: (pattern: 'none' | 'solid' | 'criss-cross') => void;
   selectedElements?: BoardElement[];
   onBringToFront?: () => void;
   onSendToBack?: () => void;
@@ -455,35 +455,22 @@ export function ToolSidebar({
                   <div className="w-8 h-8 rounded bg-foreground/30" />
                 </button>
 
-                {/* Grid button */}
+                {/* Criss-cross button */}
                 <button
-                  onClick={() => onFillPatternChange?.('grid')}
+                  onClick={() => onFillPatternChange?.('criss-cross')}
                   className={cn(
                     'h-10 rounded-lg border-2 transition-all duration-200 flex items-center justify-center hover:bg-secondary/50',
-                    fillPattern === 'grid' ? 'border-accent bg-secondary/50' : 'border-border/50'
+                    fillPattern === 'criss-cross' ? 'border-accent bg-secondary/50' : 'border-border/50'
                   )}
                 >
                   <svg width="24" height="24" viewBox="0 0 24 24" className="text-foreground">
-                    <pattern id="grid-preview" width="6" height="6" patternUnits="userSpaceOnUse">
-                      <path d="M 6 0 L 0 0 0 6" fill="none" stroke="currentColor" strokeWidth="1"/>
+                    <pattern id="criss-cross-preview" width="12" height="12" patternUnits="userSpaceOnUse">
+                      <line x1="0" y1="0" x2="12" y2="12" stroke="currentColor" strokeWidth="1" opacity="0.6" strokeLinecap="round"/>
+                      <line x1="0" y1="12" x2="12" y2="0" stroke="currentColor" strokeWidth="1" opacity="0.6" strokeLinecap="round"/>
+                      <line x1="-3" y1="0" x2="9" y2="12" stroke="currentColor" strokeWidth="0.8" opacity="0.4" strokeLinecap="round"/>
+                      <line x1="-3" y1="12" x2="9" y2="0" stroke="currentColor" strokeWidth="0.8" opacity="0.4" strokeLinecap="round"/>
                     </pattern>
-                    <rect width="24" height="24" fill="url(#grid-preview)" />
-                  </svg>
-                </button>
-
-                {/* Slashes button */}
-                <button
-                  onClick={() => onFillPatternChange?.('slashes')}
-                  className={cn(
-                    'h-10 rounded-lg border-2 transition-all duration-200 flex items-center justify-center hover:bg-secondary/50',
-                    fillPattern === 'slashes' ? 'border-accent bg-secondary/50' : 'border-border/50'
-                  )}
-                >
-                  <svg width="24" height="24" viewBox="0 0 24 24" className="text-foreground">
-                    <pattern id="slashes-preview" width="6" height="6" patternUnits="userSpaceOnUse">
-                      <line x1="0" y1="6" x2="6" y2="0" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-                    </pattern>
-                    <rect width="24" height="24" fill="url(#slashes-preview)" />
+                    <rect width="24" height="24" fill="url(#criss-cross-preview)" />
                   </svg>
                 </button>
               </div>

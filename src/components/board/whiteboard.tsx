@@ -40,7 +40,7 @@ export function Whiteboard({ roomId }: WhiteboardProps) {
   const [fontSize, setFontSize] = useState(24);
   const [letterSpacing, setLetterSpacing] = useState(0);
   const [lineHeight, setLineHeight] = useState(1.5);
-  const [fillPattern, setFillPattern] = useState<'none' | 'solid' | 'grid' | 'slashes'>('none');
+  const [fillPattern, setFillPattern] = useState<'none' | 'solid' | 'criss-cross'>('none');
   const [elements, setElements] = useState<BoardElement[]>([]);
   const [collaboration, setCollaboration] = useState<CollaborationManager | null>(null);
   const [connectedUsers, setConnectedUsers] = useState(1);
@@ -554,7 +554,7 @@ export function Whiteboard({ roomId }: WhiteboardProps) {
     setLineHeight(height);
   }, [selectedElements, saveToUndoStack, handleUpdateElement]);
 
-  const handleFillPatternChange = useCallback((pattern: 'none' | 'solid' | 'grid' | 'slashes') => {
+  const handleFillPatternChange = useCallback((pattern: 'none' | 'solid' | 'criss-cross') => {
     if (selectedElements.length > 0) {
       saveToUndoStack();
       selectedElements.forEach((el) => {

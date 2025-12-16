@@ -21,7 +21,7 @@ interface CanvasProps {
   fontSize?: number;
   letterSpacing?: number;
   lineHeight?: number;
-  fillPattern?: 'none' | 'solid' | 'grid' | 'slashes';
+  fillPattern?: 'none' | 'solid' | 'criss-cross';
   collaboration: CollaborationManager | null;
   elements: BoardElement[];
   onAddElement: (element: BoardElement) => void;
@@ -1115,10 +1115,10 @@ export function Canvas({
         const isClosed = isClosedShape(currentElement.points);
 
         // Add closed flag and apply fill pattern only if shape is closed
-        const finalElement = {
+        const finalElement: BoardElement = {
           ...currentElement,
           isClosed,
-          fillPattern: isClosed && currentElement.fillPattern !== 'none' ? currentElement.fillPattern : 'none',
+          fillPattern: (isClosed && currentElement.fillPattern !== 'none' ? currentElement.fillPattern : 'none') as 'none' | 'solid' | 'criss-cross',
         };
 
         onAddElement(finalElement);
@@ -2162,12 +2162,20 @@ export function Canvas({
           </filter>
 
           {/* Pattern definitions for pen fill */}
-          <pattern id="fill-pattern-grid" width="12" height="12" patternUnits="userSpaceOnUse">
-            <path d="M 12 0 L 0 0 0 12" fill="none" stroke="currentColor" strokeWidth="1.2" />
-          </pattern>
-
-          <pattern id="fill-pattern-slashes" width="8" height="8" patternUnits="userSpaceOnUse">
-            <line x1="0" y1="8" x2="8" y2="0" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+          {/* Criss-cross pattern - diagonal lines both ways with organic spacing */}
+          <pattern id="fill-pattern-criss-cross" width="24" height="24" patternUnits="userSpaceOnUse">
+            {/* Diagonal lines going one way */}
+            <line x1="0" y1="0" x2="24" y2="24" stroke="currentColor" strokeWidth="1" opacity="0.6" strokeLinecap="round" />
+            <line x1="-6" y1="0" x2="18" y2="24" stroke="currentColor" strokeWidth="0.8" opacity="0.5" strokeLinecap="round" />
+            <line x1="6" y1="0" x2="30" y2="24" stroke="currentColor" strokeWidth="1.2" opacity="0.5" strokeLinecap="round" />
+            <line x1="-12" y1="0" x2="12" y2="24" stroke="currentColor" strokeWidth="0.9" opacity="0.4" strokeLinecap="round" />
+            <line x1="12" y1="0" x2="36" y2="24" stroke="currentColor" strokeWidth="0.9" opacity="0.4" strokeLinecap="round" />
+            {/* Diagonal lines going the other way */}
+            <line x1="0" y1="24" x2="24" y2="0" stroke="currentColor" strokeWidth="1" opacity="0.6" strokeLinecap="round" />
+            <line x1="-6" y1="24" x2="18" y2="0" stroke="currentColor" strokeWidth="0.9" opacity="0.5" strokeLinecap="round" />
+            <line x1="6" y1="24" x2="30" y2="0" stroke="currentColor" strokeWidth="1.1" opacity="0.5" strokeLinecap="round" />
+            <line x1="-12" y1="24" x2="12" y2="0" stroke="currentColor" strokeWidth="0.8" opacity="0.4" strokeLinecap="round" />
+            <line x1="12" y1="24" x2="36" y2="0" stroke="currentColor" strokeWidth="1" opacity="0.4" strokeLinecap="round" />
           </pattern>
         </defs>
         <g transform={`translate(${pan.x}, ${pan.y}) scale(${zoom})`}>
