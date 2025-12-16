@@ -35,6 +35,12 @@ import {
 } from "@/components/ui/accordion"
 import { CodeBlock as StyledCodeBlock } from "@/components/ui/code-block"
 import { Kbd, KbdGroup } from "@/components/ui/kbd"
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet"
 import { ArrowLeft, ArrowRight, Download, Heart, Settings } from "lucide-react"
 import { AnimateCursorApiReference, AnimateCursorFollowPreview, AnimateCursorMinimalPreview } from "@/components/animate-ui/docs/animate-cursor-docs"
 import { PropsTable, type PropRow } from "@/components/docs/props-table"
@@ -1606,7 +1612,12 @@ export function Example() {
   )
 }
 
-export function ComponentsDocs() {
+interface ComponentsDocsProps {
+  mobileMenuOpen?: boolean
+  onMobileMenuChange?: (open: boolean) => void
+}
+
+export function ComponentsDocs({ mobileMenuOpen = false, onMobileMenuChange }: ComponentsDocsProps = {}) {
   const registry = useComponentRegistry()
   const [activeId, setActiveId] = useState("introduction")
   const [activePreviewVariantId, setActivePreviewVariantId] = useState<string>("")
@@ -1625,6 +1636,7 @@ export function ComponentsDocs() {
   const handleNavigate = (id: string) => {
     setActiveId(id)
     scrollToTop()
+    onMobileMenuChange?.(false)
   }
 
   const activeEntry = registry.find((entry) => entry.id === activeId)
@@ -1660,59 +1672,78 @@ export function ComponentsDocs() {
     return () => window.removeEventListener('resize', updateHighlight)
   }, [activeId])
 
+  // Shared navigation content
+  const NavigationContent = () => (
+    <div className="relative space-y-4" ref={navContainerRef}>
+      {activeId && (
+        <div
+          className="absolute z-0 top-0 left-2 rounded-md bg-secondary transition-all duration-500 ease-out"
+          style={highlightStyle}
+        />
+      )}
+      <div>
+        <div className="relative z-10 text-sm font-medium text-foreground mb-2">Sections</div>
+        <nav className="grid gap-1 pl-2">
+          <button
+            ref={(el) => {
+              if (el) navRefs.current.set("introduction", el)
+              else navRefs.current.delete("introduction")
+            }}
+            type="button"
+            className={cn(
+              "relative z-10 rounded-md px-2 py-1 text-sm transition-colors hover:bg-secondary/60 text-left",
+              activeId === "introduction" ? "text-foreground" : "text-muted-foreground"
+            )}
+            onClick={() => handleNavigate("introduction")}
+          >
+            Introduction
+          </button>
+        </nav>
+      </div>
+      <div>
+        <div className="relative z-10 text-sm font-medium text-foreground mb-2">Components</div>
+        <nav className="grid gap-1 pl-2">
+          {registry.map((entry) => (
+            <button
+              key={entry.id}
+              ref={(el) => {
+                if (el) navRefs.current.set(entry.id, el)
+                else navRefs.current.delete(entry.id)
+              }}
+              type="button"
+              className={cn(
+                "relative z-10 rounded-md px-2 py-1 text-sm transition-colors hover:bg-secondary/60 text-left",
+                activeId === entry.id ? "text-foreground" : "text-muted-foreground"
+              )}
+              onClick={() => handleNavigate(entry.id)}
+            >
+              {entry.name}
+            </button>
+          ))}
+        </nav>
+      </div>
+    </div>
+  )
+
   return (
-    <div className="grid gap-8 lg:grid-cols-[220px_1fr]">
-      <aside className="sticky top-20 self-start">
-        <div className="relative space-y-4" ref={navContainerRef}>
-          {activeId && (
-            <div
-              className="absolute z-0 top-0 left-2 rounded-md bg-secondary transition-all duration-500 ease-out"
-              style={highlightStyle}
-            />
-          )}
-          <div>
-            <div className="relative z-10 text-sm font-medium text-foreground mb-2">Sections</div>
-            <nav className="grid gap-1 pl-2">
-              <button
-                ref={(el) => {
-                  if (el) navRefs.current.set("introduction", el)
-                  else navRefs.current.delete("introduction")
-                }}
-                type="button"
-                className={cn(
-                  "relative z-10 rounded-md px-2 py-1 text-sm transition-colors hover:bg-secondary/60 text-left",
-                  activeId === "introduction" ? "text-foreground" : "text-muted-foreground"
-                )}
-                onClick={() => handleNavigate("introduction")}
-              >
-                Introduction
-              </button>
-            </nav>
+    <>
+      {/* Mobile sheet - controlled from parent */}
+      <Sheet open={mobileMenuOpen} onOpenChange={onMobileMenuChange}>
+        <SheetContent side="left" className="w-[280px] sm:w-[320px]">
+          <SheetHeader>
+            <SheetTitle>Documentation</SheetTitle>
+          </SheetHeader>
+          <div className="mt-6">
+            <NavigationContent />
           </div>
-          <div>
-            <div className="relative z-10 text-sm font-medium text-foreground mb-2">Components</div>
-            <nav className="grid gap-1 pl-2">
-              {registry.map((entry) => (
-                <button
-                  key={entry.id}
-                  ref={(el) => {
-                    if (el) navRefs.current.set(entry.id, el)
-                    else navRefs.current.delete(entry.id)
-                  }}
-                  type="button"
-                  className={cn(
-                    "relative z-10 rounded-md px-2 py-1 text-sm transition-colors hover:bg-secondary/60 text-left",
-                    activeId === entry.id ? "text-foreground" : "text-muted-foreground"
-                  )}
-                  onClick={() => handleNavigate(entry.id)}
-                >
-                  {entry.name}
-                </button>
-              ))}
-            </nav>
-          </div>
-        </div>
-      </aside>
+        </SheetContent>
+      </Sheet>
+
+      <div className="grid gap-8 lg:grid-cols-[220px_1fr]">
+        {/* Desktop sidebar */}
+        <aside className="hidden lg:block sticky top-20 self-start">
+          <NavigationContent />
+        </aside>
 
       <div className="space-y-8">
         {activeId === "introduction" ? (
@@ -1848,6 +1879,7 @@ export function ComponentsDocs() {
           </section>
         ) : null}
       </div>
-    </div>
+      </div>
+    </>
   )
 }

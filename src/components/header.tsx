@@ -3,12 +3,17 @@ import Link from "next/link"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { ChevronDown, Pencil, Grip, Eraser, ImageIcon } from "lucide-react"
 
-export function Header() {
+interface HeaderProps {
+  rightContent?: React.ReactNode
+}
+
+export function Header({ rightContent }: HeaderProps = {}) {
   return (
     <header className="border-b border-transparent sticky top-0 z-50 relative isolate backdrop-blur supports-[backdrop-filter]:bg-black/10">
       <div className="pointer-events-none absolute inset-x-0 top-0 h-24 bg-gradient-to-b from-black/90 via-black/60 to-transparent" />
       <div className="max-w-6xl mx-auto px-4 relative z-10">
-        <nav className="flex items-center justify-start gap-10 h-16">
+        <nav className="flex items-center justify-between gap-10 h-16">
+          <div className="flex items-center gap-10">
           {/* Logo */}
           <Link href="/" className="flex items-center">
             <Image
@@ -64,6 +69,14 @@ export function Header() {
                 Components
               </Link>
           </div>
+          </div>
+
+          {/* Right content slot */}
+          {rightContent && (
+            <div className="flex items-center">
+              {rightContent}
+            </div>
+          )}
         </nav>
       </div>
     </header>
