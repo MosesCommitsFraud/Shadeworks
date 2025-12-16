@@ -15,8 +15,7 @@ interface CanvasProps {
   fillColor?: string;
   opacity?: number;
   strokeStyle?: 'solid' | 'dashed' | 'dotted';
-  lineCap?: 'butt' | 'round' | 'square';
-  lineJoin?: 'miter' | 'round' | 'bevel';
+  lineCap?: 'butt' | 'round';
   cornerRadius?: number;
   fontFamily?: string;
   textAlign?: 'left' | 'center' | 'right';
@@ -215,7 +214,6 @@ export function Canvas({
   opacity = 100,
   strokeStyle = 'solid',
   lineCap = 'round',
-  lineJoin = 'round',
   cornerRadius = 0,
   fontFamily = 'var(--font-inter)',
   textAlign = 'left',
@@ -950,7 +948,6 @@ export function Canvas({
         opacity,
         strokeStyle,
         lineCap,
-        lineJoin,
       };
       setCurrentElement(newElement);
       setIsDrawing(true);
@@ -966,7 +963,6 @@ export function Canvas({
       opacity,
       strokeStyle,
       lineCap,
-      lineJoin,
       cornerRadius,
     };
 
@@ -984,7 +980,7 @@ export function Canvas({
 
     setCurrentElement(newElement);
     setIsDrawing(true);
-  }, [tool, strokeColor, strokeWidth, fillColor, opacity, strokeStyle, lineCap, lineJoin, cornerRadius, fillPattern, getMousePosition, elements, pan, selectedBounds, selectedElements, selectedIds, shiftPressed, onStartTransform, getElementsToErase, onDeleteElement]);
+  }, [tool, strokeColor, strokeWidth, fillColor, opacity, strokeStyle, lineCap, cornerRadius, fillPattern, getMousePosition, elements, pan, selectedBounds, selectedElements, selectedIds, shiftPressed, onStartTransform, getElementsToErase, onDeleteElement]);
 
   const handleMouseUp = useCallback(() => {
     if (isPanning) {
@@ -1362,7 +1358,6 @@ export function Canvas({
         const strokeDasharray = elStrokeStyle === 'dashed' ? '10,10' : elStrokeStyle === 'dotted' ? '2,6' : 'none';
         const points = element.points.map(p => `${p.x},${p.y}`).join(' ');
         const elLineCap = element.lineCap || 'round';
-        const elLineJoin = element.lineJoin || 'round';
         // Create a wider invisible hitbox for easier clicking (minimum 16px)
         const hitboxWidth = Math.max(element.strokeWidth * 6, 16);
         return (
@@ -1386,7 +1381,7 @@ export function Canvas({
               stroke="transparent"
               strokeWidth={hitboxWidth}
               strokeLinecap={elLineCap}
-              strokeLinejoin={elLineJoin}
+              strokeLinejoin="round"
               fill="none"
               pointerEvents="stroke"
             />
@@ -1396,7 +1391,7 @@ export function Canvas({
               stroke={element.strokeColor}
               strokeWidth={element.strokeWidth}
               strokeLinecap={elLineCap}
-              strokeLinejoin={elLineJoin}
+              strokeLinejoin="round"
               strokeDasharray={strokeDasharray}
               fill="none"
               opacity={isMarkedForDeletion ? elOpacity * 0.3 : elOpacity}
@@ -1408,7 +1403,7 @@ export function Canvas({
                 stroke="rgba(0, 0, 0, 0.6)"
                 strokeWidth={element.strokeWidth}
                 strokeLinecap={elLineCap}
-                strokeLinejoin={elLineJoin}
+                strokeLinejoin="round"
                 fill="none"
                 pointerEvents="none"
               />

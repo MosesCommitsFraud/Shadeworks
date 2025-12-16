@@ -34,13 +34,13 @@ interface ToolSidebarProps {
   onLineHeightChange: (height: number) => void;
   fillPattern?: 'none' | 'solid' | 'criss-cross';
   onFillPatternChange?: (pattern: 'none' | 'solid' | 'criss-cross') => void;
-  lineCap?: 'butt' | 'round' | 'square';
-  onLineCapChange?: (cap: 'butt' | 'round' | 'square') => void;
-  lineJoin?: 'miter' | 'round' | 'bevel';
-  onLineJoinChange?: (join: 'miter' | 'round' | 'bevel') => void;
+  lineCap?: 'butt' | 'round';
+  onLineCapChange?: (cap: 'butt' | 'round') => void;
   selectedElements?: BoardElement[];
   onBringToFront?: () => void;
   onSendToBack?: () => void;
+  onMoveForward?: () => void;
+  onMoveBackward?: () => void;
 }
 
 // Tools that have adjustable properties
@@ -74,11 +74,11 @@ export function ToolSidebar({
   onFillPatternChange,
   lineCap = 'round',
   onLineCapChange,
-  lineJoin = 'round',
-  onLineJoinChange,
   selectedElements = [],
   onBringToFront,
   onSendToBack,
+  onMoveForward,
+  onMoveBackward,
 }: ToolSidebarProps) {
   const { theme, resolvedTheme } = useTheme();
   const [isCollapsed, setIsCollapsed] = useState(false);
@@ -440,7 +440,7 @@ export function ToolSidebar({
               <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
                 Line Cap
               </label>
-              <div className="grid grid-cols-3 gap-1">
+              <div className="grid grid-cols-2 gap-1">
                 <button
                   onClick={() => onLineCapChange('butt')}
                   className={cn(
@@ -467,73 +467,6 @@ export function ToolSidebar({
                 >
                   <svg width="28" height="20" viewBox="0 0 28 20" className="text-foreground">
                     <line x1="4" y1="10" x2="24" y2="10" stroke="currentColor" strokeWidth="6" strokeLinecap="round" />
-                  </svg>
-                </button>
-                <button
-                  onClick={() => onLineCapChange('square')}
-                  className={cn(
-                    'h-8 rounded-sm border-2 transition-all duration-200 flex items-center justify-center hover:bg-secondary/50',
-                    lineCap === 'square'
-                      ? 'border-accent bg-secondary/50'
-                      : 'border-border/50'
-                  )}
-                  title="Square"
-                >
-                  <svg width="28" height="20" viewBox="0 0 28 20" className="text-foreground">
-                    <line x1="4" y1="10" x2="24" y2="10" stroke="currentColor" strokeWidth="6" strokeLinecap="square" />
-                  </svg>
-                </button>
-              </div>
-            </div>
-          )}
-
-          {/* Line Join (not for text tool) */}
-          {showStrokeWidthAndStyle && onLineJoinChange && (
-            <div className="space-y-2">
-              <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                Line Join
-              </label>
-              <div className="grid grid-cols-3 gap-1">
-                <button
-                  onClick={() => onLineJoinChange('miter')}
-                  className={cn(
-                    'h-8 rounded-sm border-2 transition-all duration-200 flex items-center justify-center hover:bg-secondary/50',
-                    lineJoin === 'miter'
-                      ? 'border-accent bg-secondary/50'
-                      : 'border-border/50'
-                  )}
-                  title="Miter (sharp)"
-                >
-                  <svg width="24" height="20" viewBox="0 0 24 20" className="text-foreground">
-                    <polyline points="4,16 12,4 20,16" fill="none" stroke="currentColor" strokeWidth="4" strokeLinejoin="miter" strokeLinecap="butt" />
-                  </svg>
-                </button>
-                <button
-                  onClick={() => onLineJoinChange('round')}
-                  className={cn(
-                    'h-8 rounded-sm border-2 transition-all duration-200 flex items-center justify-center hover:bg-secondary/50',
-                    lineJoin === 'round'
-                      ? 'border-accent bg-secondary/50'
-                      : 'border-border/50'
-                  )}
-                  title="Round"
-                >
-                  <svg width="24" height="20" viewBox="0 0 24 20" className="text-foreground">
-                    <polyline points="4,16 12,4 20,16" fill="none" stroke="currentColor" strokeWidth="4" strokeLinejoin="round" strokeLinecap="butt" />
-                  </svg>
-                </button>
-                <button
-                  onClick={() => onLineJoinChange('bevel')}
-                  className={cn(
-                    'h-8 rounded-sm border-2 transition-all duration-200 flex items-center justify-center hover:bg-secondary/50',
-                    lineJoin === 'bevel'
-                      ? 'border-accent bg-secondary/50'
-                      : 'border-border/50'
-                  )}
-                  title="Bevel (flat)"
-                >
-                  <svg width="24" height="20" viewBox="0 0 24 20" className="text-foreground">
-                    <polyline points="4,16 12,4 20,16" fill="none" stroke="currentColor" strokeWidth="4" strokeLinejoin="bevel" strokeLinecap="butt" />
                   </svg>
                 </button>
               </div>
@@ -620,25 +553,39 @@ export function ToolSidebar({
           </div>
 
           {/* Layer Order (when elements are selected) */}
-          {hasSelectedElements && onBringToFront && onSendToBack && (
+          {hasSelectedElements && onBringToFront && onSendToBack && onMoveForward && onMoveBackward && (
             <div className="space-y-2 pt-2 border-t border-border">
               <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
                 Layer Order
               </label>
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-4 gap-1">
                 <button
                   onClick={onBringToFront}
-                  className="flex items-center justify-center gap-2 px-3 py-2.5 rounded-sm border-2 border-border/50 hover:border-accent hover:bg-secondary/50 transition-all duration-200"
+                  className="flex items-center justify-center px-2 py-2 rounded-sm border-2 border-border/50 hover:border-accent hover:bg-secondary/50 transition-all duration-200"
+                  title="Bring to Front"
                 >
-                  <ArrowUpToLine className="w-4 h-4" />
-                  <span className="text-xs font-medium">Front</span>
+                  <ArrowUpToLine className="w-3.5 h-3.5" />
+                </button>
+                <button
+                  onClick={onMoveForward}
+                  className="flex items-center justify-center px-2 py-2 rounded-sm border-2 border-border/50 hover:border-accent hover:bg-secondary/50 transition-all duration-200"
+                  title="Move Forward"
+                >
+                  <ChevronLeft className="w-3.5 h-3.5 -rotate-90" />
+                </button>
+                <button
+                  onClick={onMoveBackward}
+                  className="flex items-center justify-center px-2 py-2 rounded-sm border-2 border-border/50 hover:border-accent hover:bg-secondary/50 transition-all duration-200"
+                  title="Move Backward"
+                >
+                  <ChevronLeft className="w-3.5 h-3.5 rotate-90" />
                 </button>
                 <button
                   onClick={onSendToBack}
-                  className="flex items-center justify-center gap-2 px-3 py-2.5 rounded-sm border-2 border-border/50 hover:border-accent hover:bg-secondary/50 transition-all duration-200"
+                  className="flex items-center justify-center px-2 py-2 rounded-sm border-2 border-border/50 hover:border-accent hover:bg-secondary/50 transition-all duration-200"
+                  title="Send to Back"
                 >
-                  <ArrowDownToLine className="w-4 h-4" />
-                  <span className="text-xs font-medium">Back</span>
+                  <ArrowDownToLine className="w-3.5 h-3.5" />
                 </button>
               </div>
             </div>

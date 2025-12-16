@@ -32,8 +32,7 @@ export interface BoardElement {
   opacity?: number;
   strokeStyle?: 'solid' | 'dashed' | 'dotted';
   cornerRadius?: number;
-  lineCap?: 'butt' | 'round' | 'square';
-  lineJoin?: 'miter' | 'round' | 'bevel';
+  lineCap?: 'butt' | 'round';
   // Text properties
   fontFamily?: string;
   textAlign?: 'left' | 'center' | 'right';

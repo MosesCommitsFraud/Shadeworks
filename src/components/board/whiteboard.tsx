@@ -34,8 +34,7 @@ export function Whiteboard({ roomId }: WhiteboardProps) {
   const [fillColor, setFillColor] = useState('transparent');
   const [opacity, setOpacity] = useState(100);
   const [strokeStyle, setStrokeStyle] = useState<'solid' | 'dashed' | 'dotted'>('solid');
-  const [lineCap, setLineCap] = useState<'butt' | 'round' | 'square'>('round');
-  const [lineJoin, setLineJoin] = useState<'miter' | 'round' | 'bevel'>('round');
+  const [lineCap, setLineCap] = useState<'butt' | 'round'>('round');
   const [cornerRadius, setCornerRadius] = useState(0);
   const [fontFamily, setFontFamily] = useState('var(--font-inter)');
   const [textAlign, setTextAlign] = useState<'left' | 'center' | 'right'>('left');
@@ -575,7 +574,7 @@ export function Whiteboard({ roomId }: WhiteboardProps) {
     setFillPattern(pattern);
   }, [selectedElements, saveToUndoStack, handleUpdateElement]);
 
-  const handleLineCapChange = useCallback((cap: 'butt' | 'round' | 'square') => {
+  const handleLineCapChange = useCallback((cap: 'butt' | 'round') => {
     if (selectedElements.length > 0) {
       saveToUndoStack();
       selectedElements.forEach((el) => {
@@ -585,14 +584,24 @@ export function Whiteboard({ roomId }: WhiteboardProps) {
     setLineCap(cap);
   }, [selectedElements, saveToUndoStack, handleUpdateElement]);
 
-  const handleLineJoinChange = useCallback((join: 'miter' | 'round' | 'bevel') => {
-    if (selectedElements.length > 0) {
-      saveToUndoStack();
-      selectedElements.forEach((el) => {
-        handleUpdateElement(el.id, { lineJoin: join });
-      });
-    }
-    setLineJoin(join);
+  const handleMoveForward = useCallback(() => {
+    if (selectedElements.length === 0) return;
+    saveToUndoStack();
+
+    selectedElements.forEach((el) => {
+      const currentZIndex = el.zIndex ?? 0;
+      handleUpdateElement(el.id, { zIndex: currentZIndex + 1 });
+    });
+  }, [selectedElements, saveToUndoStack, handleUpdateElement]);
+
+  const handleMoveBackward = useCallback(() => {
+    if (selectedElements.length === 0) return;
+    saveToUndoStack();
+
+    selectedElements.forEach((el) => {
+      const currentZIndex = el.zIndex ?? 0;
+      handleUpdateElement(el.id, { zIndex: currentZIndex - 1 });
+    });
   }, [selectedElements, saveToUndoStack, handleUpdateElement]);
 
   // Sync sidebar properties with selected elements
@@ -613,9 +622,6 @@ export function Whiteboard({ roomId }: WhiteboardProps) {
       }
       if (firstElement.lineCap !== undefined) {
         setLineCap(firstElement.lineCap);
-      }
-      if (firstElement.lineJoin !== undefined) {
-        setLineJoin(firstElement.lineJoin);
       }
       if (firstElement.cornerRadius !== undefined) {
         setCornerRadius(firstElement.cornerRadius);
@@ -756,8 +762,6 @@ export function Whiteboard({ roomId }: WhiteboardProps) {
         onStrokeStyleChange={handleStrokeStyleChange}
         lineCap={lineCap}
         onLineCapChange={handleLineCapChange}
-        lineJoin={lineJoin}
-        onLineJoinChange={handleLineJoinChange}
         cornerRadius={cornerRadius}
         onCornerRadiusChange={handleCornerRadiusChange}
         fontFamily={fontFamily}
@@ -775,6 +779,8 @@ export function Whiteboard({ roomId }: WhiteboardProps) {
         selectedElements={selectedElements}
         onBringToFront={handleBringToFront}
         onSendToBack={handleSendToBack}
+        onMoveForward={handleMoveForward}
+        onMoveBackward={handleMoveBackward}
       />
 
       <Canvas
@@ -785,7 +791,6 @@ export function Whiteboard({ roomId }: WhiteboardProps) {
         opacity={opacity}
         strokeStyle={strokeStyle}
         lineCap={lineCap}
-        lineJoin={lineJoin}
         cornerRadius={cornerRadius}
         fontFamily={fontFamily}
         textAlign={textAlign}
