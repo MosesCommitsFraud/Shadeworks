@@ -2162,12 +2162,12 @@ export function Canvas({
           </filter>
 
           {/* Pattern definitions for pen fill */}
-          <pattern id="fill-pattern-grid" width="10" height="10" patternUnits="userSpaceOnUse">
-            <path d="M 10 0 L 0 0 0 10" fill="none" stroke="currentColor" strokeWidth="0.5" />
+          <pattern id="fill-pattern-grid" width="12" height="12" patternUnits="userSpaceOnUse">
+            <path d="M 12 0 L 0 0 0 12" fill="none" stroke="currentColor" strokeWidth="1.2" />
           </pattern>
 
-          <pattern id="fill-pattern-slashes" width="10" height="10" patternUnits="userSpaceOnUse">
-            <line x1="0" y1="10" x2="10" y2="0" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+          <pattern id="fill-pattern-slashes" width="8" height="8" patternUnits="userSpaceOnUse">
+            <line x1="0" y1="8" x2="8" y2="0" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
           </pattern>
         </defs>
         <g transform={`translate(${pan.x}, ${pan.y}) scale(${zoom})`}>

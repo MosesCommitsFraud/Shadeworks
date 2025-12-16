@@ -464,8 +464,8 @@ export function ToolSidebar({
                   )}
                 >
                   <svg width="24" height="24" viewBox="0 0 24 24" className="text-foreground">
-                    <pattern id="grid-preview" width="8" height="8" patternUnits="userSpaceOnUse">
-                      <path d="M 8 0 L 0 0 0 8" fill="none" stroke="currentColor" strokeWidth="0.5"/>
+                    <pattern id="grid-preview" width="6" height="6" patternUnits="userSpaceOnUse">
+                      <path d="M 6 0 L 0 0 0 6" fill="none" stroke="currentColor" strokeWidth="1"/>
                     </pattern>
                     <rect width="24" height="24" fill="url(#grid-preview)" />
                   </svg>
@@ -480,8 +480,8 @@ export function ToolSidebar({
                   )}
                 >
                   <svg width="24" height="24" viewBox="0 0 24 24" className="text-foreground">
-                    <pattern id="slashes-preview" width="8" height="8" patternUnits="userSpaceOnUse">
-                      <line x1="0" y1="8" x2="8" y2="0" stroke="currentColor" strokeWidth="1"/>
+                    <pattern id="slashes-preview" width="6" height="6" patternUnits="userSpaceOnUse">
+                      <line x1="0" y1="6" x2="6" y2="0" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
                     </pattern>
                     <rect width="24" height="24" fill="url(#slashes-preview)" />
                   </svg>

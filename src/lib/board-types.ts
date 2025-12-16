@@ -41,7 +41,7 @@ export interface BoardElement {
   // Layer order
   zIndex?: number;
   // Pattern fill properties
-  fillPattern?: 'none' | 'solid' | 'grid' | 'slashes';
+  fillPattern?: 'none' | 'solid' | 'criss-cross' | 'diagonal';
   isClosed?: boolean;
 }
 
@@ -89,7 +89,7 @@ export const FONT_SIZES = [12, 16, 20, 24, 32, 48, 64];
 export const DEFAULT_PEN_FILL_COLOR = '#d1d5db';
 
 // Utility function to detect if a pen stroke forms a closed shape
-export function isClosedShape(points: Point[], threshold: number = 20): boolean {
+export function isClosedShape(points: Point[], threshold: number = 10): boolean {
   if (points.length < 10) return false;
 
   const first = points[0];
