@@ -5,6 +5,7 @@ import { Label } from '@/components/ui/label';
 import { Slider } from '@/components/ui/slider';
 import { Input } from '@/components/ui/input';
 import { Separator } from '@/components/ui/separator';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Settings, Palette, Type as TypeIcon } from 'lucide-react';
 import type { Tool, ToolSettings, Layer } from '@/lib/editor/types';
 
@@ -140,21 +141,25 @@ export function PropertiesPanel({
 
                 <div className="space-y-2">
                   <Label className="text-xs">Font Family</Label>
-                  <select
+                  <Select
                     value={toolSettings.fontFamily}
-                    onChange={(e) =>
-                      onToolSettingsChange({ fontFamily: e.target.value })
+                    onValueChange={(value) =>
+                      onToolSettingsChange({ fontFamily: value })
                     }
-                    className="w-full h-8 px-3 rounded-md border border-input bg-background text-sm"
                   >
-                    <option value="Arial">Arial</option>
-                    <option value="Helvetica">Helvetica</option>
-                    <option value="Times New Roman">Times New Roman</option>
-                    <option value="Courier New">Courier New</option>
-                    <option value="Georgia">Georgia</option>
-                    <option value="Verdana">Verdana</option>
-                    <option value="Comic Sans MS">Comic Sans MS</option>
-                  </select>
+                    <SelectTrigger className="w-full h-8 text-sm">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Arial">Arial</SelectItem>
+                      <SelectItem value="Helvetica">Helvetica</SelectItem>
+                      <SelectItem value="Times New Roman">Times New Roman</SelectItem>
+                      <SelectItem value="Courier New">Courier New</SelectItem>
+                      <SelectItem value="Georgia">Georgia</SelectItem>
+                      <SelectItem value="Verdana">Verdana</SelectItem>
+                      <SelectItem value="Comic Sans MS">Comic Sans MS</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
 
                 <div className="space-y-2">

@@ -350,18 +350,18 @@ export function CanvasPreview({
               <span>Play/Pause</span>
             </div>
             <div className="flex items-center gap-2">
-              <KbdGroup>
+              <div className="inline-flex items-center gap-1">
                 <Kbd>←</Kbd>
-                <span>/</span>
+                <span className="text-muted-foreground text-xs">/</span>
                 <Kbd>→</Kbd>
-              </KbdGroup>
+              </div>
               <span>Frame</span>
             </div>
             <div className="flex items-center gap-2">
               <KbdGroup>
-                <Kbd>{modKey}</Kbd>
-                <span>+</span>
-                <Kbd>K</Kbd>
+                <span>{modKey}</span>
+                <span className="text-sm opacity-85">+</span>
+                <span>K</span>
               </KbdGroup>
               <span>Keyframe</span>
             </div>
@@ -376,9 +376,9 @@ export function CanvasPreview({
           <>
             <div className="flex items-center gap-2">
               <KbdGroup>
-                <Kbd>{modKey}</Kbd>
-                <span>+</span>
-                <Kbd>S</Kbd>
+                <span>{modKey}</span>
+                <span className="text-sm opacity-85">+</span>
+                <span>S</span>
               </KbdGroup>
               <span>Export</span>
             </div>
@@ -387,11 +387,11 @@ export function CanvasPreview({
               <span>Compare</span>
             </div>
             <div className="flex items-center gap-2">
-              <KbdGroup>
+              <div className="inline-flex items-center gap-1">
                 <Kbd>+</Kbd>
-                <span>/</span>
+                <span className="text-muted-foreground text-xs">/</span>
                 <Kbd>-</Kbd>
-              </KbdGroup>
+              </div>
               <span>Zoom</span>
             </div>
             <div className="flex items-center gap-2">

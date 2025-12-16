@@ -2,6 +2,7 @@
 
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { Kbd } from '@/components/ui/kbd';
 import {
   MousePointer2,
   Paintbrush,
@@ -63,9 +64,7 @@ export function ToolsPanel({ tool, onToolChange }: ToolsPanelProps) {
               </TooltipTrigger>
               <TooltipContent side="right" className="flex items-center gap-2">
                 <span>{toolItem.label}</span>
-                <kbd className="px-1.5 py-0.5 text-xs font-mono bg-muted rounded">
-                  {toolItem.shortcut}
-                </kbd>
+                <Kbd>{toolItem.shortcut}</Kbd>
               </TooltipContent>
             </Tooltip>
           );

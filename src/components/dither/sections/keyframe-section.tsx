@@ -4,6 +4,7 @@ import { useCallback, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
+import { KbdGroup } from '@/components/ui/kbd';
 import {
   Select,
   SelectContent,
@@ -240,9 +241,11 @@ export function KeyframeSection({
         <h3 className="text-sm font-medium">Keyframe Animation</h3>
         <p className="text-xs text-muted-foreground">
           Add keyframes to capture settings at specific frames. Press{' '}
-          <kbd className="px-1.5 py-0.5 text-[10px] font-mono bg-muted border border-border rounded">
-            {navigator.platform.includes('Mac') ? 'Cmd' : 'Ctrl'}+K
-          </kbd>{' '}
+          <KbdGroup>
+            <span>{navigator.userAgent.includes('Mac') ? '⌘' : 'Ctrl'}</span>
+            <span className="text-sm opacity-85">+</span>
+            <span>K</span>
+          </KbdGroup>{' '}
           to add/update a keyframe.
         </p>
       </div>

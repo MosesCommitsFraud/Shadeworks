@@ -10,7 +10,7 @@ import {
 } from '@/components/ui/dialog';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
-import { Kbd, KbdGroup } from '@/components/ui/kbd';
+import { KbdGroup } from '@/components/ui/kbd';
 import { getModifierKey, getShiftKey, isMac } from '@/lib/utils/platform';
 import type { MediaType } from '@/lib/dither/types';
 
@@ -111,10 +111,10 @@ export function HotkeysDialog({ open, onOpenChange, mediaType = 'image' }: Hotke
                       </span>
                       <KbdGroup>
                         {shortcut.keys.map((key, keyIdx) => (
-                          <span key={keyIdx} className="flex items-center gap-1">
-                            <Kbd>{key}</Kbd>
+                          <span key={keyIdx}>
+                            <span>{key}</span>
                             {keyIdx < shortcut.keys.length - 1 && key !== '+' && (
-                              <span className="text-xs text-muted-foreground">
+                              <span className="text-sm opacity-85">
                                 {shortcut.keys[keyIdx + 1] === '+' ? '' : '+'}
                               </span>
                             )}
@@ -137,7 +137,7 @@ export function HotkeysDialog({ open, onOpenChange, mediaType = 'image' }: Hotke
               </p>
               {!isMac() && (
                 <p>
-                  On macOS, use <Kbd>⌘</Kbd> instead of <Kbd>Ctrl</Kbd>.
+                  On macOS, use <KbdGroup><span>⌘</span></KbdGroup> instead of <KbdGroup><span>Ctrl</span></KbdGroup>.
                 </p>
               )}
               <p>

@@ -6,6 +6,7 @@ import { ChevronLeft, ChevronRight, Circle, Minus, Square, Type, Pencil, ArrowUp
 import { Tool, COLORS, STROKE_WIDTHS, FONTS, FONT_SIZES, BoardElement } from '@/lib/board-types';
 import { cn } from '@/lib/utils';
 import { Slider } from '@/components/ui/slider';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 interface ToolSidebarProps {
   selectedTool: Tool;
@@ -266,15 +267,21 @@ export function ToolSidebar({
                 Size & Align
               </label>
               <div className="flex gap-1">
-                <select
-                  value={fontSize}
-                  onChange={(e) => onFontSizeChange(Number(e.target.value))}
-                  className="flex-1 h-8 px-2 rounded-md border border-border/50 bg-background text-xs focus:border-accent focus:outline-none"
+                <Select
+                  value={fontSize.toString()}
+                  onValueChange={(value) => onFontSizeChange(Number(value))}
                 >
-                  {FONT_SIZES.map((size) => (
-                    <option key={size} value={size}>{size}px</option>
-                  ))}
-                </select>
+                  <SelectTrigger className="flex-1 h-8 text-xs">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {FONT_SIZES.map((size) => (
+                      <SelectItem key={size} value={size.toString()}>
+                        {size}px
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
                 <button
                   onClick={() => onTextAlignChange('left')}
                   className={cn(
@@ -308,41 +315,30 @@ export function ToolSidebar({
 
           {/* Letter Spacing & Line Height (for text tool) */}
           {isTextTool && (
-            <div className="space-y-2">
+            <div className="space-y-3">
               <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
                 Spacing
               </label>
-              <div className="space-y-1.5">
-                <div>
-                  <div className="flex justify-between items-center mb-1">
-                    <span className="text-[10px] text-muted-foreground">Letter</span>
-                    <span className="text-[10px] font-medium text-foreground">{letterSpacing.toFixed(1)}px</span>
-                  </div>
-                  <input
-                    type="range"
-                    min="-2"
-                    max="10"
-                    step="0.5"
-                    value={letterSpacing}
-                    onChange={(e) => onLetterSpacingChange(Number(e.target.value))}
-                    className="w-full h-1.5 bg-secondary rounded-lg appearance-none cursor-pointer accent-accent"
-                  />
-                </div>
-                <div>
-                  <div className="flex justify-between items-center mb-1">
-                    <span className="text-[10px] text-muted-foreground">Line</span>
-                    <span className="text-[10px] font-medium text-foreground">{lineHeight.toFixed(1)}</span>
-                  </div>
-                  <input
-                    type="range"
-                    min="1"
-                    max="3"
-                    step="0.1"
-                    value={lineHeight}
-                    onChange={(e) => onLineHeightChange(Number(e.target.value))}
-                    className="w-full h-1.5 bg-secondary rounded-lg appearance-none cursor-pointer accent-accent"
-                  />
-                </div>
+              <div className="space-y-3">
+                <Slider
+                  label="Letter"
+                  showValue
+                  unit="px"
+                  value={[letterSpacing]}
+                  onValueChange={([v]) => onLetterSpacingChange(v)}
+                  min={-2}
+                  max={10}
+                  step={0.5}
+                />
+                <Slider
+                  label="Line"
+                  showValue
+                  value={[lineHeight]}
+                  onValueChange={([v]) => onLineHeightChange(v)}
+                  min={1}
+                  max={3}
+                  step={0.1}
+                />
               </div>
             </div>
           )}
@@ -422,24 +418,16 @@ export function ToolSidebar({
           {/* Corner Radius (for rectangles) */}
           {showCornerRadius && (
             <div className="space-y-2">
-              <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                Corner Radius
-              </label>
-              <div className="space-y-1">
-                <input
-                  type="range"
-                  min="0"
-                  max="50"
-                  value={cornerRadius}
-                  onChange={(e) => onCornerRadiusChange(Number(e.target.value))}
-                  className="w-full h-2 bg-secondary rounded-lg appearance-none cursor-pointer accent-accent"
-                />
-                <div className="flex justify-between text-xs text-muted-foreground">
-                  <span>Sharp</span>
-                  <span className="font-medium text-foreground">{cornerRadius}px</span>
-                  <span>Round</span>
-                </div>
-              </div>
+              <Slider
+                label="Corner Radius"
+                showValue
+                unit="px"
+                value={[cornerRadius]}
+                onValueChange={([v]) => onCornerRadiusChange(v)}
+                min={0}
+                max={50}
+                step={1}
+              />
             </div>
           )}
 
