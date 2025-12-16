@@ -1666,7 +1666,7 @@ export function ComponentsDocs() {
         <div className="relative space-y-4" ref={navContainerRef}>
           {activeId && (
             <div
-              className="absolute z-0 top-0 left-0 rounded-md bg-secondary transition-all duration-500 ease-out"
+              className="absolute z-0 top-0 left-2 rounded-md bg-secondary transition-all duration-500 ease-out"
               style={highlightStyle}
             />
           )}
