@@ -11,6 +11,7 @@ import { FindCanvas } from './find-canvas';
 import { CollaborationManager, type ConnectionStatus } from '@/lib/collaboration';
 import { generateFunnyName } from '@/lib/funny-names';
 import type { Tool, BoardElement, ShadeworksFile } from '@/lib/board-types';
+import { isClosedShape } from '@/lib/board-types';
 
 interface WhiteboardProps {
   roomId: string;
@@ -39,6 +40,7 @@ export function Whiteboard({ roomId }: WhiteboardProps) {
   const [fontSize, setFontSize] = useState(24);
   const [letterSpacing, setLetterSpacing] = useState(0);
   const [lineHeight, setLineHeight] = useState(1.5);
+  const [fillPattern, setFillPattern] = useState<'none' | 'solid' | 'grid' | 'slashes'>('none');
   const [elements, setElements] = useState<BoardElement[]>([]);
   const [collaboration, setCollaboration] = useState<CollaborationManager | null>(null);
   const [connectedUsers, setConnectedUsers] = useState(1);
@@ -447,7 +449,12 @@ export function Whiteboard({ roomId }: WhiteboardProps) {
     if (selectedElements.length > 0) {
       saveToUndoStack();
       selectedElements.forEach((el) => {
-        if (el.type === 'rectangle' || el.type === 'ellipse' || el.type === 'frame') {
+        if (
+          el.type === 'rectangle' ||
+          el.type === 'ellipse' ||
+          el.type === 'frame' ||
+          (el.type === 'pen' && el.isClosed && el.fillPattern !== 'none')
+        ) {
           handleUpdateElement(el.id, { fillColor: color });
         }
       });
@@ -547,6 +554,25 @@ export function Whiteboard({ roomId }: WhiteboardProps) {
     setLineHeight(height);
   }, [selectedElements, saveToUndoStack, handleUpdateElement]);
 
+  const handleFillPatternChange = useCallback((pattern: 'none' | 'solid' | 'grid' | 'slashes') => {
+    if (selectedElements.length > 0) {
+      saveToUndoStack();
+      selectedElements.forEach((el) => {
+        if (el.type === 'pen') {
+          // Check if the stroke is closed (in case it wasn't detected before)
+          const isClosed = el.isClosed ?? isClosedShape(el.points);
+          if (isClosed) {
+            handleUpdateElement(el.id, {
+              fillPattern: pattern,
+              isClosed: true, // Make sure isClosed is set
+            });
+          }
+        }
+      });
+    }
+    setFillPattern(pattern);
+  }, [selectedElements, saveToUndoStack, handleUpdateElement]);
+
   // Sync sidebar properties with selected elements
   useEffect(() => {
     if (selectedElements.length > 0) {
@@ -580,6 +606,9 @@ export function Whiteboard({ roomId }: WhiteboardProps) {
       }
       if (firstElement.lineHeight !== undefined) {
         setLineHeight(firstElement.lineHeight);
+      }
+      if (firstElement.fillPattern !== undefined) {
+        setFillPattern(firstElement.fillPattern);
       }
     }
   }, [selectedElements]);
@@ -709,6 +738,8 @@ export function Whiteboard({ roomId }: WhiteboardProps) {
         onLetterSpacingChange={handleLetterSpacingChange}
         lineHeight={lineHeight}
         onLineHeightChange={handleLineHeightChange}
+        fillPattern={fillPattern}
+        onFillPatternChange={handleFillPatternChange}
         selectedElements={selectedElements}
         onBringToFront={handleBringToFront}
         onSendToBack={handleSendToBack}
@@ -727,6 +758,7 @@ export function Whiteboard({ roomId }: WhiteboardProps) {
         fontSize={fontSize}
         letterSpacing={letterSpacing}
         lineHeight={lineHeight}
+        fillPattern={fillPattern}
         collaboration={collaboration}
         elements={elements}
         onAddElement={handleAddElement}

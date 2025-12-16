@@ -40,6 +40,9 @@ export interface BoardElement {
   lineHeight?: number;
   // Layer order
   zIndex?: number;
+  // Pattern fill properties
+  fillPattern?: 'none' | 'solid' | 'grid' | 'slashes';
+  isClosed?: boolean;
 }
 
 export interface Cursor {
@@ -82,6 +85,21 @@ export const FONTS = [
 ];
 
 export const FONT_SIZES = [12, 16, 20, 24, 32, 48, 64];
+
+export const DEFAULT_PEN_FILL_COLOR = '#d1d5db';
+
+// Utility function to detect if a pen stroke forms a closed shape
+export function isClosedShape(points: Point[], threshold: number = 20): boolean {
+  if (points.length < 10) return false;
+
+  const first = points[0];
+  const last = points[points.length - 1];
+  const distance = Math.sqrt(
+    Math.pow(last.x - first.x, 2) + Math.pow(last.y - first.y, 2)
+  );
+
+  return distance < threshold;
+}
 
 export interface ShadeworksFile {
   type: 'shadeworks';

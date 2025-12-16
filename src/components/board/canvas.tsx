@@ -4,6 +4,7 @@ import { useRef, useEffect, useState, useCallback } from 'react';
 import { v4 as uuid } from 'uuid';
 import getStroke from 'perfect-freehand';
 import type { Tool, BoardElement, Point } from '@/lib/board-types';
+import { isClosedShape } from '@/lib/board-types';
 import { CollaborationManager } from '@/lib/collaboration';
 import { CollaboratorCursors } from './collaborator-cursor';
 
@@ -20,6 +21,7 @@ interface CanvasProps {
   fontSize?: number;
   letterSpacing?: number;
   lineHeight?: number;
+  fillPattern?: 'none' | 'solid' | 'grid' | 'slashes';
   collaboration: CollaborationManager | null;
   elements: BoardElement[];
   onAddElement: (element: BoardElement) => void;
@@ -216,6 +218,7 @@ export function Canvas({
   fontSize = 24,
   letterSpacing = 0,
   lineHeight = 1.5,
+  fillPattern = 'none',
   collaboration,
   elements,
   onAddElement,
@@ -959,6 +962,10 @@ export function Canvas({
       cornerRadius,
     };
 
+    if (tool === 'pen') {
+      newElement.fillPattern = fillPattern;
+    }
+
     if (tool === 'rectangle' || tool === 'ellipse') {
       newElement.x = point.x;
       newElement.y = point.y;
@@ -969,7 +976,7 @@ export function Canvas({
 
     setCurrentElement(newElement);
     setIsDrawing(true);
-  }, [tool, strokeColor, strokeWidth, fillColor, opacity, strokeStyle, cornerRadius, getMousePosition, elements, pan, selectedBounds, selectedElements, selectedIds, shiftPressed, onStartTransform, getElementsToErase, onDeleteElement]);
+  }, [tool, strokeColor, strokeWidth, fillColor, opacity, strokeStyle, cornerRadius, fillPattern, getMousePosition, elements, pan, selectedBounds, selectedElements, selectedIds, shiftPressed, onStartTransform, getElementsToErase, onDeleteElement]);
 
   const handleMouseUp = useCallback(() => {
     if (isPanning) {
@@ -1104,7 +1111,17 @@ export function Canvas({
       let elementAdded = false;
 
       if (currentElement.type === 'pen' && currentElement.points.length >= 1) {
-        onAddElement(currentElement);
+        // Check if shape is closed
+        const isClosed = isClosedShape(currentElement.points);
+
+        // Add closed flag and apply fill pattern only if shape is closed
+        const finalElement = {
+          ...currentElement,
+          isClosed,
+          fillPattern: isClosed && currentElement.fillPattern !== 'none' ? currentElement.fillPattern : 'none',
+        };
+
+        onAddElement(finalElement);
         elementAdded = true;
       } else if (currentElement.type === 'line' && currentElement.points.length === 2) {
         onAddElement(currentElement);
@@ -1281,6 +1298,9 @@ export function Canvas({
       case 'pen': {
         const elOpacity = (element.opacity ?? 100) / 100;
         const elStrokeStyle = element.strokeStyle || 'solid';
+        const elFillPattern = element.fillPattern || 'none';
+        const elFillColor = element.fillColor || '#d1d5db';
+        const shouldFill = element.isClosed && elFillPattern !== 'none';
 
         // For solid strokes, use the filled path approach
         if (elStrokeStyle === 'solid') {
@@ -1291,8 +1311,27 @@ export function Canvas({
             streamline: 0.5,
           });
           const pathData = getSvgPathFromStroke(stroke);
+
+          // Create a simple polygon path from the original points for the fill
+          const fillPath = shouldFill
+            ? `M ${element.points.map(p => `${p.x},${p.y}`).join(' L ')} Z`
+            : '';
+
           return (
             <g key={element.id}>
+              {/* Fill layer - renders under stroke using original points */}
+              {shouldFill && (
+                <path
+                  d={fillPath}
+                  fill={elFillPattern === 'solid'
+                    ? elFillColor
+                    : `url(#fill-pattern-${elFillPattern})`}
+                  style={{ color: elFillColor }}
+                  opacity={elOpacity * 0.7}
+                  pointerEvents="none"
+                />
+              )}
+              {/* Stroke layer */}
               <path
                 data-element-id={element.id}
                 d={pathData}
@@ -1318,6 +1357,18 @@ export function Canvas({
         const hitboxWidth = Math.max(element.strokeWidth * 6, 16);
         return (
           <g key={element.id}>
+            {/* Fill layer for dashed/dotted strokes */}
+            {shouldFill && (
+              <polygon
+                points={points}
+                fill={elFillPattern === 'solid'
+                  ? elFillColor
+                  : `url(#fill-pattern-${elFillPattern})`}
+                style={{ color: elFillColor }}
+                opacity={elOpacity * 0.7}
+                pointerEvents="none"
+              />
+            )}
             {/* Invisible wider hitbox for easier clicking */}
             <polyline
               data-element-id={element.id}
@@ -2109,6 +2160,15 @@ export function Canvas({
               <feMergeNode in="SourceGraphic"/>
             </feMerge>
           </filter>
+
+          {/* Pattern definitions for pen fill */}
+          <pattern id="fill-pattern-grid" width="10" height="10" patternUnits="userSpaceOnUse">
+            <path d="M 10 0 L 0 0 0 10" fill="none" stroke="currentColor" strokeWidth="0.5" />
+          </pattern>
+
+          <pattern id="fill-pattern-slashes" width="10" height="10" patternUnits="userSpaceOnUse">
+            <line x1="0" y1="10" x2="10" y2="0" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+          </pattern>
         </defs>
         <g transform={`translate(${pan.x}, ${pan.y}) scale(${zoom})`}>
           {/* Render all elements sorted by zIndex */}

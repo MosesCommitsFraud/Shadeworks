@@ -32,6 +32,8 @@ interface ToolSidebarProps {
   onLetterSpacingChange: (spacing: number) => void;
   lineHeight: number;
   onLineHeightChange: (height: number) => void;
+  fillPattern?: 'none' | 'solid' | 'grid' | 'slashes';
+  onFillPatternChange?: (pattern: 'none' | 'solid' | 'grid' | 'slashes') => void;
   selectedElements?: BoardElement[];
   onBringToFront?: () => void;
   onSendToBack?: () => void;
@@ -64,6 +66,8 @@ export function ToolSidebar({
   onLetterSpacingChange,
   lineHeight,
   onLineHeightChange,
+  fillPattern = 'none',
+  onFillPatternChange,
   selectedElements = [],
   onBringToFront,
   onSendToBack,
@@ -90,8 +94,15 @@ export function ToolSidebar({
 
   // Determine what controls to show based on selected elements or current tool
   const showFill = hasSelectedElements
-    ? selectedElements.some(el => el.type === 'rectangle' || el.type === 'ellipse' || el.type === 'frame')
-    : selectedTool === 'rectangle' || selectedTool === 'ellipse';
+    ? selectedElements.some(el =>
+        el.type === 'rectangle' ||
+        el.type === 'ellipse' ||
+        el.type === 'frame' ||
+        (el.type === 'pen' && el.isClosed && fillPattern !== 'none')
+      )
+    : selectedTool === 'rectangle' ||
+      selectedTool === 'ellipse' ||
+      (selectedTool === 'pen' && fillPattern !== 'none');
 
   const showCornerRadius = hasSelectedElements
     ? selectedElements.some(el => el.type === 'rectangle' || el.type === 'frame')
@@ -410,6 +421,70 @@ export function ToolSidebar({
                   )}
                 >
                   <div className="w-full h-0.5 border-t-2 border-dotted border-foreground mx-2" />
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Fill Pattern (for pen tool) */}
+          {(selectedTool === 'pen' || selectedElements.some(el => el.type === 'pen')) && (
+            <div className="space-y-2">
+              <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                Fill Pattern
+              </label>
+              <div className="grid grid-cols-2 gap-2">
+                {/* None button */}
+                <button
+                  onClick={() => onFillPatternChange?.('none')}
+                  className={cn(
+                    'h-10 rounded-lg border-2 transition-all duration-200 flex items-center justify-center hover:bg-secondary/50',
+                    fillPattern === 'none' ? 'border-accent bg-secondary/50' : 'border-border/50'
+                  )}
+                >
+                  <span className="text-xs">None</span>
+                </button>
+
+                {/* Solid button */}
+                <button
+                  onClick={() => onFillPatternChange?.('solid')}
+                  className={cn(
+                    'h-10 rounded-lg border-2 transition-all duration-200 flex items-center justify-center hover:bg-secondary/50',
+                    fillPattern === 'solid' ? 'border-accent bg-secondary/50' : 'border-border/50'
+                  )}
+                >
+                  <div className="w-8 h-8 rounded bg-foreground/30" />
+                </button>
+
+                {/* Grid button */}
+                <button
+                  onClick={() => onFillPatternChange?.('grid')}
+                  className={cn(
+                    'h-10 rounded-lg border-2 transition-all duration-200 flex items-center justify-center hover:bg-secondary/50',
+                    fillPattern === 'grid' ? 'border-accent bg-secondary/50' : 'border-border/50'
+                  )}
+                >
+                  <svg width="24" height="24" viewBox="0 0 24 24" className="text-foreground">
+                    <pattern id="grid-preview" width="8" height="8" patternUnits="userSpaceOnUse">
+                      <path d="M 8 0 L 0 0 0 8" fill="none" stroke="currentColor" strokeWidth="0.5"/>
+                    </pattern>
+                    <rect width="24" height="24" fill="url(#grid-preview)" />
+                  </svg>
+                </button>
+
+                {/* Slashes button */}
+                <button
+                  onClick={() => onFillPatternChange?.('slashes')}
+                  className={cn(
+                    'h-10 rounded-lg border-2 transition-all duration-200 flex items-center justify-center hover:bg-secondary/50',
+                    fillPattern === 'slashes' ? 'border-accent bg-secondary/50' : 'border-border/50'
+                  )}
+                >
+                  <svg width="24" height="24" viewBox="0 0 24 24" className="text-foreground">
+                    <pattern id="slashes-preview" width="8" height="8" patternUnits="userSpaceOnUse">
+                      <line x1="0" y1="8" x2="8" y2="0" stroke="currentColor" strokeWidth="1"/>
+                    </pattern>
+                    <rect width="24" height="24" fill="url(#slashes-preview)" />
+                  </svg>
                 </button>
               </div>
             </div>
