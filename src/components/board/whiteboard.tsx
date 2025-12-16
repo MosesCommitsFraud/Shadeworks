@@ -625,7 +625,7 @@ export function Whiteboard({ roomId }: WhiteboardProps) {
         {/* Shadeworks Logo */}
         <a
           href="/"
-          className="bg-card/95 backdrop-blur-md border border-border rounded-lg px-3 py-2 shadow-2xl hover:bg-muted/60 transition-colors"
+          className="bg-card/95 backdrop-blur-md border border-border rounded-md px-3 py-2 shadow-2xl hover:bg-muted/60 transition-colors"
         >
           <img
             src={(resolvedTheme || theme) === 'light' ? '/logo-text-sw-dark.svg' : '/logo-text-sw-white.svg'}

@@ -125,7 +125,7 @@ export function BurgerMenu({
       <DropdownMenuTrigger asChild>
         <button
           className={cn(
-            'p-2.5 rounded-lg transition-all duration-200',
+            'p-2.5 rounded-md transition-all duration-200',
             'bg-card/95 backdrop-blur-md border border-border',
             'hover:bg-muted/60 text-muted-foreground hover:text-foreground',
             'shadow-2xl'

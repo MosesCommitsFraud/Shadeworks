@@ -110,7 +110,7 @@ export function Toolbar({
   return (
     <div className="absolute top-4 left-1/2 -translate-x-1/2 z-50 flex items-stretch gap-2">
       {/* Main Tools */}
-      <div className="flex items-center gap-1 bg-card/95 backdrop-blur-md border border-border rounded-sm p-1.5 shadow-2xl">
+      <div className="flex items-center gap-1 bg-card/95 backdrop-blur-md border border-border rounded-md p-1.5 shadow-2xl">
         {tools.map((tool) => (
           <Tooltip key={tool.id}>
             <TooltipTrigger asChild>
@@ -138,7 +138,7 @@ export function Toolbar({
       </div>
 
       {/* Collaboration Panel */}
-      <div className="flex items-center gap-2 bg-card/95 backdrop-blur-md border border-border rounded-sm px-2 py-1.5 shadow-2xl">
+      <div className="flex items-center gap-2 bg-card/95 backdrop-blur-md border border-border rounded-md px-2 py-1.5 shadow-2xl">
         {/* Your Name */}
         <div className="flex items-center gap-2 px-1">
           {/* Status indicator */}

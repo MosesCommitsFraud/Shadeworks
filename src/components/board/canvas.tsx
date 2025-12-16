@@ -2287,10 +2287,10 @@ export function Canvas({
 
       {/* Zoom and Undo/Redo Controls */}
       <div className="absolute bottom-4 left-4 flex items-center gap-2">
-        <div className="flex items-center gap-2 bg-card/95 backdrop-blur-md border border-border rounded-lg p-1.5 shadow-xl">
+        <div className="flex items-center gap-2 bg-card/95 backdrop-blur-md border border-border rounded-md p-1.5 shadow-xl">
           <button
             onClick={() => setZoom(prev => Math.max(0.1, prev - 0.1))}
-            className="p-1.5 rounded hover:bg-secondary/80 text-muted-foreground hover:text-foreground transition-all"
+            className="p-1.5 rounded-sm hover:bg-secondary/80 text-muted-foreground hover:text-foreground transition-all"
             title="Zoom Out"
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -2302,7 +2302,7 @@ export function Canvas({
           </span>
           <button
             onClick={() => setZoom(prev => Math.min(5, prev + 0.1))}
-            className="p-1.5 rounded hover:bg-secondary/80 text-muted-foreground hover:text-foreground transition-all"
+            className="p-1.5 rounded-sm hover:bg-secondary/80 text-muted-foreground hover:text-foreground transition-all"
             title="Zoom In"
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -2312,16 +2312,16 @@ export function Canvas({
           <div className="w-px h-4 bg-border" />
           <button
             onClick={() => setZoom(1)}
-            className="p-1.5 rounded hover:bg-secondary/80 text-muted-foreground hover:text-foreground transition-all text-xs"
+            className="p-1.5 rounded-sm hover:bg-secondary/80 text-muted-foreground hover:text-foreground transition-all text-xs"
             title="Reset Zoom"
           >
             Reset
           </button>
         </div>
-        <div className="flex items-center gap-2 bg-card/95 backdrop-blur-md border border-border rounded-lg p-1.5 shadow-xl">
+        <div className="flex items-center gap-2 bg-card/95 backdrop-blur-md border border-border rounded-md p-1.5 shadow-xl">
           <button
             onClick={onUndo}
-            className="p-1.5 rounded hover:bg-secondary/80 text-muted-foreground hover:text-foreground transition-all"
+            className="p-1.5 rounded-sm hover:bg-secondary/80 text-muted-foreground hover:text-foreground transition-all"
             title="Undo (Ctrl+Z)"
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -2330,7 +2330,7 @@ export function Canvas({
           </button>
           <button
             onClick={onRedo}
-            className="p-1.5 rounded hover:bg-secondary/80 text-muted-foreground hover:text-foreground transition-all"
+            className="p-1.5 rounded-sm hover:bg-secondary/80 text-muted-foreground hover:text-foreground transition-all"
             title="Redo (Ctrl+Y)"
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
