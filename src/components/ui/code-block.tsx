@@ -1,11 +1,11 @@
 "use client"
 
-import * as React from "react"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { useState } from "react"
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter'
 import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism'
+import { Copy, Check } from "lucide-react"
 
 interface CodeBlockProps {
   code: string
@@ -80,7 +80,7 @@ export function CodeBlock({
     try {
       await navigator.clipboard.writeText(code)
       setCopied(true)
-      window.setTimeout(() => setCopied(false), 900)
+      window.setTimeout(() => setCopied(false), 2000)
     } catch {
       setCopied(false)
     }
@@ -115,9 +115,22 @@ export function CodeBlock({
               size="sm"
               variant="ghost"
               onClick={handleCopy}
-              className="h-7 px-2"
+              className="h-7 w-7 p-0 rounded-sm hover:bg-accent"
             >
-              {copied ? "Copied" : "Copy"}
+              <div className="relative w-4 h-4">
+                <Copy
+                  className={cn(
+                    "absolute inset-0 h-4 w-4 transition-all duration-300 ease-in-out",
+                    copied ? "scale-0 opacity-0" : "scale-100 opacity-100"
+                  )}
+                />
+                <Check
+                  className={cn(
+                    "absolute inset-0 h-4 w-4 transition-all duration-300 ease-in-out",
+                    copied ? "scale-100 opacity-100" : "scale-0 opacity-0"
+                  )}
+                />
+              </div>
             </Button>
           )}
         </div>
@@ -137,10 +150,23 @@ export function CodeBlock({
             type="button"
             size="sm"
             variant="secondary"
-            className="absolute right-2 top-2"
+            className="absolute right-2 top-2 w-8 h-8 p-0 rounded-sm hover:bg-accent"
             onClick={handleCopy}
           >
-            {copied ? "Copied" : "Copy"}
+            <div className="relative w-4 h-4">
+              <Copy
+                className={cn(
+                  "absolute inset-0 h-4 w-4 transition-all duration-300 ease-in-out",
+                  copied ? "scale-0 opacity-0" : "scale-100 opacity-100"
+                )}
+              />
+              <Check
+                className={cn(
+                  "absolute inset-0 h-4 w-4 transition-all duration-300 ease-in-out",
+                  copied ? "scale-100 opacity-100" : "scale-0 opacity-0"
+                )}
+              />
+            </div>
           </Button>
         )}
       </div>
