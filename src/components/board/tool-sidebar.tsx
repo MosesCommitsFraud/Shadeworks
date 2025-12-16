@@ -114,9 +114,6 @@ export function ToolSidebar({
         { id: 'circle', label: 'Circle' },
         { id: 'circle-outline', label: 'Circle Outline' },
         { id: 'bar', label: 'Bar' },
-        { id: 'crowfoot-one', label: 'One Crow’s Foot' },
-        { id: 'crowfoot-many', label: 'Many Crow’s Foot' },
-        { id: 'crowfoot-one-many', label: 'One + Many' },
       ] as Array<{ id: NonNullable<BoardElement['arrowEnd']>; label: string }>,
     []
   );
@@ -183,33 +180,6 @@ export function ToolSidebar({
           <svg width="28" height="20" viewBox="0 0 28 20" className="text-foreground">
             <line x1="3" y1={cy} x2="16" y2={cy} stroke={stroke} strokeWidth={sw} strokeLinecap="round" />
             <line x1={cx} y1="4.5" x2={cx} y2="15.5" stroke={stroke} strokeWidth={sw} strokeLinecap="round" />
-          </svg>
-        );
-      case 'crowfoot-one':
-        return (
-          <svg width="28" height="20" viewBox="0 0 28 20" className="text-foreground">
-            <line x1="3" y1={cy} x2="14" y2={cy} stroke={stroke} strokeWidth={sw} strokeLinecap="round" />
-            <line x1="23" y1={cy} x2="16" y2="6" stroke={stroke} strokeWidth={sw} strokeLinecap="round" />
-            <line x1="23" y1={cy} x2="16" y2="14" stroke={stroke} strokeWidth={sw} strokeLinecap="round" />
-          </svg>
-        );
-      case 'crowfoot-many':
-        return (
-          <svg width="28" height="20" viewBox="0 0 28 20" className="text-foreground">
-            <line x1="3" y1={cy} x2="14" y2={cy} stroke={stroke} strokeWidth={sw} strokeLinecap="round" />
-            <line x1="23" y1={cy} x2="16" y2="5.5" stroke={stroke} strokeWidth={sw} strokeLinecap="round" />
-            <line x1="23" y1={cy} x2="16" y2={cy} stroke={stroke} strokeWidth={sw} strokeLinecap="round" />
-            <line x1="23" y1={cy} x2="16" y2="14.5" stroke={stroke} strokeWidth={sw} strokeLinecap="round" />
-          </svg>
-        );
-      case 'crowfoot-one-many':
-        return (
-          <svg width="28" height="20" viewBox="0 0 28 20" className="text-foreground">
-            <line x1="3" y1={cy} x2="12" y2={cy} stroke={stroke} strokeWidth={sw} strokeLinecap="round" />
-            <line x1="14.5" y1="4.5" x2="14.5" y2="15.5" stroke={stroke} strokeWidth={sw} strokeLinecap="round" />
-            <line x1="23" y1={cy} x2="16" y2="5.5" stroke={stroke} strokeWidth={sw} strokeLinecap="round" />
-            <line x1="23" y1={cy} x2="16" y2={cy} stroke={stroke} strokeWidth={sw} strokeLinecap="round" />
-            <line x1="23" y1={cy} x2="16" y2="14.5" stroke={stroke} strokeWidth={sw} strokeLinecap="round" />
           </svg>
         );
       default:

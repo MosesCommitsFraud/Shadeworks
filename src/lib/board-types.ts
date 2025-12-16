@@ -55,10 +55,7 @@ export interface BoardElement {
     | 'diamond-outline'
     | 'circle'
     | 'circle-outline'
-    | 'bar'
-    | 'crowfoot-one'
-    | 'crowfoot-many'
-    | 'crowfoot-one-many';
+    | 'bar';
   arrowEnd?:
     | 'none'
     | 'arrow'
@@ -68,10 +65,7 @@ export interface BoardElement {
     | 'diamond-outline'
     | 'circle'
     | 'circle-outline'
-    | 'bar'
-    | 'crowfoot-one'
-    | 'crowfoot-many'
-    | 'crowfoot-one-many';
+    | 'bar';
   // Text properties
   fontFamily?: string;
   textAlign?: 'left' | 'center' | 'right';

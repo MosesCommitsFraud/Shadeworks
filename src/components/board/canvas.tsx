@@ -1565,16 +1565,27 @@ export function Canvas({
         const renderMarker = (marker: NonNullable<BoardElement['arrowEnd']>, tip: Point, from: Point) => {
           if (marker === 'none') return null;
 
-          const { bx, by, px, py } = getMarkerBasis(tip, from);
+          const { bx, by, px, py, ux, uy } = getMarkerBasis(tip, from);
           const size = markerSize;
           const stroke = element.strokeColor;
           const strokeWidth = Math.max(1.5, element.strokeWidth);
           const outlineStrokeWidth = Math.min(strokeWidth, 6);
 
+          // Push arrowhead forward to sit at the very end of the line
+          // Different offsets for different marker types
+          let offsetMultiplier = 4; // Default for most shapes
+          if (marker === 'diamond-outline' || marker === 'circle-outline') {
+            offsetMultiplier = 5; // Diamond and circle outlines need more offset
+          } else if (marker === 'bar') {
+            offsetMultiplier = 0; // Bar sits at the line endpoint
+          }
+          const offset = strokeWidth * offsetMultiplier;
+          const offsetTip = { x: tip.x + ux * offset, y: tip.y + uy * offset };
+
           const line = (x2: number, y2: number) => (
             <line
-              x1={tip.x}
-              y1={tip.y}
+              x1={offsetTip.x}
+              y1={offsetTip.y}
               x2={x2}
               y2={y2}
               stroke={stroke}
@@ -1586,10 +1597,10 @@ export function Canvas({
 
           const bar = () => {
             const half = size * 0.65;
-            const x1 = tip.x + px * half;
-            const y1 = tip.y + py * half;
-            const x2 = tip.x - px * half;
-            const y2 = tip.y - py * half;
+            const x1 = offsetTip.x + px * half;
+            const y1 = offsetTip.y + py * half;
+            const x2 = offsetTip.x - px * half;
+            const y2 = offsetTip.y - py * half;
             return (
               <line
                 x1={x1}
@@ -1604,32 +1615,8 @@ export function Canvas({
             );
           };
 
-          const crowfoot = (many: boolean) => {
-            const back = size * 1.05;
-            const spread = size * 0.85;
-            const baseX = tip.x + bx * back;
-            const baseY = tip.y + by * back;
-
-            const l1 = line(baseX + px * spread, baseY + py * spread);
-            const l2 = line(baseX - px * spread, baseY - py * spread);
-            if (!many) return (
-              <g pointerEvents="none">
-                {l1}
-                {l2}
-              </g>
-            );
-            const lMid = line(baseX, baseY);
-            return (
-              <g pointerEvents="none">
-                {l1}
-                {lMid}
-                {l2}
-              </g>
-            );
-          };
-
           if (marker === 'arrow') {
-            const [pA, pB] = getArrowHeadPoints(tip, from, size);
+            const [pA, pB] = getArrowHeadPoints(offsetTip, from, size);
             return (
               <g pointerEvents="none">
                 {line(pA.x, pA.y)}
@@ -1641,14 +1628,14 @@ export function Canvas({
           if (marker === 'triangle' || marker === 'triangle-outline') {
             const back = size * 1.1;
             const spread = size * 0.85;
-            const baseX = tip.x + bx * back;
-            const baseY = tip.y + by * back;
+            const baseX = offsetTip.x + bx * back;
+            const baseY = offsetTip.y + by * back;
             const p1 = { x: baseX + px * spread, y: baseY + py * spread };
             const p2 = { x: baseX - px * spread, y: baseY - py * spread };
             return (
               <polygon
                 pointerEvents="none"
-                points={`${tip.x},${tip.y} ${p1.x},${p1.y} ${p2.x},${p2.y}`}
+                points={`${offsetTip.x},${offsetTip.y} ${p1.x},${p1.y} ${p2.x},${p2.y}`}
                 fill={marker === 'triangle' ? stroke : 'none'}
                 stroke={marker === 'triangle-outline' ? stroke : 'none'}
                 strokeWidth={marker === 'triangle-outline' ? outlineStrokeWidth : undefined}
@@ -1662,16 +1649,16 @@ export function Canvas({
             const back1 = size * 0.9;
             const back2 = size * 1.8;
             const spread = size * 0.75;
-            const midX = tip.x + bx * back1;
-            const midY = tip.y + by * back1;
-            const rearX = tip.x + bx * back2;
-            const rearY = tip.y + by * back2;
+            const midX = offsetTip.x + bx * back1;
+            const midY = offsetTip.y + by * back1;
+            const rearX = offsetTip.x + bx * back2;
+            const rearY = offsetTip.y + by * back2;
             const left = { x: midX + px * spread, y: midY + py * spread };
             const right = { x: midX - px * spread, y: midY - py * spread };
             return (
               <polygon
                 pointerEvents="none"
-                points={`${tip.x},${tip.y} ${left.x},${left.y} ${rearX},${rearY} ${right.x},${right.y}`}
+                points={`${offsetTip.x},${offsetTip.y} ${left.x},${left.y} ${rearX},${rearY} ${right.x},${right.y}`}
                 fill={marker === 'diamond' ? stroke : 'none'}
                 stroke={marker === 'diamond-outline' ? stroke : 'none'}
                 strokeWidth={marker === 'diamond-outline' ? outlineStrokeWidth : undefined}
@@ -1684,8 +1671,8 @@ export function Canvas({
           if (marker === 'circle' || marker === 'circle-outline') {
             const back = size * 0.9;
             const r = Math.max(3, size * 0.55);
-            const cx = tip.x + bx * back;
-            const cy = tip.y + by * back;
+            const cx = offsetTip.x + bx * back;
+            const cy = offsetTip.y + by * back;
             return (
               <circle
                 pointerEvents="none"
@@ -1701,48 +1688,6 @@ export function Canvas({
           }
 
           if (marker === 'bar') return <g pointerEvents="none">{bar()}</g>;
-          if (marker === 'crowfoot-one') return <g pointerEvents="none">{crowfoot(false)}</g>;
-          if (marker === 'crowfoot-many') return <g pointerEvents="none">{crowfoot(true)}</g>;
-          if (marker === 'crowfoot-one-many') {
-            const barOffset = size * 0.45;
-            const movedTip = { x: tip.x + bx * barOffset, y: tip.y + by * barOffset };
-            const movedFrom = { x: from.x + bx * barOffset, y: from.y + by * barOffset };
-            return (
-              <g pointerEvents="none">
-                {/* Bar close to the tip */}
-                {(() => {
-                  const { px: mpx, py: mpy } = getMarkerBasis(movedTip, movedFrom);
-                  const half = size * 0.65;
-                  return (
-                    <line
-                      x1={movedTip.x + mpx * half}
-                      y1={movedTip.y + mpy * half}
-                      x2={movedTip.x - mpx * half}
-                      y2={movedTip.y - mpy * half}
-                      stroke={stroke}
-                      strokeWidth={strokeWidth}
-                      strokeLinecap={elLineCap}
-                      opacity={markerOpacity}
-                    />
-                  );
-                })()}
-                {/* Crowfoot further back */}
-                {(() => {
-                  const back = size * 1.3;
-                  const spread = size * 0.85;
-                  const baseX = tip.x + bx * back;
-                  const baseY = tip.y + by * back;
-                  return (
-                    <>
-                      {line(baseX + px * spread, baseY + py * spread)}
-                      {line(baseX, baseY)}
-                      {line(baseX - px * spread, baseY - py * spread)}
-                    </>
-                  );
-                })()}
-              </g>
-            );
-          }
 
           return null;
         };
