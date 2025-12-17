@@ -291,7 +291,6 @@ export function Canvas({
   const [textInput, setTextInput] = useState<{ x: number; y: number; width?: number; height?: number; isTextBox?: boolean } | null>(null);
   const [textValue, setTextValue] = useState('');
   const textInputRef = useRef<HTMLTextAreaElement>(null);
-  const [lassoPoints, setLassoPoints] = useState<Point[]>([]);
   const [lastMousePos, setLastMousePos] = useState<Point>({ x: 0, y: 0 });
 
   // Eraser preview state
@@ -927,12 +926,8 @@ export function Canvas({
         });
         break;
       }
-      case 'lasso': {
-        setLassoPoints([...lassoPoints, point]);
-        break;
-      }
     }
-  }, [isDrawing, currentElement, startPoint, tool, collaboration, getMousePosition, isPanning, panStart, elements, onDeleteElement, strokeWidth, isDragging, isResizing, selectedIds, dragStart, originalElements, originalBounds, resizeHandle, onUpdateElement, shiftPressed, isBoxSelecting, lassoPoints, lastMousePos, setLastMousePos, isDraggingLineEndpoint, lineEndpointIndex, isDraggingConnectorCorner, connectorStyle, getElementsToErase]);
+  }, [isDrawing, currentElement, startPoint, tool, collaboration, getMousePosition, isPanning, panStart, elements, onDeleteElement, strokeWidth, isDragging, isResizing, selectedIds, dragStart, originalElements, originalBounds, resizeHandle, onUpdateElement, shiftPressed, isBoxSelecting, lastMousePos, setLastMousePos, isDraggingLineEndpoint, lineEndpointIndex, isDraggingConnectorCorner, connectorStyle, getElementsToErase]);
 
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
     // Middle mouse button for panning OR hand tool with left click
@@ -1035,7 +1030,7 @@ export function Canvas({
     }
 
     // For drawing tools, if we clicked on an element, select it instead
-    if (tool !== 'eraser' && tool !== 'text' && tool !== 'lasso' && clickedElement) {
+    if (tool !== 'eraser' && tool !== 'text' && clickedElement) {
       setSelectedIds([clickedElement.id]);
       return;
     }
@@ -1075,12 +1070,6 @@ export function Canvas({
       if (elementsToMark.length > 0) {
         setEraserMarkedIds(new Set(elementsToMark));
       }
-      return;
-    }
-
-    if (tool === 'lasso') {
-      setLassoPoints([point]);
-      setIsDrawing(true);
       return;
     }
 
@@ -1246,32 +1235,6 @@ export function Canvas({
       return;
     }
 
-    // Handle lasso selection
-    if (tool === 'lasso' && lassoPoints.length > 2) {
-      const selected: string[] = [];
-      elements.forEach(el => {
-        const bounds = getBoundingBox(el);
-        if (bounds) {
-          // Simple point-in-polygon check for center of element
-          const centerX = bounds.x + bounds.width / 2;
-          const centerY = bounds.y + bounds.height / 2;
-          let inside = false;
-          for (let i = 0, j = lassoPoints.length - 1; i < lassoPoints.length; j = i++) {
-            const xi = lassoPoints[i].x, yi = lassoPoints[i].y;
-            const xj = lassoPoints[j].x, yj = lassoPoints[j].y;
-            const intersect = ((yi > centerY) !== (yj > centerY))
-              && (centerX < (xj - xi) * (centerY - yi) / (yj - yi) + xi);
-            if (intersect) inside = !inside;
-          }
-          if (inside) selected.push(el.id);
-        }
-      });
-      setSelectedIds(selected);
-      setLassoPoints([]);
-      setIsDrawing(false);
-      return;
-    }
-
     if (currentElement && isDrawing) {
       let elementAdded = false;
 
@@ -1322,8 +1285,7 @@ export function Canvas({
     setIsDrawing(false);
     setCurrentElement(null);
     setStartPoint(null);
-    setLassoPoints([]);
-  }, [currentElement, isDrawing, onAddElement, isPanning, isDragging, isResizing, isBoxSelecting, selectionBox, elements, tool, lassoPoints, onDeleteElement, onToolChange, lastMousePos, startPoint, textInputRef, setTextInput, setTextValue, setIsDrawing, setStartPoint, setSelectedIds, isDraggingLineEndpoint, isDraggingConnectorCorner, eraserMarkedIds]);
+  }, [currentElement, isDrawing, onAddElement, isPanning, isDragging, isResizing, isBoxSelecting, selectionBox, elements, tool, onDeleteElement, onToolChange, lastMousePos, startPoint, textInputRef, setTextInput, setTextValue, setIsDrawing, setStartPoint, setSelectedIds, isDraggingLineEndpoint, isDraggingConnectorCorner, eraserMarkedIds]);
 
   const handleMouseLeave = useCallback(() => {
     // Clear eraser cursor when mouse leaves canvas
@@ -2573,8 +2535,6 @@ export function Canvas({
         return 'text';
       case 'laser':
         return 'pointer';
-      case 'lasso':
-        return 'crosshair';
       default:
         return 'crosshair';
     }
@@ -2718,18 +2678,6 @@ export function Canvas({
               stroke="var(--accent)"
               strokeWidth={1}
               strokeDasharray="4,4"
-            />
-          )}
-
-          {/* Render lasso selection path */}
-          {tool === 'lasso' && lassoPoints.length > 0 && (
-            <polyline
-              points={lassoPoints.map(p => `${p.x},${p.y}`).join(' ')}
-              fill="none"
-              stroke="var(--accent)"
-              strokeWidth={2}
-              strokeDasharray="5,5"
-              opacity={0.7}
             />
           )}
 

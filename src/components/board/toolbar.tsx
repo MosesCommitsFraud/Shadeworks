@@ -13,7 +13,6 @@ import {
   Share2,
   Check,
   Pointer,
-  Lasso,
   Lock,
   Unlock,
   Hand,
@@ -58,7 +57,6 @@ const tools: { id: Tool; icon: React.ElementType; label: string; hotkey: number 
   { id: 'text', icon: Type, label: 'Text', hotkey: 5 },
   { id: 'eraser', icon: Eraser, label: 'Eraser', hotkey: 6 },
   { id: 'laser', icon: Pointer, label: 'Laser Pointer', hotkey: 7 },
-  { id: 'lasso', icon: Lasso, label: 'Lasso Selection', hotkey: 8 },
 ];
 
 export function Toolbar({

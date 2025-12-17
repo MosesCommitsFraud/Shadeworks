@@ -8,8 +8,7 @@ export type Tool =
   | 'ellipse'
   | 'eraser'
   | 'text'
-  | 'laser'
-  | 'lasso';
+  | 'laser';
 
 export interface Point {
   x: number;
