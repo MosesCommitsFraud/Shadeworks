@@ -43,6 +43,7 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet"
+import { ColorPicker } from "@/components/ui/color-picker"
 import { ArrowLeft, ArrowRight, Download, Heart, Settings } from "lucide-react"
 import { AnimateCursorApiReference, AnimateCursorFollowPreview, AnimateCursorMinimalPreview } from "@/components/animate-ui/docs/animate-cursor-docs"
 import { PropsTable, type PropRow } from "@/components/docs/props-table"
@@ -1804,6 +1805,277 @@ export function Example() {
           )
         },
       },
+      {
+        id: "color-picker",
+        name: "Color Picker",
+        description: "Figma-style color picker with 2D saturation/value selector, hue and alpha sliders, multiple format outputs (HEX/RGB/HSL), eyedropper tool, and recent colors.",
+        code: `'use client'
+
+import { useState } from "react"
+import { Button } from "@/components/ui/button"
+import { ColorPicker } from "@/components/ui/color-picker"
+
+export function Example() {
+  const [color, setColor] = useState("#3b82f6")
+  const [isOpen, setIsOpen] = useState(false)
+
+  return (
+    <>
+      <Button onClick={() => setIsOpen(true)} variant="outline">
+        Choose Color
+      </Button>
+      <ColorPicker
+        value={color}
+        onChange={setColor}
+        isOpen={isOpen}
+        onClose={() => setIsOpen(false)}
+        title="Pick a Color"
+      />
+    </>
+  )
+}`,
+        previewVariants: [
+          {
+            id: "basic",
+            name: "Basic",
+            description: "Simple color picker with a button trigger.",
+            code: `import { useState } from "react"
+import { Button } from "@/components/ui/button"
+import { ColorPicker } from "@/components/ui/color-picker"
+
+export function Example() {
+  const [color, setColor] = useState("#3b82f6")
+  const [isOpen, setIsOpen] = useState(false)
+
+  return (
+    <div className="flex items-center gap-4">
+      <Button onClick={() => setIsOpen(true)} variant="outline">
+        Choose Color
+      </Button>
+      <div className="flex items-center gap-2">
+        <div
+          className="w-8 h-8 rounded border border-input"
+          style={{ backgroundColor: color }}
+        />
+        <span className="text-sm text-muted-foreground font-mono">{color}</span>
+      </div>
+      <ColorPicker
+        value={color}
+        onChange={setColor}
+        isOpen={isOpen}
+        onClose={() => setIsOpen(false)}
+        title="Pick a Color"
+      />
+    </div>
+  )
+}`,
+            Preview: function Preview() {
+              const [color, setColor] = useState("#3b82f6")
+              const [isOpen, setIsOpen] = useState(false)
+
+              return (
+                <div className="flex items-center gap-4">
+                  <Button onClick={() => setIsOpen(true)} variant="outline">
+                    Choose Color
+                  </Button>
+                  <div className="flex items-center gap-2">
+                    <div
+                      className="w-8 h-8 rounded border border-input"
+                      style={{ backgroundColor: color }}
+                    />
+                    <span className="text-sm text-muted-foreground font-mono">{color}</span>
+                  </div>
+                  <ColorPicker
+                    value={color}
+                    onChange={setColor}
+                    isOpen={isOpen}
+                    onClose={() => setIsOpen(false)}
+                    title="Pick a Color"
+                  />
+                </div>
+              )
+            },
+          },
+          {
+            id: "with-swatch",
+            name: "With Swatch Button",
+            description: "Color picker triggered by clicking the color swatch itself.",
+            code: `import { useState } from "react"
+import { ColorPicker } from "@/components/ui/color-picker"
+
+export function Example() {
+  const [strokeColor, setStrokeColor] = useState("#ef4444")
+  const [fillColor, setFillColor] = useState("#10b981")
+  const [showStrokePicker, setShowStrokePicker] = useState(false)
+  const [showFillPicker, setShowFillPicker] = useState(false)
+
+  return (
+    <div className="flex items-center gap-4">
+      <div className="space-y-2">
+        <label className="text-xs text-muted-foreground">Stroke</label>
+        <button
+          onClick={() => setShowStrokePicker(true)}
+          className="w-10 h-10 rounded-md border border-input hover:scale-105 transition-transform"
+          style={{ backgroundColor: strokeColor }}
+        />
+      </div>
+      <div className="space-y-2">
+        <label className="text-xs text-muted-foreground">Fill</label>
+        <button
+          onClick={() => setShowFillPicker(true)}
+          className="w-10 h-10 rounded-md border border-input hover:scale-105 transition-transform"
+          style={{ backgroundColor: fillColor }}
+        />
+      </div>
+
+      <ColorPicker
+        value={strokeColor}
+        onChange={setStrokeColor}
+        isOpen={showStrokePicker}
+        onClose={() => setShowStrokePicker(false)}
+        title="Stroke Color"
+      />
+      <ColorPicker
+        value={fillColor}
+        onChange={setFillColor}
+        isOpen={showFillPicker}
+        onClose={() => setShowFillPicker(false)}
+        title="Fill Color"
+      />
+    </div>
+  )
+}`,
+            Preview: function Preview() {
+              const [strokeColor, setStrokeColor] = useState("#ef4444")
+              const [fillColor, setFillColor] = useState("#10b981")
+              const [showStrokePicker, setShowStrokePicker] = useState(false)
+              const [showFillPicker, setShowFillPicker] = useState(false)
+
+              return (
+                <div className="flex items-center gap-4">
+                  <div className="space-y-2">
+                    <label className="text-xs text-muted-foreground">Stroke</label>
+                    <button
+                      onClick={() => setShowStrokePicker(true)}
+                      className="w-10 h-10 rounded-md border border-input hover:scale-105 transition-transform"
+                      style={{ backgroundColor: strokeColor }}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-xs text-muted-foreground">Fill</label>
+                    <button
+                      onClick={() => setShowFillPicker(true)}
+                      className="w-10 h-10 rounded-md border border-input hover:scale-105 transition-transform"
+                      style={{ backgroundColor: fillColor }}
+                    />
+                  </div>
+
+                  <ColorPicker
+                    value={strokeColor}
+                    onChange={setStrokeColor}
+                    isOpen={showStrokePicker}
+                    onClose={() => setShowStrokePicker(false)}
+                    title="Stroke Color"
+                  />
+                  <ColorPicker
+                    value={fillColor}
+                    onChange={setFillColor}
+                    isOpen={showFillPicker}
+                    onClose={() => setShowFillPicker(false)}
+                    title="Fill Color"
+                  />
+                </div>
+              )
+            },
+          },
+        ],
+        Preview: function Preview() {
+          const [color, setColor] = useState("#3b82f6")
+          const [isOpen, setIsOpen] = useState(false)
+
+          return (
+            <div className="flex items-center gap-4">
+              <Button onClick={() => setIsOpen(true)} variant="outline">
+                Choose Color
+              </Button>
+              <div className="flex items-center gap-2">
+                <div
+                  className="w-8 h-8 rounded border border-input"
+                  style={{ backgroundColor: color }}
+                />
+                <span className="text-sm text-muted-foreground font-mono">{color}</span>
+              </div>
+              <ColorPicker
+                value={color}
+                onChange={setColor}
+                isOpen={isOpen}
+                onClose={() => setIsOpen(false)}
+                title="Pick a Color"
+              />
+            </div>
+          )
+        },
+        ApiReference: function ApiReference() {
+          const rows: PropRow[] = [
+            {
+              prop: "value",
+              type: "string",
+              defaultValue: "—",
+              description: "Current color value. Accepts HEX (#RRGGBB, #RRGGBBAA), RGB, HSL, or 'transparent'.",
+            },
+            {
+              prop: "onChange",
+              type: "(color: string) => void",
+              defaultValue: "—",
+              description: "Callback when color changes. Returns color in HEX format.",
+            },
+            {
+              prop: "isOpen",
+              type: "boolean",
+              defaultValue: "—",
+              description: "Controls the visibility of the color picker modal.",
+            },
+            {
+              prop: "onClose",
+              type: "() => void",
+              defaultValue: "—",
+              description: "Callback when the color picker should close (clicking overlay or Escape key).",
+            },
+            {
+              prop: "title",
+              type: "string",
+              defaultValue: `"Custom Color"`,
+              description: "Title displayed in the color picker header.",
+            },
+            {
+              prop: "position",
+              type: `{ left: number; top: number } | "auto"`,
+              defaultValue: `"auto"`,
+              description: "Modal position. 'auto' positions it to the left of the sidebar (right: 20rem).",
+            },
+            {
+              prop: "showAlpha",
+              type: "boolean",
+              defaultValue: "true",
+              description: "Shows the alpha/opacity slider.",
+            },
+            {
+              prop: "showEyedropper",
+              type: "boolean",
+              defaultValue: "true",
+              description: "Shows the eyedropper button (only in supported browsers: Chrome, Edge).",
+            },
+            {
+              prop: "showSwatches",
+              type: "boolean",
+              defaultValue: "true",
+              description: "Shows recently used colors (persisted in localStorage).",
+            },
+          ]
+
+          return <PropsTable title="ColorPicker" rows={rows} />
+        },
+      },
     ]
 
     // Automatically sort components alphabetically by name
@@ -2017,7 +2289,7 @@ export function ComponentsDocs({ mobileMenuOpen = false, onMobileMenuChange }: C
                           <TabsTrigger value="code">Code</TabsTrigger>
                         </TabsList>
                         <TabsContent value="preview">
-                          <div className="rounded-lg border bg-background p-12 flex items-center justify-center min-h-[300px]">
+                          <div className="rounded-lg border bg-background p-12 flex items-center justify-center min-h-[500px]">
                             <selectedVariant.Preview />
                           </div>
                         </TabsContent>
