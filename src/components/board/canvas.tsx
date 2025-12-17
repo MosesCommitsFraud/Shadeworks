@@ -811,13 +811,22 @@ export function Canvas({
           break;
       }
       
-      const minSize = 10;
+      const minAbsSize =
+        originalElement.type === 'rectangle' ||
+        originalElement.type === 'ellipse' ||
+        originalElement.type === 'frame' ||
+        originalElement.type === 'web-embed' ||
+        originalElement.type === 'text'
+          ? 2
+          : 0;
 
-      // Allow crossing resize handles to flip/invert elements (negative scale),
-      // while still enforcing a minimum absolute size for stability.
+      // Avoid snapping/flipping when elements get very small (especially lines/pen),
+      // while still keeping box-like elements at a small minimum size.
       const clampSignedSize = (size: number) => {
-        if (Number.isNaN(size)) return minSize;
-        if (Math.abs(size) < minSize) return size === 0 ? minSize : Math.sign(size) * minSize;
+        if (Number.isNaN(size)) return minAbsSize;
+        if (minAbsSize <= 0) return size;
+        if (size === 0) return 0;
+        if (Math.abs(size) < minAbsSize) return Math.sign(size) * minAbsSize;
         return size;
       };
 
@@ -1012,7 +1021,7 @@ export function Canvas({
     if (tool === 'select') {
       // Check if clicking on a resize handle first (single selection only)
       if (selectedBounds && selectedIds.length === 1) {
-        const handleSize = 8;
+        const handleSize = 10 / zoom;
         const selectionPadding = 6 / zoom;
         const visualBounds = expandBounds(selectedBounds, selectionPadding);
         const handles: { handle: ResizeHandle; x: number; y: number }[] = [
@@ -2514,7 +2523,7 @@ export function Canvas({
       }
     }
 
-    const handleSize = 8;
+    const handleSize = 8 / zoom;
     const selectionPadding = 6 / zoom;
     const visualBounds = expandBounds(selectedBounds, selectionPadding);
     const handles: { pos: ResizeHandle; x: number; y: number; cursor: string }[] = selectedIds.length === 1 ? [
