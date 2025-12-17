@@ -2,7 +2,7 @@
 
 import { useMemo, useRef, useState } from 'react';
 import { useTheme } from 'next-themes';
-import { ChevronLeft, ChevronRight, Circle, Minus, Square, Type, Pencil, ArrowUpToLine, ArrowDownToLine, X, AlignLeft, AlignCenter, AlignRight } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Circle, Minus, Square, Type, Pencil, ArrowUpToLine, ArrowDownToLine, X, AlignLeft, AlignCenter, AlignRight, ArrowRight } from 'lucide-react';
 import { Tool, COLORS, STROKE_WIDTHS, FONTS, FONT_SIZES, BoardElement } from '@/lib/board-types';
 import { cn } from '@/lib/utils';
 import { Slider } from '@/components/ui/slider';
@@ -295,6 +295,7 @@ export function ToolSidebar({
           <div className="flex items-center gap-2 pb-2 border-b border-border">
             {selectedTool === 'pen' && <Pencil className="w-4 h-4 text-foreground" />}
             {selectedTool === 'line' && <Minus className="w-4 h-4 text-foreground" />}
+            {selectedTool === 'arrow' && <ArrowRight className="w-4 h-4 text-foreground" />}
             {selectedTool === 'rectangle' && <Square className="w-4 h-4 text-foreground" />}
             {selectedTool === 'ellipse' && <Circle className="w-4 h-4 text-foreground" />}
             {selectedTool === 'text' && <Type className="w-4 h-4 text-foreground" />}
