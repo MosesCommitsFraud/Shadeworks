@@ -8,6 +8,7 @@ import { ToolSidebar } from './tool-sidebar';
 import { BurgerMenu } from './burger-menu';
 import { ExportImageModal } from './export-image-modal';
 import { FindCanvas } from './find-canvas';
+import { HotkeysDialog } from './hotkeys-dialog';
 import { CollaborationManager, type ConnectionStatus } from '@/lib/collaboration';
 import { generateFunnyName } from '@/lib/funny-names';
 import type { Tool, BoardElement, ShadeworksFile } from '@/lib/board-types';
@@ -61,6 +62,7 @@ export function Whiteboard({ roomId }: WhiteboardProps) {
   const [saveFileName, setSaveFileName] = useState('');
   const [showExportDialog, setShowExportDialog] = useState(false);
   const [showFindCanvas, setShowFindCanvas] = useState(false);
+  const [showHotkeysDialog, setShowHotkeysDialog] = useState(false);
   const [highlightedElementIds, setHighlightedElementIds] = useState<string[]>([]);
 
   // Undo/Redo stacks - store snapshots
@@ -730,6 +732,7 @@ export function Whiteboard({ roomId }: WhiteboardProps) {
           onOpen={handleOpen}
           onExportImage={handleExportImage}
           onFindOnCanvas={handleFindOnCanvas}
+          onHelp={() => setShowHotkeysDialog(true)}
           canvasBackground={canvasBackground}
           onCanvasBackgroundChange={setCanvasBackground}
           roomId={roomId}
@@ -746,6 +749,19 @@ export function Whiteboard({ roomId }: WhiteboardProps) {
           />
         </a>
       </div>
+
+      {/* Hotkeys - Top Right */}
+      <div className="absolute top-4 right-4 z-50">
+        <button
+          onClick={() => setShowHotkeysDialog(true)}
+          className="p-2.5 rounded-md transition-all duration-200 bg-card/95 backdrop-blur-md border border-border hover:bg-muted/60 text-muted-foreground hover:text-foreground shadow-2xl"
+          aria-label="Keyboard shortcuts"
+        >
+          <span className="w-5 h-5 flex items-center justify-center font-semibold">?</span>
+        </button>
+      </div>
+
+      <HotkeysDialog open={showHotkeysDialog} onOpenChange={setShowHotkeysDialog} />
 
       {/* Find Canvas */}
       <FindCanvas

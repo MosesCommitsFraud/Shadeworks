@@ -108,7 +108,7 @@ export function BurgerMenu({
       }
 
       // ? - Help
-      if (e.key === '?' && !ctrlKey && !e.shiftKey) {
+      if (e.key === '?' && !ctrlKey) {
         e.preventDefault();
         onHelp?.();
       }
