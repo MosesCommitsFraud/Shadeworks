@@ -719,7 +719,11 @@ export function Canvas({
       let newHeight = originalBounds.height;
       
       const aspectRatio = originalBounds.width / originalBounds.height;
-      
+      const originalLeft = originalBounds.x;
+      const originalTop = originalBounds.y;
+      const originalRight = originalBounds.x + originalBounds.width;
+      const originalBottom = originalBounds.y + originalBounds.height;
+       
       switch (resizeHandle) {
         case 'nw':
           newX = originalBounds.x + dx;
@@ -798,23 +802,54 @@ export function Canvas({
       }
       
       const minSize = 10;
-      if (newWidth < minSize) {
-        if (resizeHandle.includes('w')) newX = originalBounds.x + originalBounds.width - minSize;
-        newWidth = minSize;
+
+      // Allow crossing resize handles to flip/invert elements (negative scale),
+      // while still enforcing a minimum absolute size for stability.
+      const clampSignedSize = (size: number) => {
+        if (Number.isNaN(size)) return minSize;
+        if (Math.abs(size) < minSize) return size === 0 ? minSize : Math.sign(size) * minSize;
+        return size;
+      };
+
+      const nextWidth = clampSignedSize(newWidth);
+      if (nextWidth !== newWidth) {
+        if (resizeHandle.includes('w') && !resizeHandle.includes('e')) {
+          newX = originalRight - nextWidth;
+        } else if (resizeHandle.includes('e') && !resizeHandle.includes('w')) {
+          newX = originalLeft;
+        } else {
+          const centerX = newX + newWidth / 2;
+          newX = centerX - nextWidth / 2;
+        }
+        newWidth = nextWidth;
       }
-      if (newHeight < minSize) {
-        if (resizeHandle.includes('n')) newY = originalBounds.y + originalBounds.height - minSize;
-        newHeight = minSize;
+
+      const nextHeight = clampSignedSize(newHeight);
+      if (nextHeight !== newHeight) {
+        if (resizeHandle.includes('n') && !resizeHandle.includes('s')) {
+          newY = originalBottom - nextHeight;
+        } else if (resizeHandle.includes('s') && !resizeHandle.includes('n')) {
+          newY = originalTop;
+        } else {
+          const centerY = newY + newHeight / 2;
+          newY = centerY - nextHeight / 2;
+        }
+        newHeight = nextHeight;
       }
-      
+       
       if (originalElement.type === 'rectangle' || originalElement.type === 'ellipse' || originalElement.type === 'frame' || originalElement.type === 'web-embed') {
+        const normalizedX = Math.min(newX, newX + newWidth);
+        const normalizedY = Math.min(newY, newY + newHeight);
+        const normalizedWidth = Math.abs(newWidth);
+        const normalizedHeight = Math.abs(newHeight);
         onUpdateElement(selectedIds[0], {
-          x: newX,
-          y: newY,
-          width: newWidth,
-          height: newHeight,
+          x: normalizedX,
+          y: normalizedY,
+          width: normalizedWidth,
+          height: normalizedHeight,
         });
       } else if (originalElement.type === 'pen' || originalElement.type === 'line' || originalElement.type === 'arrow' || originalElement.type === 'laser') {
+        // `newWidth/newHeight` can be negative here, which intentionally mirrors the element.
         const scaleX = newWidth / originalBounds.width;
         const scaleY = newHeight / originalBounds.height;
         const newPoints = originalElement.points.map(p => ({
@@ -823,16 +858,20 @@ export function Canvas({
         }));
         onUpdateElement(selectedIds[0], { points: newPoints });
       } else if (originalElement.type === 'text') {
-        const scaleX = newWidth / originalBounds.width;
-        const scaleY = newHeight / originalBounds.height;
+        const normalizedX = Math.min(newX, newX + newWidth);
+        const normalizedY = Math.min(newY, newY + newHeight);
+        const normalizedWidth = Math.abs(newWidth);
+        const normalizedHeight = Math.abs(newHeight);
+        const scaleX = normalizedWidth / originalBounds.width;
+        const scaleY = normalizedHeight / originalBounds.height;
         const origScaleX = originalElement.scaleX ?? 1;
         const origScaleY = originalElement.scaleY ?? 1;
         
         onUpdateElement(selectedIds[0], { 
-          x: newX,
-          y: newY,
-          width: newWidth,
-          height: newHeight,
+          x: normalizedX,
+          y: normalizedY,
+          width: normalizedWidth,
+          height: normalizedHeight,
           scaleX: origScaleX * scaleX,
           scaleY: origScaleY * scaleY,
         });
