@@ -1590,7 +1590,7 @@ export function Canvas({
               y2={y2}
               stroke={stroke}
               strokeWidth={strokeWidth}
-              strokeLinecap={elLineCap}
+              strokeLinecap="round"
               opacity={markerOpacity}
             />
           );
