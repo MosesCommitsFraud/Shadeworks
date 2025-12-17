@@ -1266,11 +1266,38 @@ export function Canvas({
         onAddElement(currentElement);
         elementAdded = true;
       } else if (currentElement.type === 'laser' && currentElement.points.length > 1) {
-        // Add laser element and schedule it for removal after 2 seconds
+        // Add laser element and schedule smooth fade-out
         onAddElement(currentElement);
-        setTimeout(() => {
-          onDeleteElement(currentElement.id);
-        }, 2000);
+
+        // Smooth fade-out animation
+        const fadeStartTime = Date.now();
+        const fadeDuration = 800; // 800ms fade duration
+        const holdDuration = 3000; // Hold at full opacity for 3 seconds first
+
+        const animateFade = () => {
+          const elapsed = Date.now() - fadeStartTime;
+
+          if (elapsed < holdDuration) {
+            // Hold at full opacity
+            requestAnimationFrame(animateFade);
+          } else {
+            const fadeElapsed = elapsed - holdDuration;
+            if (fadeElapsed < fadeDuration) {
+              // Smoothly fade out using easeOut curve
+              const progress = fadeElapsed / fadeDuration;
+              const easeOutProgress = 1 - Math.pow(1 - progress, 3); // Cubic ease-out
+              const newOpacity = Math.max(0, 100 * (1 - easeOutProgress));
+
+              onUpdateElement(currentElement.id, { opacity: newOpacity });
+              requestAnimationFrame(animateFade);
+            } else {
+              // Fully faded, delete the element
+              onDeleteElement(currentElement.id);
+            }
+          }
+        };
+
+        requestAnimationFrame(animateFade);
         // Don't switch tool for laser
       } else if (
         (currentElement.type === 'rectangle' || currentElement.type === 'ellipse') &&
@@ -2271,7 +2298,7 @@ export function Canvas({
               data-element-id={element.id}
               d={pathData}
               fill="#ef4444"
-              opacity={isMarkedForDeletion ? Math.max(0.5, elOpacity * 0.8) * 0.3 : Math.max(0.5, elOpacity * 0.8)}
+              opacity={isMarkedForDeletion ? elOpacity * 0.8 * 0.3 : elOpacity * 0.8}
               filter="url(#laser-glow)"
               pointerEvents="auto"
             />
@@ -2279,7 +2306,7 @@ export function Canvas({
             <path
               d={centerLineData}
               fill="#ffffff"
-              opacity={isMarkedForDeletion ? 0.3 : 0.9}
+              opacity={isMarkedForDeletion ? elOpacity * 0.3 : elOpacity * 0.9}
               pointerEvents="none"
             />
             {isMarkedForDeletion && (
