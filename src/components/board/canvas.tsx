@@ -208,6 +208,34 @@ function getResizeCursor(handle: Exclude<ResizeHandle, null>) {
   }
 }
 
+function getHandleDirection(handle: Exclude<ResizeHandle, null>): Point {
+  switch (handle) {
+    case 'n':
+      return { x: 0, y: -1 };
+    case 'ne':
+      return { x: 1, y: -1 };
+    case 'e':
+      return { x: 1, y: 0 };
+    case 'se':
+      return { x: 1, y: 1 };
+    case 's':
+      return { x: 0, y: 1 };
+    case 'sw':
+      return { x: -1, y: 1 };
+    case 'w':
+      return { x: -1, y: 0 };
+    case 'nw':
+      return { x: -1, y: -1 };
+  }
+}
+
+function getRotatedResizeCursor(handle: Exclude<ResizeHandle, null>, rotationDeg: number) {
+  if (!rotationDeg) return getResizeCursor(handle);
+  const world = rotateVector(getHandleDirection(handle), rotationDeg);
+  const worldHandle = getWorldResizeHandle(world, { x: 0, y: 0 });
+  return getResizeCursor(worldHandle);
+}
+
 function getResizeHandleFromSelectionEdge(
   point: Point,
   bounds: BoundingBox,
@@ -980,7 +1008,7 @@ export function Canvas({
 
       const edgeHandle = getResizeHandleFromSelectionEdge(point, visualBounds, rotationDeg, 10 / zoom);
       if (edgeHandle) {
-        setHoverCursor(getResizeCursor(edgeHandle));
+        setHoverCursor(getRotatedResizeCursor(edgeHandle, rotationDeg));
       } else if (selectedElement && selectedElement.type !== 'line' && selectedElement.type !== 'arrow' && selectedElement.type !== 'laser') {
         const center = getBoundsCenter(visualBounds);
         const rotateHandleDistance = 28 / zoom;
@@ -1608,21 +1636,6 @@ export function Canvas({
           selectedIds.length === 1 ? (elements.find((el) => el.id === selectedIds[0])?.rotation ?? 0) : 0;
         const centerForHandles = getBoundsCenter(visualBounds);
 
-        // Dragging directly on the selection edge should resize too (single selection only).
-        if (selectedIds.length === 1) {
-          const edgeThreshold = 10 / zoom;
-          const edgeHandle = getResizeHandleFromSelectionEdge(point, visualBounds, rotationDegForHandles, edgeThreshold);
-          if (edgeHandle) {
-            onStartTransform?.();
-            setIsResizing(true);
-            setResizeHandle(edgeHandle);
-            setDragStart(point);
-            setOriginalElements(selectedElements.map((el) => ({ ...el })));
-            setOriginalBounds({ ...selectedBounds });
-            return;
-          }
-        }
-
         // Only show corner handles for single selection.
         const baseHandlePoints: Array<{ h: Exclude<ResizeHandle, null>; x: number; y: number }> = selectedIds.length === 1
           ? [
@@ -1657,6 +1670,21 @@ export function Canvas({
             setResizeHandle(h.handle);
             setDragStart(point);
             setOriginalElements(selectedElements.map(el => ({ ...el })));
+            setOriginalBounds({ ...selectedBounds });
+            return;
+          }
+        }
+
+        // Dragging directly on the selection edge should resize too (single selection only).
+        if (selectedIds.length === 1) {
+          const edgeThreshold = 10 / zoom;
+          const edgeHandle = getResizeHandleFromSelectionEdge(point, visualBounds, rotationDegForHandles, edgeThreshold);
+          if (edgeHandle) {
+            onStartTransform?.();
+            setIsResizing(true);
+            setResizeHandle(edgeHandle);
+            setDragStart(point);
+            setOriginalElements(selectedElements.map((el) => ({ ...el })));
             setOriginalBounds({ ...selectedBounds });
             return;
           }
@@ -3355,6 +3383,12 @@ export function Canvas({
     if (isPanning) return 'grabbing';
     if (isRotating) return 'grabbing';
     if (isResizing) {
+      if (resizeHandle && selectedIds.length === 1) {
+        const selectedElement = elements.find((el) => el.id === selectedIds[0]);
+        const rotationDeg = selectedElement?.rotation ?? 0;
+        return getRotatedResizeCursor(resizeHandle, rotationDeg);
+      }
+
       switch (resizeHandle) {
         case 'nw':
         case 'se':
