@@ -1087,7 +1087,7 @@ export function Canvas({
         id: uuid(),
         type: 'laser',
         points: [point],
-        strokeColor,
+        strokeColor: '#ef4444', // Force red color for laser
         strokeWidth,
         timestamp: Date.now(),
         opacity,
@@ -2281,8 +2281,8 @@ export function Canvas({
             <path
               data-element-id={element.id}
               d={pathData}
-              fill={element.strokeColor}
-              opacity={isMarkedForDeletion ? Math.max(0.3, elOpacity * 0.7) * 0.3 : Math.max(0.3, elOpacity * 0.7)}
+              fill="#ef4444"
+              opacity={isMarkedForDeletion ? Math.max(0.5, elOpacity * 0.8) * 0.3 : Math.max(0.5, elOpacity * 0.8)}
               filter="url(#laser-glow)"
               pointerEvents="auto"
             />
@@ -2639,10 +2639,34 @@ export function Canvas({
         onMouseLeave={handleMouseLeave}
       >
         <defs>
-          <filter id="laser-glow">
-            <feGaussianBlur stdDeviation="2" result="coloredBlur"/>
+          <filter id="laser-glow" x="-50%" y="-50%" width="200%" height="200%">
+            {/* Create multiple blur layers for stronger glow */}
+            <feGaussianBlur stdDeviation="3" result="blur1"/>
+            <feGaussianBlur stdDeviation="6" result="blur2"/>
+            <feGaussianBlur stdDeviation="9" result="blur3"/>
+
+            {/* Brighten the glow */}
+            <feColorMatrix in="blur1" result="brightBlur1" type="matrix"
+              values="1.5 0 0 0 0
+                      0 0 0 0 0
+                      0 0 0 0 0
+                      0 0 0 1 0"/>
+            <feColorMatrix in="blur2" result="brightBlur2" type="matrix"
+              values="1.3 0 0 0 0
+                      0 0 0 0 0
+                      0 0 0 0 0
+                      0 0 0 0.8 0"/>
+            <feColorMatrix in="blur3" result="brightBlur3" type="matrix"
+              values="1.2 0 0 0 0
+                      0 0 0 0 0
+                      0 0 0 0 0
+                      0 0 0 0.6 0"/>
+
+            {/* Merge all layers */}
             <feMerge>
-              <feMergeNode in="coloredBlur"/>
+              <feMergeNode in="brightBlur3"/>
+              <feMergeNode in="brightBlur2"/>
+              <feMergeNode in="brightBlur1"/>
               <feMergeNode in="SourceGraphic"/>
             </feMerge>
           </filter>
