@@ -208,6 +208,45 @@ function getResizeCursor(handle: Exclude<ResizeHandle, null>) {
   }
 }
 
+function getResizeHandleFromSelectionEdge(
+  point: Point,
+  bounds: BoundingBox,
+  rotationDeg: number,
+  threshold: number
+): Exclude<ResizeHandle, null> | null {
+  const center = getBoundsCenter(bounds);
+  const local = rotationDeg ? rotatePoint(point, center, -rotationDeg) : point;
+
+  const left = bounds.x;
+  const right = bounds.x + bounds.width;
+  const top = bounds.y;
+  const bottom = bounds.y + bounds.height;
+
+  const withinX = local.x >= left - threshold && local.x <= right + threshold;
+  const withinY = local.y >= top - threshold && local.y <= bottom + threshold;
+
+  if (!withinX || !withinY) return null;
+
+  const dLeft = Math.abs(local.x - left);
+  const dRight = Math.abs(local.x - right);
+  const dTop = Math.abs(local.y - top);
+  const dBottom = Math.abs(local.y - bottom);
+
+  const candidates: Array<{ h: Exclude<ResizeHandle, null>; d: number }> = [];
+  if (local.y >= top - threshold && local.y <= bottom + threshold) {
+    if (dLeft <= threshold) candidates.push({ h: 'w', d: dLeft });
+    if (dRight <= threshold) candidates.push({ h: 'e', d: dRight });
+  }
+  if (local.x >= left - threshold && local.x <= right + threshold) {
+    if (dTop <= threshold) candidates.push({ h: 'n', d: dTop });
+    if (dBottom <= threshold) candidates.push({ h: 's', d: dBottom });
+  }
+
+  if (candidates.length === 0) return null;
+  candidates.sort((a, b) => a.d - b.d);
+  return candidates[0].h;
+}
+
 
 function chooseRotateHandleSide(rotationDeg: number): RotateHandleSide {
   const targetWorldAngle = -90; // screen "up"
@@ -535,6 +574,7 @@ export function Canvas({
   } | null>(null);
   const [rotateHandleSide, setRotateHandleSide] = useState<RotateHandleSide>('n');
   const lastSingleSelectedIdRef = useRef<string | null>(null);
+  const [hoverCursor, setHoverCursor] = useState<string | null>(null);
 
   // Line endpoint dragging state
   const [isDraggingLineEndpoint, setIsDraggingLineEndpoint] = useState(false);
@@ -921,6 +961,65 @@ export function Canvas({
 
       onUpdateElement(rotateStart.elementId, { rotation: nextRotationDeg });
       return;
+    }
+
+    // Hover feedback for selection border resize / rotate handle (single selection)
+    if (
+      tool === 'select' &&
+      !isDragging &&
+      !isResizing &&
+      !isRotating &&
+      !isBoxSelecting &&
+      selectedBounds &&
+      selectedIds.length === 1
+    ) {
+      const selectionPadding = 6 / zoom;
+      const visualBounds = expandBounds(selectedBounds, selectionPadding);
+      const selectedElement = elements.find((el) => el.id === selectedIds[0]);
+      const rotationDeg = selectedElement?.rotation ?? 0;
+
+      const edgeHandle = getResizeHandleFromSelectionEdge(point, visualBounds, rotationDeg, 10 / zoom);
+      if (edgeHandle) {
+        setHoverCursor(getResizeCursor(edgeHandle));
+      } else if (selectedElement && selectedElement.type !== 'line' && selectedElement.type !== 'arrow' && selectedElement.type !== 'laser') {
+        const center = getBoundsCenter(visualBounds);
+        const rotateHandleDistance = 28 / zoom;
+        const rotateHandleRadius = 4 / zoom;
+
+        const localAnchor: Point =
+          rotateHandleSide === 'n'
+            ? { x: visualBounds.x + visualBounds.width / 2, y: visualBounds.y }
+            : rotateHandleSide === 'e'
+              ? { x: visualBounds.x + visualBounds.width, y: visualBounds.y + visualBounds.height / 2 }
+              : rotateHandleSide === 's'
+                ? { x: visualBounds.x + visualBounds.width / 2, y: visualBounds.y + visualBounds.height }
+                : { x: visualBounds.x, y: visualBounds.y + visualBounds.height / 2 };
+
+        const outward: Point =
+          rotateHandleSide === 'n'
+            ? { x: 0, y: -1 }
+            : rotateHandleSide === 'e'
+              ? { x: 1, y: 0 }
+              : rotateHandleSide === 's'
+                ? { x: 0, y: 1 }
+                : { x: -1, y: 0 };
+
+        const localHandle: Point = {
+          x: localAnchor.x + outward.x * rotateHandleDistance,
+          y: localAnchor.y + outward.y * rotateHandleDistance,
+        };
+
+        const handlePos = rotationDeg ? rotatePoint(localHandle, center, rotationDeg) : localHandle;
+        if (Math.hypot(point.x - handlePos.x, point.y - handlePos.y) <= rotateHandleRadius * 2.25) {
+          setHoverCursor('grab');
+        } else {
+          setHoverCursor(null);
+        }
+      } else {
+        setHoverCursor(null);
+      }
+    } else if (hoverCursor) {
+      setHoverCursor(null);
     }
 
     // Handle connector endpoint dragging (line/arrow)
@@ -1508,16 +1607,40 @@ export function Canvas({
         const rotationDegForHandles =
           selectedIds.length === 1 ? (elements.find((el) => el.id === selectedIds[0])?.rotation ?? 0) : 0;
         const centerForHandles = getBoundsCenter(visualBounds);
-        const baseHandlePoints: Array<{ h: Exclude<ResizeHandle, null>; x: number; y: number }> = [
-          { h: 'nw', x: visualBounds.x, y: visualBounds.y },
-          { h: 'n', x: visualBounds.x + visualBounds.width / 2, y: visualBounds.y },
-          { h: 'ne', x: visualBounds.x + visualBounds.width, y: visualBounds.y },
-          { h: 'e', x: visualBounds.x + visualBounds.width, y: visualBounds.y + visualBounds.height / 2 },
-          { h: 'se', x: visualBounds.x + visualBounds.width, y: visualBounds.y + visualBounds.height },
-          { h: 's', x: visualBounds.x + visualBounds.width / 2, y: visualBounds.y + visualBounds.height },
-          { h: 'sw', x: visualBounds.x, y: visualBounds.y + visualBounds.height },
-          { h: 'w', x: visualBounds.x, y: visualBounds.y + visualBounds.height / 2 },
-        ];
+
+        // Dragging directly on the selection edge should resize too (single selection only).
+        if (selectedIds.length === 1) {
+          const edgeThreshold = 10 / zoom;
+          const edgeHandle = getResizeHandleFromSelectionEdge(point, visualBounds, rotationDegForHandles, edgeThreshold);
+          if (edgeHandle) {
+            onStartTransform?.();
+            setIsResizing(true);
+            setResizeHandle(edgeHandle);
+            setDragStart(point);
+            setOriginalElements(selectedElements.map((el) => ({ ...el })));
+            setOriginalBounds({ ...selectedBounds });
+            return;
+          }
+        }
+
+        // Only show corner handles for single selection.
+        const baseHandlePoints: Array<{ h: Exclude<ResizeHandle, null>; x: number; y: number }> = selectedIds.length === 1
+          ? [
+              { h: 'nw', x: visualBounds.x, y: visualBounds.y },
+              { h: 'ne', x: visualBounds.x + visualBounds.width, y: visualBounds.y },
+              { h: 'se', x: visualBounds.x + visualBounds.width, y: visualBounds.y + visualBounds.height },
+              { h: 'sw', x: visualBounds.x, y: visualBounds.y + visualBounds.height },
+            ]
+          : [
+              { h: 'nw', x: visualBounds.x, y: visualBounds.y },
+              { h: 'n', x: visualBounds.x + visualBounds.width / 2, y: visualBounds.y },
+              { h: 'ne', x: visualBounds.x + visualBounds.width, y: visualBounds.y },
+              { h: 'e', x: visualBounds.x + visualBounds.width, y: visualBounds.y + visualBounds.height / 2 },
+              { h: 'se', x: visualBounds.x + visualBounds.width, y: visualBounds.y + visualBounds.height },
+              { h: 's', x: visualBounds.x + visualBounds.width / 2, y: visualBounds.y + visualBounds.height },
+              { h: 'sw', x: visualBounds.x, y: visualBounds.y + visualBounds.height },
+              { h: 'w', x: visualBounds.x, y: visualBounds.y + visualBounds.height / 2 },
+            ];
 
         // Hit-testing uses the *local* handle id (so resize math stays stable), but positions are rotated.
         const handles: Array<{ handle: Exclude<ResizeHandle, null>; x: number; y: number }> = baseHandlePoints.map((h) => {
@@ -1865,6 +1988,7 @@ export function Canvas({
     setEraserCursorPos(null);
     // Clear laser cursor when mouse leaves canvas
     setLaserCursorPos(null);
+    setHoverCursor(null);
     // Also handle mouse up logic
     handleMouseUp();
   }, [handleMouseUp]);
@@ -3092,13 +3216,9 @@ export function Canvas({
 
     const baseHandles: Array<{ pos: Exclude<ResizeHandle, null>; x: number; y: number }> = [
       { pos: 'nw', x: visualBounds.x, y: visualBounds.y },
-      { pos: 'n', x: visualBounds.x + visualBounds.width / 2, y: visualBounds.y },
       { pos: 'ne', x: visualBounds.x + visualBounds.width, y: visualBounds.y },
-      { pos: 'e', x: visualBounds.x + visualBounds.width, y: visualBounds.y + visualBounds.height / 2 },
       { pos: 'se', x: visualBounds.x + visualBounds.width, y: visualBounds.y + visualBounds.height },
-      { pos: 's', x: visualBounds.x + visualBounds.width / 2, y: visualBounds.y + visualBounds.height },
       { pos: 'sw', x: visualBounds.x, y: visualBounds.y + visualBounds.height },
-      { pos: 'w', x: visualBounds.x, y: visualBounds.y + visualBounds.height / 2 },
     ];
 
     const handles: Array<{ keyId: Exclude<ResizeHandle, null>; pos: Exclude<ResizeHandle, null>; x: number; y: number; cursor: string }> = baseHandles.map((h) => {
@@ -3155,7 +3275,7 @@ export function Canvas({
           fill="none"
           stroke="var(--accent)"
           strokeWidth={2}
-          strokeDasharray="5,5"
+          strokeDasharray={selectedIds.length === 1 ? undefined : "5,5"}
           pointerEvents="none"
           transform={selectionTransform}
         />
@@ -3233,6 +3353,7 @@ export function Canvas({
   const getCursorStyle = () => {
     if (isDragging) return 'grabbing';
     if (isPanning) return 'grabbing';
+    if (isRotating) return 'grabbing';
     if (isResizing) {
       switch (resizeHandle) {
         case 'nw':
@@ -3262,7 +3383,7 @@ export function Canvas({
       case 'eraser':
         return 'none';
       case 'select':
-        return selectedIds.length > 0 ? 'grab' : 'crosshair';
+        return hoverCursor ?? (selectedIds.length > 0 ? 'grab' : 'crosshair');
       case 'text':
         return 'text';
       case 'laser':
