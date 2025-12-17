@@ -23,8 +23,6 @@ import { cn } from '@/lib/utils';
 import { useState, useEffect } from 'react';
 import { CollaboratorAvatars } from './collaborator-avatars';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/animate-ui/components/radix/tooltip';
-import { Kbd } from '@/components/ui/kbd';
-import { isMac } from '@/lib/platform';
 
 interface ToolbarProps {
   selectedTool: Tool;
@@ -51,12 +49,12 @@ const tools: { id: Tool; icon: React.ElementType; label: string; hotkey: number 
   { id: 'select', icon: MousePointer2, label: 'Select', hotkey: 'V' },
   { id: 'pen', icon: Pencil, label: 'Pen', hotkey: 1 },
   { id: 'line', icon: Minus, label: 'Line', hotkey: 2 },
-  { id: 'arrow', icon: ArrowRight, label: 'Arrow', hotkey: 9 },
-  { id: 'rectangle', icon: Square, label: 'Rectangle', hotkey: 3 },
-  { id: 'ellipse', icon: Circle, label: 'Ellipse', hotkey: 4 },
-  { id: 'text', icon: Type, label: 'Text', hotkey: 5 },
-  { id: 'eraser', icon: Eraser, label: 'Eraser', hotkey: 6 },
-  { id: 'laser', icon: Pointer, label: 'Laser Pointer', hotkey: 7 },
+  { id: 'arrow', icon: ArrowRight, label: 'Arrow', hotkey: 3 },
+  { id: 'rectangle', icon: Square, label: 'Rectangle', hotkey: 4 },
+  { id: 'ellipse', icon: Circle, label: 'Ellipse', hotkey: 5 },
+  { id: 'text', icon: Type, label: 'Text', hotkey: 6 },
+  { id: 'eraser', icon: Eraser, label: 'Eraser', hotkey: 7 },
+  { id: 'laser', icon: Pointer, label: 'Laser Pointer', hotkey: 8 },
 ];
 
 export function Toolbar({
@@ -156,28 +154,22 @@ export function Toolbar({
       {/* Main Tools */}
       <div className="flex items-center gap-1 bg-card/95 backdrop-blur-md border border-border rounded-md p-1.5 shadow-2xl">
         {tools.map((tool) => (
-          <Tooltip key={tool.id}>
-            <TooltipTrigger asChild>
-              <button
-                onClick={() => onToolChange(tool.id)}
-                className={cn(
-                  'p-2 rounded-sm transition-all duration-200',
-                  'hover:bg-secondary/80',
-                  selectedTool === tool.id
-                    ? 'bg-accent text-accent-foreground shadow-lg'
-                    : 'text-muted-foreground hover:text-foreground'
-                )}
-              >
-                <tool.icon className="w-4 h-4" />
-              </button>
-            </TooltipTrigger>
-            <TooltipContent>
-              <div className="flex items-center gap-2">
-                <span>{tool.label}</span>
-                <Kbd>{tool.hotkey}</Kbd>
-              </div>
-            </TooltipContent>
-          </Tooltip>
+          <button
+            key={tool.id}
+            onClick={() => onToolChange(tool.id)}
+            className={cn(
+              'relative p-2 rounded-sm transition-all duration-200',
+              'hover:bg-secondary/80',
+              selectedTool === tool.id
+                ? 'bg-accent text-accent-foreground shadow-lg'
+                : 'text-muted-foreground hover:text-foreground'
+            )}
+          >
+            <tool.icon className="w-4 h-4" />
+            <span className="absolute bottom-0 right-0 text-[8px] font-medium opacity-60">
+              {tool.hotkey}
+            </span>
+          </button>
         ))}
       </div>
 
