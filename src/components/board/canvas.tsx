@@ -297,6 +297,9 @@ export function Canvas({
   const [eraserMarkedIds, setEraserMarkedIds] = useState<Set<string>>(new Set());
   const [eraserCursorPos, setEraserCursorPos] = useState<Point | null>(null);
 
+  // Laser pointer cursor state
+  const [laserCursorPos, setLaserCursorPos] = useState<Point | null>(null);
+
   // Move and resize state
   const [isDragging, setIsDragging] = useState(false);
   const [isResizing, setIsResizing] = useState(false);
@@ -467,6 +470,9 @@ export function Canvas({
         eraserTrailRef.current.clear();
       }
     }
+    if (tool !== 'laser') {
+      setLaserCursorPos(null);
+    }
   }, [tool]);
 
   // Expose viewport setter to parent component
@@ -618,6 +624,11 @@ export function Canvas({
     // Track eraser cursor position
     if (tool === 'eraser') {
       setEraserCursorPos(point);
+    }
+
+    // Track laser cursor position
+    if (tool === 'laser') {
+      setLaserCursorPos(point);
     }
 
     if (collaboration) {
@@ -1290,6 +1301,8 @@ export function Canvas({
   const handleMouseLeave = useCallback(() => {
     // Clear eraser cursor when mouse leaves canvas
     setEraserCursorPos(null);
+    // Clear laser cursor when mouse leaves canvas
+    setLaserCursorPos(null);
     // Also handle mouse up logic
     handleMouseUp();
   }, [handleMouseUp]);
@@ -2534,7 +2547,7 @@ export function Canvas({
       case 'text':
         return 'text';
       case 'laser':
-        return 'pointer';
+        return 'none';
       default:
         return 'crosshair';
     }
@@ -2712,6 +2725,45 @@ export function Canvas({
               opacity={0.5}
               pointerEvents="none"
             />
+          )}
+
+          {/* Laser pointer cursor - glowing red dot with white center */}
+          {tool === 'laser' && laserCursorPos && (
+            <g pointerEvents="none">
+              {/* Outer glow - large red blur */}
+              <circle
+                cx={laserCursorPos.x}
+                cy={laserCursorPos.y}
+                r={8 / zoom}
+                fill="#ff0000"
+                opacity={0.3}
+                filter="blur(4px)"
+              />
+              {/* Middle glow - medium red blur */}
+              <circle
+                cx={laserCursorPos.x}
+                cy={laserCursorPos.y}
+                r={5 / zoom}
+                fill="#ff0000"
+                opacity={0.5}
+                filter="blur(2px)"
+              />
+              {/* Main red dot */}
+              <circle
+                cx={laserCursorPos.x}
+                cy={laserCursorPos.y}
+                r={3 / zoom}
+                fill="#ff0000"
+                opacity={0.9}
+              />
+              {/* White center dot */}
+              <circle
+                cx={laserCursorPos.x}
+                cy={laserCursorPos.y}
+                r={1 / zoom}
+                fill="#ffffff"
+              />
+            </g>
           )}
         </g>
 
