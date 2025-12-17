@@ -54,12 +54,150 @@ interface RemoteCursor {
 }
 
 type ResizeHandle = 'nw' | 'n' | 'ne' | 'e' | 'se' | 's' | 'sw' | 'w' | null;
+type RotateHandleSide = 'n' | 'e' | 's' | 'w';
 
 interface BoundingBox {
   x: number;
   y: number;
   width: number;
   height: number;
+}
+
+function degToRad(deg: number) {
+  return (deg * Math.PI) / 180;
+}
+
+function radToDeg(rad: number) {
+  return (rad * 180) / Math.PI;
+}
+
+function normalizeAngleDeg(angleDeg: number) {
+  let a = angleDeg % 360;
+  if (a >= 180) a -= 360;
+  if (a < -180) a += 360;
+  return a;
+}
+
+function rotatePoint(point: Point, center: Point, angleDeg: number): Point {
+  const r = degToRad(angleDeg);
+  const cos = Math.cos(r);
+  const sin = Math.sin(r);
+  const dx = point.x - center.x;
+  const dy = point.y - center.y;
+  return {
+    x: center.x + dx * cos - dy * sin,
+    y: center.y + dx * sin + dy * cos,
+  };
+}
+
+function getBoundsCenter(bounds: BoundingBox): Point {
+  return { x: bounds.x + bounds.width / 2, y: bounds.y + bounds.height / 2 };
+}
+
+function getWorldResizeHandle(pos: Point, center: Point): Exclude<ResizeHandle, null> {
+  const angleDeg = radToDeg(Math.atan2(pos.y - center.y, pos.x - center.x));
+  const candidates: Array<{ h: Exclude<ResizeHandle, null>; a: number }> = [
+    { h: 'e', a: 0 },
+    { h: 'se', a: 45 },
+    { h: 's', a: 90 },
+    { h: 'sw', a: 135 },
+    { h: 'w', a: 180 },
+    { h: 'nw', a: -135 },
+    { h: 'n', a: -90 },
+    { h: 'ne', a: -45 },
+  ];
+
+  let best = candidates[0];
+  let bestDist = Number.POSITIVE_INFINITY;
+  for (const c of candidates) {
+    const dist = Math.abs(normalizeAngleDeg(angleDeg - c.a));
+    if (dist < bestDist) {
+      bestDist = dist;
+      best = c;
+    }
+  }
+  return best.h;
+}
+
+function getResizeCursor(handle: Exclude<ResizeHandle, null>) {
+  switch (handle) {
+    case 'n':
+    case 's':
+      return 'ns-resize';
+    case 'e':
+    case 'w':
+      return 'ew-resize';
+    case 'ne':
+    case 'sw':
+      return 'nesw-resize';
+    case 'nw':
+    case 'se':
+      return 'nwse-resize';
+  }
+}
+
+function getHandlePointFromBounds(bounds: BoundingBox, handle: Exclude<ResizeHandle, null>): Point {
+  switch (handle) {
+    case 'nw':
+      return { x: bounds.x, y: bounds.y };
+    case 'n':
+      return { x: bounds.x + bounds.width / 2, y: bounds.y };
+    case 'ne':
+      return { x: bounds.x + bounds.width, y: bounds.y };
+    case 'e':
+      return { x: bounds.x + bounds.width, y: bounds.y + bounds.height / 2 };
+    case 'se':
+      return { x: bounds.x + bounds.width, y: bounds.y + bounds.height };
+    case 's':
+      return { x: bounds.x + bounds.width / 2, y: bounds.y + bounds.height };
+    case 'sw':
+      return { x: bounds.x, y: bounds.y + bounds.height };
+    case 'w':
+      return { x: bounds.x, y: bounds.y + bounds.height / 2 };
+  }
+}
+
+function getOppositeResizeHandle(handle: Exclude<ResizeHandle, null>): Exclude<ResizeHandle, null> {
+  switch (handle) {
+    case 'n':
+      return 's';
+    case 'ne':
+      return 'sw';
+    case 'e':
+      return 'w';
+    case 'se':
+      return 'nw';
+    case 's':
+      return 'n';
+    case 'sw':
+      return 'ne';
+    case 'w':
+      return 'e';
+    case 'nw':
+      return 'se';
+  }
+}
+
+function chooseRotateHandleSide(rotationDeg: number): RotateHandleSide {
+  const targetWorldAngle = -90; // screen "up"
+  const candidates: Array<{ side: RotateHandleSide; normalDeg: number }> = [
+    { side: 'n', normalDeg: -90 },
+    { side: 'e', normalDeg: 0 },
+    { side: 's', normalDeg: 90 },
+    { side: 'w', normalDeg: 180 },
+  ];
+
+  let best = candidates[0];
+  let bestDist = Number.POSITIVE_INFINITY;
+  for (const c of candidates) {
+    const worldAngle = rotationDeg + c.normalDeg;
+    const dist = Math.abs(normalizeAngleDeg(worldAngle - targetWorldAngle));
+    if (dist < bestDist) {
+      bestDist = dist;
+      best = c;
+    }
+  }
+  return best.side;
 }
 
 function expandBounds(bounds: BoundingBox, padding: number): BoundingBox {
@@ -355,6 +493,17 @@ export function Canvas({
   const [dragStart, setDragStart] = useState<Point | null>(null);
   const [originalElements, setOriginalElements] = useState<BoardElement[]>([]);
   const [originalBounds, setOriginalBounds] = useState<BoundingBox | null>(null);
+
+  // Rotate state (single selection only)
+  const [isRotating, setIsRotating] = useState(false);
+  const [rotateStart, setRotateStart] = useState<{
+    elementId: string;
+    center: Point;
+    startPointerAngleRad: number;
+    startRotationDeg: number;
+  } | null>(null);
+  const [rotateHandleSide, setRotateHandleSide] = useState<RotateHandleSide>('n');
+  const lastSingleSelectedIdRef = useRef<string | null>(null);
 
   // Line endpoint dragging state
   const [isDraggingLineEndpoint, setIsDraggingLineEndpoint] = useState(false);
@@ -665,6 +814,23 @@ export function Canvas({
   const selectedElements = selectedIds.map(id => elements.find(el => el.id === id)).filter(Boolean) as BoardElement[];
   const selectedBounds = getCombinedBounds(selectedIds, elements);
 
+  // Decide which side gets the rotate handle at selection time (keeps stable while rotating).
+  useEffect(() => {
+    if (selectedIds.length === 1) {
+      const id = selectedIds[0];
+      if (lastSingleSelectedIdRef.current !== id) {
+        lastSingleSelectedIdRef.current = id;
+        const el = elements.find((e) => e.id === id);
+        const rotationDeg = el?.rotation ?? 0;
+        setRotateHandleSide(chooseRotateHandleSide(rotationDeg));
+      }
+      return;
+    }
+
+    lastSingleSelectedIdRef.current = null;
+    setRotateHandleSide('n');
+  }, [elements, selectedIds]);
+
   const handleMouseMove = useCallback((e: React.MouseEvent) => {
     const point = getMousePosition(e);
     setLastMousePos(point);
@@ -708,6 +874,21 @@ export function Canvas({
       } else {
         setSelectedIds([]);
       }
+      return;
+    }
+
+    // Handle rotate dragging (single selection)
+    if (isRotating && rotateStart) {
+      const currentPointerAngleRad = Math.atan2(point.y - rotateStart.center.y, point.x - rotateStart.center.x);
+      const deltaDeg = radToDeg(currentPointerAngleRad - rotateStart.startPointerAngleRad);
+      let nextRotationDeg = rotateStart.startRotationDeg + deltaDeg;
+
+      if (shiftPressed) {
+        const snap = 15;
+        nextRotationDeg = Math.round(nextRotationDeg / snap) * snap;
+      }
+
+      onUpdateElement(rotateStart.elementId, { rotation: nextRotationDeg });
       return;
     }
 
@@ -925,10 +1106,23 @@ export function Canvas({
           originalElement.type === 'frame' ||
           originalElement.type === 'web-embed'
         ) {
-          const normalizedX = Math.min(newX, newX + newWidth);
-          const normalizedY = Math.min(newY, newY + newHeight);
+          let normalizedX = Math.min(newX, newX + newWidth);
+          let normalizedY = Math.min(newY, newY + newHeight);
           const normalizedWidth = Math.abs(newWidth);
           const normalizedHeight = Math.abs(newHeight);
+
+          const rotationDeg = originalElement.rotation ?? 0;
+          if (rotationDeg) {
+            const originalCenter = getBoundsCenter(originalBounds);
+            const nextBounds = { x: normalizedX, y: normalizedY, width: normalizedWidth, height: normalizedHeight };
+            const nextCenter = getBoundsCenter(nextBounds);
+            const opposite = getOppositeResizeHandle(resizeHandle as Exclude<ResizeHandle, null>);
+            const originalOppWorld = rotatePoint(getHandlePointFromBounds(originalBounds, opposite), originalCenter, rotationDeg);
+            const nextOppWorld = rotatePoint(getHandlePointFromBounds(nextBounds, opposite), nextCenter, rotationDeg);
+            normalizedX += originalOppWorld.x - nextOppWorld.x;
+            normalizedY += originalOppWorld.y - nextOppWorld.y;
+          }
+
           onUpdateElement(selectedIds[0], {
             x: normalizedX,
             y: normalizedY,
@@ -950,14 +1144,26 @@ export function Canvas({
           }));
           onUpdateElement(selectedIds[0], { points: newPoints });
         } else if (originalElement.type === 'text') {
-          const normalizedX = Math.min(newX, newX + newWidth);
-          const normalizedY = Math.min(newY, newY + newHeight);
+          let normalizedX = Math.min(newX, newX + newWidth);
+          let normalizedY = Math.min(newY, newY + newHeight);
           const normalizedWidth = Math.abs(newWidth);
           const normalizedHeight = Math.abs(newHeight);
           const scaleX = normalizedWidth / (originalBounds.width || 1);
           const scaleY = normalizedHeight / (originalBounds.height || 1);
           const origScaleX = originalElement.scaleX ?? 1;
           const origScaleY = originalElement.scaleY ?? 1;
+
+          const rotationDeg = originalElement.rotation ?? 0;
+          if (rotationDeg) {
+            const originalCenter = getBoundsCenter(originalBounds);
+            const nextBounds = { x: normalizedX, y: normalizedY, width: normalizedWidth, height: normalizedHeight };
+            const nextCenter = getBoundsCenter(nextBounds);
+            const opposite = getOppositeResizeHandle(resizeHandle as Exclude<ResizeHandle, null>);
+            const originalOppWorld = rotatePoint(getHandlePointFromBounds(originalBounds, opposite), originalCenter, rotationDeg);
+            const nextOppWorld = rotatePoint(getHandlePointFromBounds(nextBounds, opposite), nextCenter, rotationDeg);
+            normalizedX += originalOppWorld.x - nextOppWorld.x;
+            normalizedY += originalOppWorld.y - nextOppWorld.y;
+          }
 
           onUpdateElement(selectedIds[0], {
             x: normalizedX,
@@ -1112,7 +1318,7 @@ export function Canvas({
         break;
       }
     }
-  }, [isDrawing, currentElement, startPoint, tool, collaboration, getMousePosition, isPanning, panStart, elements, onDeleteElement, strokeWidth, isDragging, isResizing, selectedIds, dragStart, originalElements, originalBounds, resizeHandle, onUpdateElement, shiftPressed, isBoxSelecting, lastMousePos, setLastMousePos, setSelectedIds, isDraggingLineEndpoint, lineEndpointIndex, isDraggingConnectorCorner, connectorStyle, getElementsToErase]);
+  }, [isDrawing, currentElement, startPoint, tool, collaboration, getMousePosition, isPanning, panStart, elements, onDeleteElement, strokeWidth, isDragging, isResizing, isRotating, rotateStart, selectedIds, dragStart, originalElements, originalBounds, resizeHandle, onUpdateElement, shiftPressed, isBoxSelecting, lastMousePos, setLastMousePos, setSelectedIds, isDraggingLineEndpoint, lineEndpointIndex, isDraggingConnectorCorner, connectorStyle, getElementsToErase]);
 
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
     // Middle mouse button for panning OR hand tool with left click
@@ -1153,16 +1359,74 @@ export function Canvas({
         const handleSize = 10 / zoom;
         const selectionPadding = 6 / zoom;
         const visualBounds = expandBounds(selectedBounds, selectionPadding);
-        const handles: { handle: ResizeHandle; x: number; y: number }[] = [
-          { handle: 'nw', x: visualBounds.x, y: visualBounds.y },
-          { handle: 'n', x: visualBounds.x + visualBounds.width / 2, y: visualBounds.y },
-          { handle: 'ne', x: visualBounds.x + visualBounds.width, y: visualBounds.y },
-          { handle: 'e', x: visualBounds.x + visualBounds.width, y: visualBounds.y + visualBounds.height / 2 },
-          { handle: 'se', x: visualBounds.x + visualBounds.width, y: visualBounds.y + visualBounds.height },
-          { handle: 's', x: visualBounds.x + visualBounds.width / 2, y: visualBounds.y + visualBounds.height },
-          { handle: 'sw', x: visualBounds.x, y: visualBounds.y + visualBounds.height },
-          { handle: 'w', x: visualBounds.x, y: visualBounds.y + visualBounds.height / 2 },
+
+        // Rotate handle (single selection, non-connector)
+        if (selectedIds.length === 1) {
+          const selectedElement = elements.find((el) => el.id === selectedIds[0]);
+          if (selectedElement && selectedElement.type !== 'line' && selectedElement.type !== 'arrow' && selectedElement.type !== 'laser') {
+            const rotationDeg = selectedElement.rotation ?? 0;
+            const center = getBoundsCenter(visualBounds);
+            const rotateHandleDistance = 44 / zoom;
+            const rotateHandleRadius = 4 / zoom;
+
+            const localAnchor: Point =
+              rotateHandleSide === 'n'
+                ? { x: visualBounds.x + visualBounds.width / 2, y: visualBounds.y }
+                : rotateHandleSide === 'e'
+                  ? { x: visualBounds.x + visualBounds.width, y: visualBounds.y + visualBounds.height / 2 }
+                  : rotateHandleSide === 's'
+                    ? { x: visualBounds.x + visualBounds.width / 2, y: visualBounds.y + visualBounds.height }
+                    : { x: visualBounds.x, y: visualBounds.y + visualBounds.height / 2 };
+
+            const outward: Point =
+              rotateHandleSide === 'n'
+                ? { x: 0, y: -1 }
+                : rotateHandleSide === 'e'
+                  ? { x: 1, y: 0 }
+                  : rotateHandleSide === 's'
+                    ? { x: 0, y: 1 }
+                    : { x: -1, y: 0 };
+
+            const localHandle: Point = {
+              x: localAnchor.x + outward.x * rotateHandleDistance,
+              y: localAnchor.y + outward.y * rotateHandleDistance,
+            };
+
+            const handlePos = rotationDeg ? rotatePoint(localHandle, center, rotationDeg) : localHandle;
+
+            if (Math.hypot(point.x - handlePos.x, point.y - handlePos.y) <= rotateHandleRadius * 2.25) {
+              onStartTransform?.();
+              setIsRotating(true);
+              setRotateStart({
+                elementId: selectedElement.id,
+                center,
+                startPointerAngleRad: Math.atan2(point.y - center.y, point.x - center.x),
+                startRotationDeg: rotationDeg,
+              });
+              return;
+            }
+          }
+        }
+
+        const rotationDegForHandles =
+          selectedIds.length === 1 ? (elements.find((el) => el.id === selectedIds[0])?.rotation ?? 0) : 0;
+        const centerForHandles = getBoundsCenter(visualBounds);
+        const baseHandlePoints: Array<{ h: Exclude<ResizeHandle, null>; x: number; y: number }> = [
+          { h: 'nw', x: visualBounds.x, y: visualBounds.y },
+          { h: 'n', x: visualBounds.x + visualBounds.width / 2, y: visualBounds.y },
+          { h: 'ne', x: visualBounds.x + visualBounds.width, y: visualBounds.y },
+          { h: 'e', x: visualBounds.x + visualBounds.width, y: visualBounds.y + visualBounds.height / 2 },
+          { h: 'se', x: visualBounds.x + visualBounds.width, y: visualBounds.y + visualBounds.height },
+          { h: 's', x: visualBounds.x + visualBounds.width / 2, y: visualBounds.y + visualBounds.height },
+          { h: 'sw', x: visualBounds.x, y: visualBounds.y + visualBounds.height },
+          { h: 'w', x: visualBounds.x, y: visualBounds.y + visualBounds.height / 2 },
         ];
+
+        const handles: Array<{ handle: Exclude<ResizeHandle, null>; x: number; y: number }> = baseHandlePoints.map((h) => {
+          const p = rotationDegForHandles ? rotatePoint({ x: h.x, y: h.y }, centerForHandles, rotationDegForHandles) : { x: h.x, y: h.y };
+          const worldHandle = getWorldResizeHandle(p, centerForHandles);
+          return { handle: worldHandle, x: p.x, y: p.y };
+        });
         
         for (const h of handles) {
           if (Math.abs(point.x - h.x) <= handleSize && Math.abs(point.y - h.y) <= handleSize) {
@@ -1320,7 +1584,7 @@ export function Canvas({
 
     setCurrentElement(newElement);
     setIsDrawing(true);
-  }, [tool, strokeColor, strokeWidth, fillColor, opacity, strokeStyle, lineCap, connectorStyle, arrowStart, arrowEnd, cornerRadius, fillPattern, getMousePosition, elements, pan, zoom, selectedBounds, selectedElements, selectedIds, shiftPressed, onStartTransform, getElementsToErase, onDeleteElement]);
+  }, [tool, strokeColor, strokeWidth, fillColor, opacity, strokeStyle, lineCap, connectorStyle, arrowStart, arrowEnd, cornerRadius, fillPattern, getMousePosition, elements, pan, zoom, selectedBounds, selectedElements, selectedIds, shiftPressed, rotateHandleSide, onStartTransform, getElementsToErase, onDeleteElement]);
 
   const handleMouseUp = useCallback(() => {
     if (isPanning) {
@@ -1365,6 +1629,12 @@ export function Canvas({
     if (isDraggingConnectorCorner) {
       setIsDraggingConnectorCorner(false);
       setOriginalElements([]);
+      return;
+    }
+
+    if (isRotating) {
+      setIsRotating(false);
+      setRotateStart(null);
       return;
     }
 
@@ -1489,7 +1759,7 @@ export function Canvas({
     setIsDrawing(false);
     setCurrentElement(null);
     setStartPoint(null);
-  }, [currentElement, isDrawing, onAddElement, isPanning, isDragging, isResizing, isBoxSelecting, selectionBox, elements, tool, onDeleteElement, onToolChange, lastMousePos, startPoint, textInputRef, setTextInput, setTextValue, setIsDrawing, setStartPoint, setSelectedIds, isDraggingLineEndpoint, isDraggingConnectorCorner, eraserMarkedIds]);
+  }, [currentElement, isDrawing, onAddElement, isPanning, isDragging, isResizing, isRotating, isBoxSelecting, selectionBox, elements, tool, onDeleteElement, onToolChange, lastMousePos, startPoint, textInputRef, setTextInput, setTextValue, setIsDrawing, setStartPoint, setSelectedIds, isDraggingLineEndpoint, isDraggingConnectorCorner, eraserMarkedIds]);
 
   const handleMouseLeave = useCallback(() => {
     // Clear eraser cursor when mouse leaves canvas
@@ -1634,6 +1904,12 @@ export function Canvas({
   const renderElement = (element: BoardElement, isPreview = false) => {
     const opacity = isPreview ? 0.7 : 1;
     const isMarkedForDeletion = eraserMarkedIds.has(element.id);
+    const rotationDeg = element.rotation ?? 0;
+    const boundsForRotation = rotationDeg ? getBoundingBox(element) : null;
+    const rotationTransform =
+      boundsForRotation && rotationDeg
+        ? `rotate(${rotationDeg} ${boundsForRotation.x + boundsForRotation.width / 2} ${boundsForRotation.y + boundsForRotation.height / 2})`
+        : undefined;
 
     switch (element.type) {
       case 'pen': {
@@ -1659,7 +1935,7 @@ export function Canvas({
             : '';
 
           return (
-            <g key={element.id}>
+            <g key={element.id} transform={rotationTransform}>
               {/* Fill layer - renders under stroke using original points */}
               {shouldFill && (
                 <path
@@ -1698,7 +1974,7 @@ export function Canvas({
         // Create a wider invisible hitbox for easier clicking (minimum 16px)
         const hitboxWidth = Math.max(element.strokeWidth * 6, 16);
         return (
-          <g key={element.id}>
+          <g key={element.id} transform={rotationTransform}>
             {/* Fill layer for dashed/dotted strokes */}
             {shouldFill && (
               <polygon
@@ -1929,7 +2205,7 @@ export function Canvas({
         };
 
         return (
-          <g key={element.id}>
+          <g key={element.id} transform={rotationTransform}>
             {/* Invisible wider hitbox for easier clicking */}
             {!hasCorner ? (
               <line
@@ -2072,7 +2348,7 @@ export function Canvas({
         const hitboxStrokeWidth = Math.max(element.strokeWidth * 6, 16);
         const hitboxOffset = (hitboxStrokeWidth - element.strokeWidth) / 2;
         return (
-          <g key={element.id}>
+          <g key={element.id} transform={rotationTransform}>
             {/* Invisible wider hitbox for easier clicking (stroke-only shapes) */}
             {!hasVisibleFill && element.strokeWidth > 0 && (
               <rect
@@ -2136,7 +2412,7 @@ export function Canvas({
         const hitboxStrokeWidth = Math.max(element.strokeWidth * 6, 16);
         const hitboxOffset = (hitboxStrokeWidth - element.strokeWidth) / 2;
         return (
-          <g key={element.id}>
+          <g key={element.id} transform={rotationTransform}>
             {/* Invisible wider hitbox for easier clicking (stroke-only shapes) */}
             {!hasVisibleFill && element.strokeWidth > 0 && (
               <ellipse
@@ -2208,7 +2484,7 @@ export function Canvas({
           });
 
           return (
-            <g key={element.id} data-element-id={element.id}>
+            <g key={element.id} transform={rotationTransform} data-element-id={element.id}>
               {/* Clickable area for the entire text box */}
               <rect
                 x={x}
@@ -2279,7 +2555,7 @@ export function Canvas({
         }
 
         return (
-          <g key={element.id}>
+          <g key={element.id} transform={rotationTransform}>
             <text
               data-element-id={element.id}
               opacity={isMarkedForDeletion ? elOpacity * 0.3 : elOpacity}
@@ -2327,7 +2603,7 @@ export function Canvas({
         const hitboxStrokeWidth = Math.max(element.strokeWidth * 6, 16);
         const hitboxOffset = (hitboxStrokeWidth - element.strokeWidth) / 2;
         return (
-          <g key={element.id}>
+          <g key={element.id} transform={rotationTransform}>
             {/* Invisible wider hitbox for easier clicking (stroke-only shapes) */}
             {!hasVisibleFill && element.strokeWidth > 0 && (
               <rect
@@ -2394,7 +2670,7 @@ export function Canvas({
         const elCornerRadius = element.cornerRadius ?? 4;
         const elFillColor = element.fillColor || 'rgba(100, 100, 255, 0.05)';
         return (
-          <g key={element.id}>
+          <g key={element.id} transform={rotationTransform}>
             <rect
               data-element-id={element.id}
               x={element.x}
@@ -2458,7 +2734,7 @@ export function Canvas({
         const centerLineData = getSvgPathFromStroke(centerStroke);
 
         return (
-          <g key={element.id} pointerEvents="none" className="select-none">
+          <g key={element.id} transform={rotationTransform} pointerEvents="none" className="select-none">
             {/* Main red glowing path */}
             <path
               data-element-id={element.id}
@@ -2697,9 +2973,9 @@ export function Canvas({
               y={h.y - handleSize / 2}
               width={handleSize}
               height={handleSize}
-              fill="var(--accent)"
-              stroke="var(--background)"
-              strokeWidth={1}
+              fill="var(--background)"
+              stroke="var(--accent)"
+              strokeWidth={2 / zoom}
               rx={2}
               style={{ cursor: h.cursor }}
             />
@@ -2710,16 +2986,64 @@ export function Canvas({
 
     const handleSize = 8 / zoom;
     const visualBounds = expandBounds(selectedBounds, selectionPadding);
-    const handles: { pos: ResizeHandle; x: number; y: number; cursor: string }[] = selectedIds.length === 1 ? [
-      { pos: 'nw', x: visualBounds.x, y: visualBounds.y, cursor: 'nwse-resize' },
-      { pos: 'n', x: visualBounds.x + visualBounds.width / 2, y: visualBounds.y, cursor: 'ns-resize' },
-      { pos: 'ne', x: visualBounds.x + visualBounds.width, y: visualBounds.y, cursor: 'nesw-resize' },
-      { pos: 'e', x: visualBounds.x + visualBounds.width, y: visualBounds.y + visualBounds.height / 2, cursor: 'ew-resize' },
-      { pos: 'se', x: visualBounds.x + visualBounds.width, y: visualBounds.y + visualBounds.height, cursor: 'nwse-resize' },
-      { pos: 's', x: visualBounds.x + visualBounds.width / 2, y: visualBounds.y + visualBounds.height, cursor: 'ns-resize' },
-      { pos: 'sw', x: visualBounds.x, y: visualBounds.y + visualBounds.height, cursor: 'nesw-resize' },
-      { pos: 'w', x: visualBounds.x, y: visualBounds.y + visualBounds.height / 2, cursor: 'ew-resize' },
-    ] : [];
+    const selectedElement = selectedIds.length === 1 ? elements.find((el) => el.id === selectedIds[0]) : null;
+    const rotationDeg = selectedElement?.rotation ?? 0;
+    const center = getBoundsCenter(visualBounds);
+    const selectionTransform = rotationDeg ? `rotate(${rotationDeg} ${center.x} ${center.y})` : undefined;
+
+    const baseHandles: Array<{ pos: Exclude<ResizeHandle, null>; x: number; y: number }> = [
+      { pos: 'nw', x: visualBounds.x, y: visualBounds.y },
+      { pos: 'n', x: visualBounds.x + visualBounds.width / 2, y: visualBounds.y },
+      { pos: 'ne', x: visualBounds.x + visualBounds.width, y: visualBounds.y },
+      { pos: 'e', x: visualBounds.x + visualBounds.width, y: visualBounds.y + visualBounds.height / 2 },
+      { pos: 'se', x: visualBounds.x + visualBounds.width, y: visualBounds.y + visualBounds.height },
+      { pos: 's', x: visualBounds.x + visualBounds.width / 2, y: visualBounds.y + visualBounds.height },
+      { pos: 'sw', x: visualBounds.x, y: visualBounds.y + visualBounds.height },
+      { pos: 'w', x: visualBounds.x, y: visualBounds.y + visualBounds.height / 2 },
+    ];
+
+    const handles: Array<{ keyId: Exclude<ResizeHandle, null>; pos: Exclude<ResizeHandle, null>; x: number; y: number; cursor: string }> = baseHandles.map((h) => {
+      const p = rotationDeg ? rotatePoint({ x: h.x, y: h.y }, center, rotationDeg) : { x: h.x, y: h.y };
+      const worldPos = getWorldResizeHandle(p, center);
+      return { keyId: h.pos, pos: worldPos, x: p.x, y: p.y, cursor: getResizeCursor(worldPos) };
+    });
+
+    const rotateHandleDistance = 44 / zoom;
+    const rotateHandleRadius = handleSize / 2;
+
+    const hasRotateHandle =
+      selectedElement && selectedElement.type !== 'line' && selectedElement.type !== 'arrow' && selectedElement.type !== 'laser';
+
+    const localRotateAnchor: Point | null = hasRotateHandle
+      ? rotateHandleSide === 'n'
+        ? { x: visualBounds.x + visualBounds.width / 2, y: visualBounds.y }
+        : rotateHandleSide === 'e'
+          ? { x: visualBounds.x + visualBounds.width, y: visualBounds.y + visualBounds.height / 2 }
+          : rotateHandleSide === 's'
+            ? { x: visualBounds.x + visualBounds.width / 2, y: visualBounds.y + visualBounds.height }
+            : { x: visualBounds.x, y: visualBounds.y + visualBounds.height / 2 }
+      : null;
+
+    const localRotateOutward: Point | null = hasRotateHandle
+      ? rotateHandleSide === 'n'
+        ? { x: 0, y: -1 }
+        : rotateHandleSide === 'e'
+          ? { x: 1, y: 0 }
+          : rotateHandleSide === 's'
+            ? { x: 0, y: 1 }
+            : { x: -1, y: 0 }
+      : null;
+
+    const localRotateHandle: Point | null =
+      localRotateAnchor && localRotateOutward
+        ? {
+            x: localRotateAnchor.x + localRotateOutward.x * rotateHandleDistance,
+            y: localRotateAnchor.y + localRotateOutward.y * rotateHandleDistance,
+          }
+        : null;
+
+    const rotateAnchorPos = localRotateAnchor ? (rotationDeg ? rotatePoint(localRotateAnchor, center, rotationDeg) : localRotateAnchor) : null;
+    const rotateHandlePos = localRotateHandle ? (rotationDeg ? rotatePoint(localRotateHandle, center, rotationDeg) : localRotateHandle) : null;
 
     return (
       <g>
@@ -2734,19 +3058,35 @@ export function Canvas({
           strokeWidth={2}
           strokeDasharray="5,5"
           pointerEvents="none"
+          transform={selectionTransform}
         />
+
+        {/* Rotate handle (hovering, further out than resize handles) */}
+        {rotateAnchorPos && rotateHandlePos && (
+          <g>
+            <circle
+              cx={rotateHandlePos.x}
+              cy={rotateHandlePos.y}
+              r={rotateHandleRadius}
+              fill="var(--background)"
+              stroke="var(--accent)"
+              strokeWidth={2 / zoom}
+              style={{ cursor: isRotating ? 'grabbing' : 'grab' }}
+            />
+          </g>
+        )}
 
         {/* Resize handles (only for single selection) */}
         {handles.map((handle) => (
           <rect
-            key={handle.pos}
+            key={handle.keyId}
             x={handle.x - handleSize / 2}
             y={handle.y - handleSize / 2}
             width={handleSize}
             height={handleSize}
-            fill="var(--accent)"
-            stroke="var(--background)"
-            strokeWidth={1}
+            fill="var(--background)"
+            stroke="var(--accent)"
+            strokeWidth={2 / zoom}
             rx={2}
             style={{ cursor: handle.cursor }}
           />

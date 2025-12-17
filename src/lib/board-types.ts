@@ -20,6 +20,10 @@ export interface BoardElement {
   type: 'pen' | 'line' | 'arrow' | 'rectangle' | 'ellipse' | 'text' | 'frame' | 'web-embed' | 'laser';
   groupId?: string;
   points: Point[];
+  /**
+   * Rotation in degrees, applied around the element's current bounding-box center.
+   */
+  rotation?: number;
   strokeColor: string;
   strokeWidth: number;
   fillColor?: string;

@@ -13,6 +13,8 @@ interface ExportImageModalProps {
 
 // Get bounding box for any element
 function getBoundingBox(element: BoardElement): { x: number; y: number; width: number; height: number } | null {
+  const rotationDeg = element.rotation ?? 0;
+
   if (element.type === 'pen' || element.type === 'line' || element.type === 'arrow' || element.type === 'laser') {
     if (element.points.length === 0) return null;
     const xs = element.points.map(p => p.x);
@@ -22,41 +24,137 @@ function getBoundingBox(element: BoardElement): { x: number; y: number; width: n
     const maxX = Math.max(...xs);
     const maxY = Math.max(...ys);
     const padding = (element.strokeWidth || 2) * 2;
-    return {
+    const base = {
       x: minX - padding,
       y: minY - padding,
       width: Math.max(maxX - minX + padding * 2, 20),
       height: Math.max(maxY - minY + padding * 2, 20),
     };
+
+    if (!rotationDeg) return base;
+
+    const cx = base.x + base.width / 2;
+    const cy = base.y + base.height / 2;
+    const r = degToRad(rotationDeg);
+    const cos = Math.cos(r);
+    const sin = Math.sin(r);
+    const corners = [
+      { x: base.x, y: base.y },
+      { x: base.x + base.width, y: base.y },
+      { x: base.x + base.width, y: base.y + base.height },
+      { x: base.x, y: base.y + base.height },
+    ].map((p) => {
+      const dx = p.x - cx;
+      const dy = p.y - cy;
+      return { x: cx + dx * cos - dy * sin, y: cy + dx * sin + dy * cos };
+    });
+
+    const minRX = Math.min(...corners.map((p) => p.x));
+    const minRY = Math.min(...corners.map((p) => p.y));
+    const maxRX = Math.max(...corners.map((p) => p.x));
+    const maxRY = Math.max(...corners.map((p) => p.y));
+    return { x: minRX, y: minRY, width: maxRX - minRX, height: maxRY - minRY };
   }
 
   if (element.type === 'rectangle' || element.type === 'ellipse' || element.type === 'frame' || element.type === 'web-embed') {
-    return {
+    const base = {
       x: element.x ?? 0,
       y: element.y ?? 0,
       width: element.width ?? 0,
       height: element.height ?? 0,
     };
+
+    if (!rotationDeg) return base;
+
+    const cx = base.x + base.width / 2;
+    const cy = base.y + base.height / 2;
+    const r = degToRad(rotationDeg);
+    const cos = Math.cos(r);
+    const sin = Math.sin(r);
+    const corners = [
+      { x: base.x, y: base.y },
+      { x: base.x + base.width, y: base.y },
+      { x: base.x + base.width, y: base.y + base.height },
+      { x: base.x, y: base.y + base.height },
+    ].map((p) => {
+      const dx = p.x - cx;
+      const dy = p.y - cy;
+      return { x: cx + dx * cos - dy * sin, y: cy + dx * sin + dy * cos };
+    });
+
+    const minRX = Math.min(...corners.map((p) => p.x));
+    const minRY = Math.min(...corners.map((p) => p.y));
+    const maxRX = Math.max(...corners.map((p) => p.x));
+    const maxRY = Math.max(...corners.map((p) => p.y));
+    return { x: minRX, y: minRY, width: maxRX - minRX, height: maxRY - minRY };
   }
 
   if (element.type === 'text') {
     const fontSize = (element.strokeWidth || 1) * 4 + 12;
     if (element.width !== undefined && element.height !== undefined) {
-      return {
+      const base = {
         x: element.x ?? 0,
         y: element.y ?? 0,
         width: element.width,
         height: element.height,
       };
+
+      if (!rotationDeg) return base;
+
+      const cx = base.x + base.width / 2;
+      const cy = base.y + base.height / 2;
+      const r = degToRad(rotationDeg);
+      const cos = Math.cos(r);
+      const sin = Math.sin(r);
+      const corners = [
+        { x: base.x, y: base.y },
+        { x: base.x + base.width, y: base.y },
+        { x: base.x + base.width, y: base.y + base.height },
+        { x: base.x, y: base.y + base.height },
+      ].map((p) => {
+        const dx = p.x - cx;
+        const dy = p.y - cy;
+        return { x: cx + dx * cos - dy * sin, y: cy + dx * sin + dy * cos };
+      });
+
+      const minRX = Math.min(...corners.map((p) => p.x));
+      const minRY = Math.min(...corners.map((p) => p.y));
+      const maxRX = Math.max(...corners.map((p) => p.x));
+      const maxRY = Math.max(...corners.map((p) => p.y));
+      return { x: minRX, y: minRY, width: maxRX - minRX, height: maxRY - minRY };
     }
     const textWidth = (element.text?.length ?? 0) * fontSize * 0.55;
     const textHeight = fontSize * 1.2;
-    return {
+    const base = {
       x: element.x ?? 0,
       y: element.y ?? 0,
       width: Math.max(textWidth, 60),
       height: textHeight,
     };
+
+    if (!rotationDeg) return base;
+
+    const cx = base.x + base.width / 2;
+    const cy = base.y + base.height / 2;
+    const r = degToRad(rotationDeg);
+    const cos = Math.cos(r);
+    const sin = Math.sin(r);
+    const corners = [
+      { x: base.x, y: base.y },
+      { x: base.x + base.width, y: base.y },
+      { x: base.x + base.width, y: base.y + base.height },
+      { x: base.x, y: base.y + base.height },
+    ].map((p) => {
+      const dx = p.x - cx;
+      const dy = p.y - cy;
+      return { x: cx + dx * cos - dy * sin, y: cy + dx * sin + dy * cos };
+    });
+
+    const minRX = Math.min(...corners.map((p) => p.x));
+    const minRY = Math.min(...corners.map((p) => p.y));
+    const maxRX = Math.max(...corners.map((p) => p.x));
+    const maxRY = Math.max(...corners.map((p) => p.y));
+    return { x: minRX, y: minRY, width: maxRX - minRX, height: maxRY - minRY };
   }
 
   return null;
@@ -83,6 +181,18 @@ function getSceneBounds(elements: BoardElement[]): { x: number; y: number; width
     width: maxX - minX + padding * 2,
     height: maxY - minY + padding * 2,
   };
+}
+
+function degToRad(deg: number) {
+  return (deg * Math.PI) / 180;
+}
+
+function getRotationTransform(el: BoardElement) {
+  const rotationDeg = el.rotation ?? 0;
+  if (!rotationDeg) return null;
+  const b = getBoundingBox(el);
+  if (!b) return null;
+  return { rotationDeg, cx: b.x + b.width / 2, cy: b.y + b.height / 2 };
 }
 
 function getStrokeDash(el: BoardElement) {
@@ -592,7 +702,15 @@ export function ExportImageModal({ isOpen, onClose, elements, canvasBackground }
     ctx.scale(previewScale, previewScale);
 
     elements.forEach(el => {
+      ctx.save();
       ctx.globalAlpha = (el.opacity ?? 100) / 100;
+
+      const rot = getRotationTransform(el);
+      if (rot) {
+        ctx.translate(rot.cx, rot.cy);
+        ctx.rotate(degToRad(rot.rotationDeg));
+        ctx.translate(-rot.cx, -rot.cy);
+      }
 
       if (el.type === 'rectangle') {
         ctx.strokeStyle = el.strokeColor;
@@ -619,7 +737,7 @@ export function ExportImageModal({ isOpen, onClose, elements, canvasBackground }
         ctx.fillText(el.text || '', el.x ?? 0, (el.y ?? 0) + fontSize);
       }
 
-      ctx.globalAlpha = 1;
+      ctx.restore();
     });
 
     ctx.restore();
@@ -699,7 +817,15 @@ export function ExportImageModal({ isOpen, onClose, elements, canvasBackground }
     ctx.translate(-bounds.x, -bounds.y);
 
     elements.forEach(el => {
+      ctx.save();
       ctx.globalAlpha = (el.opacity ?? 100) / 100;
+
+      const rot = getRotationTransform(el);
+      if (rot) {
+        ctx.translate(rot.cx, rot.cy);
+        ctx.rotate(degToRad(rot.rotationDeg));
+        ctx.translate(-rot.cx, -rot.cy);
+      }
 
       if (el.type === 'rectangle') {
         ctx.strokeStyle = el.strokeColor;
@@ -751,7 +877,7 @@ export function ExportImageModal({ isOpen, onClose, elements, canvasBackground }
         }
       }
 
-      ctx.globalAlpha = 1;
+      ctx.restore();
     });
 
     // Convert to blob and download
@@ -811,21 +937,31 @@ export function ExportImageModal({ isOpen, onClose, elements, canvasBackground }
 
     elements.forEach(el => {
       const opacity = (el.opacity ?? 100) / 100;
+      const rot = getRotationTransform(el);
 
+      let content = '';
       if (el.type === 'rectangle') {
-        svgContent += `\n    <rect x="${el.x}" y="${el.y}" width="${el.width}" height="${el.height}" stroke="${el.strokeColor}" stroke-width="${el.strokeWidth}" fill="${el.fillColor || 'none'}" rx="${el.cornerRadius ?? 0}" opacity="${opacity}"/>`;
+        content = `<rect x="${el.x}" y="${el.y}" width="${el.width}" height="${el.height}" stroke="${el.strokeColor}" stroke-width="${el.strokeWidth}" fill="${el.fillColor || 'none'}" rx="${el.cornerRadius ?? 0}" opacity="${opacity}"/>`;
       } else if (el.type === 'ellipse') {
         const cx = (el.x ?? 0) + (el.width ?? 0) / 2;
         const cy = (el.y ?? 0) + (el.height ?? 0) / 2;
-        svgContent += `\n    <ellipse cx="${cx}" cy="${cy}" rx="${(el.width ?? 0) / 2}" ry="${(el.height ?? 0) / 2}" stroke="${el.strokeColor}" stroke-width="${el.strokeWidth}" fill="${el.fillColor || 'none'}" opacity="${opacity}"/>`;
+        content = `<ellipse cx="${cx}" cy="${cy}" rx="${(el.width ?? 0) / 2}" ry="${(el.height ?? 0) / 2}" stroke="${el.strokeColor}" stroke-width="${el.strokeWidth}" fill="${el.fillColor || 'none'}" opacity="${opacity}"/>`;
       } else if ((el.type === 'line' || el.type === 'arrow') && el.points.length >= 2) {
-        svgContent += `\n    ${svgConnector(el, opacity)}`;
+        content = svgConnector(el, opacity);
       } else if (el.type === 'pen' && el.points.length > 0) {
         const pathData = `M ${el.points.map(p => `${p.x},${p.y}`).join(' L ')}`;
-        svgContent += `\n    <path d="${pathData}" stroke="${el.strokeColor}" stroke-width="${el.strokeWidth}" fill="none" stroke-linecap="round" stroke-linejoin="round" opacity="${opacity}"/>`;
+        content = `<path d="${pathData}" stroke="${el.strokeColor}" stroke-width="${el.strokeWidth}" fill="none" stroke-linecap="round" stroke-linejoin="round" opacity="${opacity}"/>`;
       } else if (el.type === 'text') {
         const fontSize = (el.strokeWidth || 1) * 4 + 12;
-        svgContent += `\n    <text x="${el.x}" y="${(el.y ?? 0) + fontSize}" fill="${el.strokeColor}" font-size="${fontSize}" font-family="sans-serif" opacity="${opacity}">${el.text || ''}</text>`;
+        content = `<text x="${el.x}" y="${(el.y ?? 0) + fontSize}" fill="${el.strokeColor}" font-size="${fontSize}" font-family="sans-serif" opacity="${opacity}">${el.text || ''}</text>`;
+      }
+
+      if (!content) return;
+
+      if (rot) {
+        svgContent += `\n    <g transform="rotate(${rot.rotationDeg} ${rot.cx} ${rot.cy})">\n      ${content}\n    </g>`;
+      } else {
+        svgContent += `\n    ${content}`;
       }
     });
 
