@@ -2155,7 +2155,7 @@ export function ComponentsDocs({ mobileMenuOpen = false, onMobileMenuChange }: C
         />
       )}
       <div>
-        <div className="relative z-10 text-sm font-medium text-foreground mb-2">Sections</div>
+        <div className="relative z-10 text-sm font-medium text-foreground mb-2 pl-2">Sections</div>
         <nav className="grid gap-1 pl-2">
           <button
             ref={(el) => {
@@ -2174,7 +2174,7 @@ export function ComponentsDocs({ mobileMenuOpen = false, onMobileMenuChange }: C
         </nav>
       </div>
       <div>
-        <div className="relative z-10 text-sm font-medium text-foreground mb-2">Components</div>
+        <div className="relative z-10 text-sm font-medium text-foreground mb-2 pl-2">Components</div>
         <nav className="grid gap-1 pl-2">
           {registry.map((entry) => (
             <button
@@ -2328,10 +2328,12 @@ export function ComponentsDocs({ mobileMenuOpen = false, onMobileMenuChange }: C
               {prevComponent ? (
                 <Button
                   variant="outline"
+                  size="icon"
                   onClick={() => handleNavigate(prevComponent.id)}
+                  aria-label={`Previous: ${prevComponent.name}`}
+                  title={`Previous: ${prevComponent.name}`}
                 >
-                  <ArrowLeft className="mr-2" />
-                  {prevComponent.name}
+                  <ArrowLeft className="size-4" />
                 </Button>
               ) : (
                 <div />
@@ -2340,10 +2342,12 @@ export function ComponentsDocs({ mobileMenuOpen = false, onMobileMenuChange }: C
               {nextComponent ? (
                 <Button
                   variant="outline"
+                  size="icon"
                   onClick={() => handleNavigate(nextComponent.id)}
+                  aria-label={`Next: ${nextComponent.name}`}
+                  title={`Next: ${nextComponent.name}`}
                 >
-                  {nextComponent.name}
-                  <ArrowRight className="ml-2" />
+                  <ArrowRight className="size-4" />
                 </Button>
               ) : (
                 <div />
