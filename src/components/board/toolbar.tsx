@@ -124,7 +124,7 @@ export function Toolbar({
             <button
               onClick={onToggleToolLock}
               className={cn(
-                'p-2 rounded-sm transition-all duration-200',
+                'relative h-10 w-10 rounded-sm transition-all duration-200 flex items-center justify-center',
                 'hover:bg-secondary/80',
                 isToolLocked
                   ? 'bg-accent text-accent-foreground shadow-lg'
@@ -132,9 +132,9 @@ export function Toolbar({
               )}
             >
               {isToolLocked ? (
-                <Lock className="w-4 h-4" />
+                <Lock className="w-[18px] h-[18px]" />
               ) : (
-                <Unlock className="w-4 h-4" />
+                <Unlock className="w-[18px] h-[18px]" />
               )}
             </button>
           </TooltipTrigger>
@@ -158,15 +158,15 @@ export function Toolbar({
             key={tool.id}
             onClick={() => onToolChange(tool.id)}
             className={cn(
-              'relative p-2 rounded-sm transition-all duration-200',
+              'relative h-10 w-10 rounded-sm transition-all duration-200 flex items-center justify-center',
               'hover:bg-secondary/80',
               selectedTool === tool.id
                 ? 'bg-accent text-accent-foreground shadow-lg'
                 : 'text-muted-foreground hover:text-foreground'
             )}
           >
-            <tool.icon className="w-4 h-4" />
-            <span className="absolute bottom-0 right-0 text-[8px] font-medium opacity-60">
+            <tool.icon className="w-[18px] h-[18px]" />
+            <span className="absolute bottom-1 right-1 text-[9px] font-medium opacity-60 leading-none">
               {tool.hotkey}
             </span>
           </button>
@@ -174,7 +174,7 @@ export function Toolbar({
       </div>
 
       {/* Collaboration Panel */}
-      <div className="flex items-center gap-2 bg-card/95 backdrop-blur-md border border-border rounded-md px-2 py-1.5 shadow-2xl">
+      <div className="flex items-center gap-2 bg-card/95 backdrop-blur-md border border-border rounded-md px-2.5 py-1.5 shadow-2xl">
         {/* Your Name */}
         <div className="flex items-center gap-2 px-1">
           {/* Status indicator */}
@@ -196,7 +196,7 @@ export function Toolbar({
                     : 'Disconnected'
             }
           />
-          <span className="text-xs font-medium text-foreground max-w-[120px] truncate" title={myName}>
+          <span className="text-xs font-medium text-foreground max-w-[140px] truncate" title={myName}>
             {myName}
           </span>
           <CollaboratorAvatars users={collaboratorUsers} maxDisplay={5} onFollowUser={onFollowUser} followedUserId={followedUserId} />
@@ -216,12 +216,12 @@ export function Toolbar({
         >
           {copied ? (
             <>
-              <Check className="w-3.5 h-3.5" />
+              <Check className="w-4 h-4" />
               <span className="text-xs font-medium">Copied!</span>
             </>
           ) : (
             <>
-              <Share2 className="w-3.5 h-3.5" />
+              <Share2 className="w-4 h-4" />
               <span className="text-xs font-medium">Invite</span>
             </>
           )}
