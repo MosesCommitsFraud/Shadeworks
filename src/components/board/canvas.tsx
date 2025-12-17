@@ -2254,8 +2254,19 @@ export function Canvas({
           streamline: 0.5,
         });
         const pathData = getSvgPathFromStroke(stroke);
+
+        // Create a smooth center line using getStroke with smaller size
+        const centerStroke = getStroke(element.points.map((p) => [p.x, p.y]), {
+          size: 1.5,
+          thinning: 0,
+          smoothing: 0.5,
+          streamline: 0.5,
+        });
+        const centerLineData = getSvgPathFromStroke(centerStroke);
+
         return (
           <g key={element.id}>
+            {/* Main red glowing path */}
             <path
               data-element-id={element.id}
               d={pathData}
@@ -2263,6 +2274,13 @@ export function Canvas({
               opacity={isMarkedForDeletion ? Math.max(0.5, elOpacity * 0.8) * 0.3 : Math.max(0.5, elOpacity * 0.8)}
               filter="url(#laser-glow)"
               pointerEvents="auto"
+            />
+            {/* Smooth white center line */}
+            <path
+              d={centerLineData}
+              fill="#ffffff"
+              opacity={isMarkedForDeletion ? 0.3 : 0.9}
+              pointerEvents="none"
             />
             {isMarkedForDeletion && (
               <path
