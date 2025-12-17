@@ -7,6 +7,7 @@ import type { Tool, BoardElement, Point } from '@/lib/board-types';
 import { isClosedShape } from '@/lib/board-types';
 import { CollaborationManager } from '@/lib/collaboration';
 import { CollaboratorCursors } from './collaborator-cursor';
+import { EraserTrail } from '@/lib/eraser-trail';
 
 interface CanvasProps {
   tool: Tool;
@@ -274,6 +275,8 @@ export function Canvas({
 }: CanvasProps) {
   const svgRef = useRef<SVGSVGElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const eraserTrailPathRef = useRef<SVGPathElement>(null);
+  const eraserTrailRef = useRef<EraserTrail | null>(null);
   const [isDrawing, setIsDrawing] = useState(false);
   const [currentElement, setCurrentElement] = useState<BoardElement | null>(null);
   const [startPoint, setStartPoint] = useState<Point | null>(null);
@@ -291,6 +294,7 @@ export function Canvas({
 
   // Eraser preview state
   const [eraserMarkedIds, setEraserMarkedIds] = useState<Set<string>>(new Set());
+  const [eraserCursorPos, setEraserCursorPos] = useState<Point | null>(null);
 
   // Move and resize state
   const [isDragging, setIsDragging] = useState(false);
@@ -388,6 +392,38 @@ export function Canvas({
     return () => container.removeEventListener('wheel', handleWheel);
   }, [pan]);
 
+  // Initialize eraser trail
+  useEffect(() => {
+    if (eraserTrailPathRef.current && !eraserTrailRef.current) {
+      // Detect theme - check if dark mode is active
+      const isDark = document.documentElement.classList.contains('dark');
+      eraserTrailRef.current = new EraserTrail(
+        eraserTrailPathRef.current,
+        isDark ? 'dark' : 'light'
+      );
+    }
+
+    // Update theme when it changes
+    const observer = new MutationObserver(() => {
+      if (eraserTrailRef.current) {
+        const isDark = document.documentElement.classList.contains('dark');
+        eraserTrailRef.current.setTheme(isDark ? 'dark' : 'light');
+      }
+    });
+
+    observer.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ['class'],
+    });
+
+    return () => {
+      observer.disconnect();
+      if (eraserTrailRef.current) {
+        eraserTrailRef.current.clear();
+      }
+    };
+  }, []);
+
   // Track remote cursors
   useEffect(() => {
     if (!collaboration) return;
@@ -424,6 +460,11 @@ export function Canvas({
   useEffect(() => {
     if (tool !== 'eraser') {
       setEraserMarkedIds(new Set());
+      setEraserCursorPos(null);
+      // Clear eraser trail when switching away from eraser
+      if (eraserTrailRef.current) {
+        eraserTrailRef.current.clear();
+      }
     }
   }, [tool]);
 
@@ -572,6 +613,11 @@ export function Canvas({
   const handleMouseMove = useCallback((e: React.MouseEvent) => {
     const point = getMousePosition(e);
     setLastMousePos(point);
+
+    // Track eraser cursor position
+    if (tool === 'eraser') {
+      setEraserCursorPos(point);
+    }
 
     if (collaboration) {
       collaboration.updateCursor(point.x, point.y);
@@ -797,6 +843,10 @@ export function Canvas({
 
     // Handle eraser tool - mark elements for deletion preview
     if (tool === 'eraser' && isDrawing) {
+      // Add point to eraser trail animation
+      if (eraserTrailRef.current) {
+        eraserTrailRef.current.addPoint(point.x, point.y);
+      }
       const elementsToMark = getElementsToErase(point);
       if (elementsToMark.length > 0) {
         setEraserMarkedIds(prev => {
@@ -1014,6 +1064,10 @@ export function Canvas({
 
     if (tool === 'eraser') {
       setIsDrawing(true);
+      // Start eraser trail animation
+      if (eraserTrailRef.current) {
+        eraserTrailRef.current.startPath(point.x, point.y);
+      }
       // Mark elements at initial point for deletion preview
       const elementsToMark = getElementsToErase(point);
       if (elementsToMark.length > 0) {
@@ -1092,6 +1146,10 @@ export function Canvas({
 
     // Handle eraser - delete marked elements on mouse release
     if (tool === 'eraser' && isDrawing) {
+      // End eraser trail animation
+      if (eraserTrailRef.current) {
+        eraserTrailRef.current.endPath();
+      }
       if (eraserMarkedIds.size > 0) {
         eraserMarkedIds.forEach(id => onDeleteElement(id));
       }
@@ -1263,6 +1321,13 @@ export function Canvas({
     setStartPoint(null);
     setLassoPoints([]);
   }, [currentElement, isDrawing, onAddElement, isPanning, isDragging, isResizing, isBoxSelecting, selectionBox, elements, tool, lassoPoints, onDeleteElement, onToolChange, lastMousePos, startPoint, textInputRef, setTextInput, setTextValue, setIsDrawing, setStartPoint, setSelectedIds, isDraggingLineEndpoint, isDraggingConnectorCorner, eraserMarkedIds]);
+
+  const handleMouseLeave = useCallback(() => {
+    // Clear eraser cursor when mouse leaves canvas
+    setEraserCursorPos(null);
+    // Also handle mouse up logic
+    handleMouseUp();
+  }, [handleMouseUp]);
 
   const handleTextSubmit = useCallback(() => {
     if (textInput && textValue.trim()) {
@@ -2495,7 +2560,7 @@ export function Canvas({
       case 'ellipse':
         return 'crosshair';
       case 'eraser':
-        return 'cell';
+        return 'none';
       case 'select':
         return selectedIds.length > 0 ? 'grab' : 'crosshair';
       case 'text':
@@ -2571,7 +2636,7 @@ export function Canvas({
         onMouseDown={handleMouseDown}
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}
-        onMouseLeave={handleMouseUp}
+        onMouseLeave={handleMouseLeave}
       >
         <defs>
           <filter id="laser-glow">
@@ -2651,6 +2716,23 @@ export function Canvas({
               strokeDasharray="4,4"
               opacity={0.5}
               rx={4}
+            />
+          )}
+
+          {/* Eraser trail animation */}
+          <path ref={eraserTrailPathRef} />
+
+          {/* Eraser cursor circle */}
+          {tool === 'eraser' && eraserCursorPos && (
+            <circle
+              cx={eraserCursorPos.x}
+              cy={eraserCursorPos.y}
+              r={strokeWidth * 2}
+              fill="none"
+              stroke="currentColor"
+              strokeWidth={1 / zoom}
+              opacity={0.5}
+              pointerEvents="none"
             />
           )}
         </g>
