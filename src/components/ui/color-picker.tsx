@@ -643,11 +643,15 @@ export function ColorPicker({
   return (
     <>
       {/* Overlay */}
-      <div className="fixed inset-0 bg-black/50" style={{ zIndex: 999998 }} onClick={onClose} />
+      <div
+        className="fixed inset-0 bg-black/50 backdrop-blur-sm"
+        style={{ zIndex: 999998 }}
+        onClick={onClose}
+      />
 
       {/* Modal */}
       <div
-        className="fixed w-80 bg-card border border-border rounded-md p-6 shadow-2xl"
+        className="fixed w-80 bg-card/95 backdrop-blur-md border border-border rounded-xl p-6 shadow-2xl"
         style={{ ...modalStyle, zIndex: 999999 }}
         onClick={(e) => e.stopPropagation()}
       >

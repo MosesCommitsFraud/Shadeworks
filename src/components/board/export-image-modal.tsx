@@ -912,14 +912,14 @@ export function ExportImageModal({ isOpen, onClose, elements, canvasBackground }
       onClick={onClose}
     >
       <div
-        className="bg-card border border-border rounded-lg shadow-2xl p-6 w-[800px] max-w-[90vw] max-h-[90vh] overflow-y-auto"
+        className="bg-card/95 backdrop-blur-md border border-border rounded-xl shadow-2xl p-6 w-[800px] max-w-[90vw] max-h-[90vh] overflow-y-auto"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between mb-6">
           <h2 className="text-xl font-semibold">Export image</h2>
           <button
             onClick={onClose}
-            className="p-2 rounded-md hover:bg-muted transition-colors"
+            className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-border/60 bg-card/60 text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground"
           >
             <X className="w-5 h-5" />
           </button>
