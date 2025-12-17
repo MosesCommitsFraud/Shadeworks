@@ -271,7 +271,7 @@ export function Canvas({
   onSelectionChange,
   onStrokeColorChange,
   onFillColorChange,
-  canvasBackground = 'grid',
+  canvasBackground = 'none',
   highlightedElementIds = [],
   isToolLocked = false,
 }: CanvasProps) {

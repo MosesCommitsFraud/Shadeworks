@@ -57,7 +57,7 @@ export function Whiteboard({ roomId }: WhiteboardProps) {
   const [isReady, setIsReady] = useState(false);
   const [followedUserId, setFollowedUserId] = useState<string | null>(null);
   const [selectedElements, setSelectedElements] = useState<BoardElement[]>([]);
-  const [canvasBackground, setCanvasBackground] = useState<'none' | 'dots' | 'lines' | 'grid'>('grid');
+  const [canvasBackground, setCanvasBackground] = useState<'none' | 'dots' | 'lines' | 'grid'>('none');
   const [showSaveDialog, setShowSaveDialog] = useState(false);
   const [saveFileName, setSaveFileName] = useState('');
   const [showExportDialog, setShowExportDialog] = useState(false);
