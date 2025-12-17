@@ -282,28 +282,30 @@ function AlphaSlider({ alpha, color, onChange }: AlphaSliderProps) {
   return (
     <div className="space-y-2">
       <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Opacity</label>
-      <div
-        ref={sliderRef}
-        className="relative h-3 rounded-md cursor-pointer touch-none select-none overflow-hidden"
-        style={{
-          background:
-            'repeating-conic-gradient(#e5e5e5 0% 25%, transparent 0% 50%) 50% / 10px 10px',
-        }}
-        onPointerDown={handlePointerDown}
-        onPointerMove={handlePointerMove}
-        onPointerUp={handlePointerUp}
-        onPointerCancel={handlePointerUp}
-      >
-        {/* Color gradient overlay */}
+      <div className="relative">
         <div
-          className="absolute inset-0"
+          ref={sliderRef}
+          className="relative h-3 rounded-md cursor-pointer touch-none select-none overflow-hidden"
           style={{
-            background: `linear-gradient(to right, rgba(${color.r}, ${color.g}, ${color.b}, 0), rgba(${color.r}, ${color.g}, ${color.b}, 1))`,
+            background:
+              'repeating-conic-gradient(#e5e5e5 0% 25%, transparent 0% 50%) 50% / 10px 10px',
           }}
-        />
-        {/* Indicator */}
+          onPointerDown={handlePointerDown}
+          onPointerMove={handlePointerMove}
+          onPointerUp={handlePointerUp}
+          onPointerCancel={handlePointerUp}
+        >
+          {/* Color gradient overlay */}
+          <div
+            className="absolute inset-0"
+            style={{
+              background: `linear-gradient(to right, rgba(${color.r}, ${color.g}, ${color.b}, 0), rgba(${color.r}, ${color.g}, ${color.b}, 1))`,
+            }}
+          />
+        </div>
+        {/* Indicator - outside slider to prevent clipping */}
         <div
-          className="absolute top-1/2 w-4 h-4 -ml-2 -mt-2 bg-white border-2 border-white rounded-full shadow-lg pointer-events-none z-10"
+          className="absolute top-1/2 w-4 h-4 -ml-2 -mt-2 bg-white border-2 border-white rounded-full shadow-lg pointer-events-none"
           style={{
             left: `${indicatorPosition}%`,
             boxShadow: '0 0 0 1px rgba(0, 0, 0, 0.3), 0 2px 4px rgba(0, 0, 0, 0.2)',
@@ -480,14 +482,16 @@ function ColorSwatches({ colors, onSelect, currentColor }: ColorSwatchesProps) {
               key={`${color}-${index}`}
               onClick={() => onSelect(color)}
               className={cn(
-                'w-7 h-7 rounded-md border border-input shadow-xs transition-all duration-200 hover:scale-110 hover:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+                'relative w-7 h-7 rounded-md border border-input shadow-xs transition-all duration-200 hover:scale-110 hover:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
                 isCurrent && 'scale-105'
               )}
               style={{
-                backgroundColor: isTransparent ? undefined : color,
-                background: isTransparent
-                  ? 'repeating-conic-gradient(#e5e5e5 0% 25%, transparent 0% 50%) 50% / 6px 6px'
+                backgroundColor: isTransparent ? 'transparent' : color,
+                backgroundImage: isTransparent
+                  ? 'repeating-conic-gradient(#e5e5e5 0% 25%, transparent 0% 50%)'
                   : undefined,
+                backgroundSize: isTransparent ? '6px 6px' : undefined,
+                backgroundPosition: isTransparent ? '50% 50%' : undefined,
                 boxShadow: isCurrent
                   ? `0 0 0 2px hsl(var(--background)), 0 0 0 4px ${isTransparent ? 'hsl(var(--foreground) / 0.5)' : color}`
                   : undefined,
