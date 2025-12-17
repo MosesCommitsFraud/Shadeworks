@@ -90,8 +90,80 @@ function rotatePoint(point: Point, center: Point, angleDeg: number): Point {
   };
 }
 
+function rotateVector(vector: Point, angleDeg: number): Point {
+  const r = degToRad(angleDeg);
+  const cos = Math.cos(r);
+  const sin = Math.sin(r);
+  return { x: vector.x * cos - vector.y * sin, y: vector.x * sin + vector.y * cos };
+}
+
 function getBoundsCenter(bounds: BoundingBox): Point {
   return { x: bounds.x + bounds.width / 2, y: bounds.y + bounds.height / 2 };
+}
+
+function getHandlePointFromBounds(bounds: BoundingBox, handle: Exclude<ResizeHandle, null>): Point {
+  switch (handle) {
+    case 'nw':
+      return { x: bounds.x, y: bounds.y };
+    case 'n':
+      return { x: bounds.x + bounds.width / 2, y: bounds.y };
+    case 'ne':
+      return { x: bounds.x + bounds.width, y: bounds.y };
+    case 'e':
+      return { x: bounds.x + bounds.width, y: bounds.y + bounds.height / 2 };
+    case 'se':
+      return { x: bounds.x + bounds.width, y: bounds.y + bounds.height };
+    case 's':
+      return { x: bounds.x + bounds.width / 2, y: bounds.y + bounds.height };
+    case 'sw':
+      return { x: bounds.x, y: bounds.y + bounds.height };
+    case 'w':
+      return { x: bounds.x, y: bounds.y + bounds.height / 2 };
+  }
+}
+
+function getHandleLocalOffset(handle: Exclude<ResizeHandle, null>, width: number, height: number): Point {
+  const hw = width / 2;
+  const hh = height / 2;
+  switch (handle) {
+    case 'nw':
+      return { x: -hw, y: -hh };
+    case 'n':
+      return { x: 0, y: -hh };
+    case 'ne':
+      return { x: hw, y: -hh };
+    case 'e':
+      return { x: hw, y: 0 };
+    case 'se':
+      return { x: hw, y: hh };
+    case 's':
+      return { x: 0, y: hh };
+    case 'sw':
+      return { x: -hw, y: hh };
+    case 'w':
+      return { x: -hw, y: 0 };
+  }
+}
+
+function getOppositeResizeHandle(handle: Exclude<ResizeHandle, null>): Exclude<ResizeHandle, null> {
+  switch (handle) {
+    case 'n':
+      return 's';
+    case 'ne':
+      return 'sw';
+    case 'e':
+      return 'w';
+    case 'se':
+      return 'nw';
+    case 's':
+      return 'n';
+    case 'sw':
+      return 'ne';
+    case 'w':
+      return 'e';
+    case 'nw':
+      return 'se';
+  }
 }
 
 function getWorldResizeHandle(pos: Point, center: Point): Exclude<ResizeHandle, null> {
@@ -136,47 +208,6 @@ function getResizeCursor(handle: Exclude<ResizeHandle, null>) {
   }
 }
 
-function getHandlePointFromBounds(bounds: BoundingBox, handle: Exclude<ResizeHandle, null>): Point {
-  switch (handle) {
-    case 'nw':
-      return { x: bounds.x, y: bounds.y };
-    case 'n':
-      return { x: bounds.x + bounds.width / 2, y: bounds.y };
-    case 'ne':
-      return { x: bounds.x + bounds.width, y: bounds.y };
-    case 'e':
-      return { x: bounds.x + bounds.width, y: bounds.y + bounds.height / 2 };
-    case 'se':
-      return { x: bounds.x + bounds.width, y: bounds.y + bounds.height };
-    case 's':
-      return { x: bounds.x + bounds.width / 2, y: bounds.y + bounds.height };
-    case 'sw':
-      return { x: bounds.x, y: bounds.y + bounds.height };
-    case 'w':
-      return { x: bounds.x, y: bounds.y + bounds.height / 2 };
-  }
-}
-
-function getOppositeResizeHandle(handle: Exclude<ResizeHandle, null>): Exclude<ResizeHandle, null> {
-  switch (handle) {
-    case 'n':
-      return 's';
-    case 'ne':
-      return 'sw';
-    case 'e':
-      return 'w';
-    case 'se':
-      return 'nw';
-    case 's':
-      return 'n';
-    case 'sw':
-      return 'ne';
-    case 'w':
-      return 'e';
-    case 'nw':
-      return 'se';
-  }
-}
 
 function chooseRotateHandleSide(rotationDeg: number): RotateHandleSide {
   const targetWorldAngle = -90; // screen "up"
@@ -960,6 +991,97 @@ export function Canvas({
 
     // Handle resizing (single element or multi-selection group)
     if (isResizing && dragStart && originalBounds && resizeHandle && originalElements.length > 0) {
+      const originalElement = originalElements.length === 1 ? originalElements[0] : null;
+      const rotationDeg = originalElement?.rotation ?? 0;
+      const supportsRotatedResize =
+        !!originalElement &&
+        (originalElement.type === 'rectangle' ||
+          originalElement.type === 'ellipse' ||
+          originalElement.type === 'frame' ||
+          originalElement.type === 'web-embed' ||
+          originalElement.type === 'text');
+
+      const centerForResize = supportsRotatedResize ? getBoundsCenter(originalBounds) : null;
+
+      // Rotated resize for box-like elements: keep opposite handle fixed in world space,
+      // compute size in local space (similar to Excalidraw).
+      if (supportsRotatedResize && centerForResize && rotationDeg && selectedIds.length === 1 && originalElements.length === 1) {
+        const draggedHandle = resizeHandle as Exclude<ResizeHandle, null>;
+        const fixedHandle = getOppositeResizeHandle(draggedHandle);
+
+        const fixedLocalPoint = getHandlePointFromBounds(originalBounds, fixedHandle);
+        const fixedWorldPoint = rotatePoint(fixedLocalPoint, centerForResize, rotationDeg);
+
+        const vWorld = { x: point.x - fixedWorldPoint.x, y: point.y - fixedWorldPoint.y };
+        const vLocal = rotateVector(vWorld, -rotationDeg);
+
+        const minAbsSize =
+          originalElement.type === 'rectangle' ||
+          originalElement.type === 'ellipse' ||
+          originalElement.type === 'frame' ||
+          originalElement.type === 'web-embed' ||
+          originalElement.type === 'text'
+            ? 2
+            : 0;
+
+        const clampSize = (size: number) => Math.max(minAbsSize, Math.abs(size));
+
+        let nextW = originalBounds.width;
+        let nextH = originalBounds.height;
+
+        const isCorner = draggedHandle.length === 2;
+        if (isCorner) {
+          nextW = clampSize(vLocal.x);
+          nextH = clampSize(vLocal.y);
+
+          if (shiftPressed) {
+            const aspect = originalBounds.height === 0 ? 1 : originalBounds.width / originalBounds.height;
+            const wFromH = nextH * aspect;
+            const hFromW = nextW / aspect;
+            if (Math.abs(wFromH - nextW) < Math.abs(hFromW - nextH)) {
+              nextW = wFromH;
+            } else {
+              nextH = hFromW;
+            }
+          }
+        } else if (draggedHandle === 'e' || draggedHandle === 'w') {
+          nextW = clampSize(vLocal.x);
+        } else if (draggedHandle === 'n' || draggedHandle === 's') {
+          nextH = clampSize(vLocal.y);
+        }
+
+        const fixedOffsetLocal = getHandleLocalOffset(fixedHandle, nextW, nextH);
+        const fixedOffsetWorld = rotateVector(fixedOffsetLocal, rotationDeg);
+        const nextCenter = { x: fixedWorldPoint.x - fixedOffsetWorld.x, y: fixedWorldPoint.y - fixedOffsetWorld.y };
+
+        const nextX = nextCenter.x - nextW / 2;
+        const nextY = nextCenter.y - nextH / 2;
+
+        if (
+          originalElement.type === 'rectangle' ||
+          originalElement.type === 'ellipse' ||
+          originalElement.type === 'frame' ||
+          originalElement.type === 'web-embed'
+        ) {
+          onUpdateElement(selectedIds[0], { x: nextX, y: nextY, width: nextW, height: nextH });
+          return;
+        }
+
+        if (originalElement.type === 'text') {
+          const scaleX = nextW / (originalBounds.width || 1);
+          const scaleY = nextH / (originalBounds.height || 1);
+          onUpdateElement(selectedIds[0], {
+            x: nextX,
+            y: nextY,
+            width: nextW,
+            height: nextH,
+            scaleX: (originalElement.scaleX ?? 1) * scaleX,
+            scaleY: (originalElement.scaleY ?? 1) * scaleY,
+          });
+          return;
+        }
+      }
+
       const dx = point.x - dragStart.x;
       const dy = point.y - dragStart.y;
 
@@ -1106,23 +1228,10 @@ export function Canvas({
           originalElement.type === 'frame' ||
           originalElement.type === 'web-embed'
         ) {
-          let normalizedX = Math.min(newX, newX + newWidth);
-          let normalizedY = Math.min(newY, newY + newHeight);
+          const normalizedX = Math.min(newX, newX + newWidth);
+          const normalizedY = Math.min(newY, newY + newHeight);
           const normalizedWidth = Math.abs(newWidth);
           const normalizedHeight = Math.abs(newHeight);
-
-          const rotationDeg = originalElement.rotation ?? 0;
-          if (rotationDeg) {
-            const originalCenter = getBoundsCenter(originalBounds);
-            const nextBounds = { x: normalizedX, y: normalizedY, width: normalizedWidth, height: normalizedHeight };
-            const nextCenter = getBoundsCenter(nextBounds);
-            const opposite = getOppositeResizeHandle(resizeHandle as Exclude<ResizeHandle, null>);
-            const originalOppWorld = rotatePoint(getHandlePointFromBounds(originalBounds, opposite), originalCenter, rotationDeg);
-            const nextOppWorld = rotatePoint(getHandlePointFromBounds(nextBounds, opposite), nextCenter, rotationDeg);
-            normalizedX += originalOppWorld.x - nextOppWorld.x;
-            normalizedY += originalOppWorld.y - nextOppWorld.y;
-          }
-
           onUpdateElement(selectedIds[0], {
             x: normalizedX,
             y: normalizedY,
@@ -1144,26 +1253,14 @@ export function Canvas({
           }));
           onUpdateElement(selectedIds[0], { points: newPoints });
         } else if (originalElement.type === 'text') {
-          let normalizedX = Math.min(newX, newX + newWidth);
-          let normalizedY = Math.min(newY, newY + newHeight);
+          const normalizedX = Math.min(newX, newX + newWidth);
+          const normalizedY = Math.min(newY, newY + newHeight);
           const normalizedWidth = Math.abs(newWidth);
           const normalizedHeight = Math.abs(newHeight);
           const scaleX = normalizedWidth / (originalBounds.width || 1);
           const scaleY = normalizedHeight / (originalBounds.height || 1);
           const origScaleX = originalElement.scaleX ?? 1;
           const origScaleY = originalElement.scaleY ?? 1;
-
-          const rotationDeg = originalElement.rotation ?? 0;
-          if (rotationDeg) {
-            const originalCenter = getBoundsCenter(originalBounds);
-            const nextBounds = { x: normalizedX, y: normalizedY, width: normalizedWidth, height: normalizedHeight };
-            const nextCenter = getBoundsCenter(nextBounds);
-            const opposite = getOppositeResizeHandle(resizeHandle as Exclude<ResizeHandle, null>);
-            const originalOppWorld = rotatePoint(getHandlePointFromBounds(originalBounds, opposite), originalCenter, rotationDeg);
-            const nextOppWorld = rotatePoint(getHandlePointFromBounds(nextBounds, opposite), nextCenter, rotationDeg);
-            normalizedX += originalOppWorld.x - nextOppWorld.x;
-            normalizedY += originalOppWorld.y - nextOppWorld.y;
-          }
 
           onUpdateElement(selectedIds[0], {
             x: normalizedX,
@@ -1366,7 +1463,7 @@ export function Canvas({
           if (selectedElement && selectedElement.type !== 'line' && selectedElement.type !== 'arrow' && selectedElement.type !== 'laser') {
             const rotationDeg = selectedElement.rotation ?? 0;
             const center = getBoundsCenter(visualBounds);
-            const rotateHandleDistance = 44 / zoom;
+            const rotateHandleDistance = 28 / zoom;
             const rotateHandleRadius = 4 / zoom;
 
             const localAnchor: Point =
@@ -1422,10 +1519,12 @@ export function Canvas({
           { h: 'w', x: visualBounds.x, y: visualBounds.y + visualBounds.height / 2 },
         ];
 
+        // Hit-testing uses the *local* handle id (so resize math stays stable), but positions are rotated.
         const handles: Array<{ handle: Exclude<ResizeHandle, null>; x: number; y: number }> = baseHandlePoints.map((h) => {
-          const p = rotationDegForHandles ? rotatePoint({ x: h.x, y: h.y }, centerForHandles, rotationDegForHandles) : { x: h.x, y: h.y };
-          const worldHandle = getWorldResizeHandle(p, centerForHandles);
-          return { handle: worldHandle, x: p.x, y: p.y };
+          const p = rotationDegForHandles
+            ? rotatePoint({ x: h.x, y: h.y }, centerForHandles, rotationDegForHandles)
+            : { x: h.x, y: h.y };
+          return { handle: h.h, x: p.x, y: p.y };
         });
         
         for (const h of handles) {
@@ -3008,7 +3107,7 @@ export function Canvas({
       return { keyId: h.pos, pos: worldPos, x: p.x, y: p.y, cursor: getResizeCursor(worldPos) };
     });
 
-    const rotateHandleDistance = 44 / zoom;
+    const rotateHandleDistance = 28 / zoom;
     const rotateHandleRadius = handleSize / 2;
 
     const hasRotateHandle =
