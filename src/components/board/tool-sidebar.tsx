@@ -347,37 +347,30 @@ export function ToolSidebar({
           {showFill && onFillColorChange && (
             <>
               <div className="space-y-2">
-                <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                  Fill Color
-                </label>
-                <div className="flex flex-wrap gap-1">
-                  {/* Transparent option */}
+                <div className="flex items-center justify-between gap-2">
+                  <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                    Fill Color
+                  </label>
                   <button
+                    type="button"
                     onClick={() => onFillColorChange('transparent')}
                     className={cn(
-                      SWATCH_BASE,
-                      'relative',
-                      fillColor === 'transparent' ? 'scale-105' : undefined
+                      'text-[10px] uppercase tracking-wider transition-colors',
+                      fillColor === 'transparent'
+                        ? 'text-muted-foreground/70 cursor-default'
+                        : 'text-muted-foreground hover:text-foreground'
                     )}
-                    style={{
-                      background: 'linear-gradient(45deg, #e5e5e5 25%, transparent 25%, transparent 75%, #e5e5e5 75%, #e5e5e5), linear-gradient(45deg, #e5e5e5 25%, transparent 25%, transparent 75%, #e5e5e5 75%, #e5e5e5)',
-                      backgroundSize: '6px 6px',
-                      backgroundPosition: '0 0, 3px 3px',
-                      boxShadow:
-                        fillColor === 'transparent'
-                          ? `0 0 0 2px hsl(var(--background)), 0 0 0 4px hsl(var(--foreground) / 0.5)`
-                          : undefined,
-                    }}
-                    title="Transparent"
+                    disabled={fillColor === 'transparent'}
+                    title="Clear fill"
                   >
-                    <div className="absolute inset-0 flex items-center justify-center">
-                      <div className="w-5 h-0.5 bg-red-500 rotate-45" />
-                    </div>
+                    Clear
                   </button>
+                </div>
+                <div className="flex flex-wrap gap-1">
                   {sidebarColors.map((color) => (
                     <button
                       key={`fill-${color}`}
-                      onClick={() => onFillColorChange(color)}
+                      onClick={() => onFillColorChange(fillColor === color ? 'transparent' : color)}
                       className={cn(
                         SWATCH_BASE,
                         fillColor === color ? 'scale-105' : undefined
@@ -395,7 +388,11 @@ export function ToolSidebar({
                   {/* Custom color picker */}
                   <button
                     onClick={() => setShowFillColorPicker(true)}
-                    className={cn(SWATCH_BASE, 'cursor-pointer overflow-hidden')}
+                    className={cn(
+                      SWATCH_BASE,
+                      'cursor-pointer overflow-hidden',
+                      fillColor !== 'transparent' && !sidebarColors.includes(fillColor) ? 'scale-105' : undefined
+                    )}
                     title="Custom fill color"
                   >
                     <div
