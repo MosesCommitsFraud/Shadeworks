@@ -62,6 +62,16 @@ interface BoundingBox {
   height: number;
 }
 
+function expandBounds(bounds: BoundingBox, padding: number): BoundingBox {
+  const p = Math.max(0, padding);
+  return {
+    x: bounds.x - p,
+    y: bounds.y - p,
+    width: bounds.width + p * 2,
+    height: bounds.height + p * 2,
+  };
+}
+
 // Convert perfect-freehand points to SVG path
 function getSvgPathFromStroke(stroke: number[][]) {
   if (!stroke.length) return '';
@@ -1003,15 +1013,17 @@ export function Canvas({
       // Check if clicking on a resize handle first (single selection only)
       if (selectedBounds && selectedIds.length === 1) {
         const handleSize = 8;
+        const selectionPadding = 6 / zoom;
+        const visualBounds = expandBounds(selectedBounds, selectionPadding);
         const handles: { handle: ResizeHandle; x: number; y: number }[] = [
-          { handle: 'nw', x: selectedBounds.x, y: selectedBounds.y },
-          { handle: 'n', x: selectedBounds.x + selectedBounds.width / 2, y: selectedBounds.y },
-          { handle: 'ne', x: selectedBounds.x + selectedBounds.width, y: selectedBounds.y },
-          { handle: 'e', x: selectedBounds.x + selectedBounds.width, y: selectedBounds.y + selectedBounds.height / 2 },
-          { handle: 'se', x: selectedBounds.x + selectedBounds.width, y: selectedBounds.y + selectedBounds.height },
-          { handle: 's', x: selectedBounds.x + selectedBounds.width / 2, y: selectedBounds.y + selectedBounds.height },
-          { handle: 'sw', x: selectedBounds.x, y: selectedBounds.y + selectedBounds.height },
-          { handle: 'w', x: selectedBounds.x, y: selectedBounds.y + selectedBounds.height / 2 },
+          { handle: 'nw', x: visualBounds.x, y: visualBounds.y },
+          { handle: 'n', x: visualBounds.x + visualBounds.width / 2, y: visualBounds.y },
+          { handle: 'ne', x: visualBounds.x + visualBounds.width, y: visualBounds.y },
+          { handle: 'e', x: visualBounds.x + visualBounds.width, y: visualBounds.y + visualBounds.height / 2 },
+          { handle: 'se', x: visualBounds.x + visualBounds.width, y: visualBounds.y + visualBounds.height },
+          { handle: 's', x: visualBounds.x + visualBounds.width / 2, y: visualBounds.y + visualBounds.height },
+          { handle: 'sw', x: visualBounds.x, y: visualBounds.y + visualBounds.height },
+          { handle: 'w', x: visualBounds.x, y: visualBounds.y + visualBounds.height / 2 },
         ];
         
         for (const h of handles) {
@@ -1165,7 +1177,7 @@ export function Canvas({
 
     setCurrentElement(newElement);
     setIsDrawing(true);
-  }, [tool, strokeColor, strokeWidth, fillColor, opacity, strokeStyle, lineCap, connectorStyle, arrowStart, arrowEnd, cornerRadius, fillPattern, getMousePosition, elements, pan, selectedBounds, selectedElements, selectedIds, shiftPressed, onStartTransform, getElementsToErase, onDeleteElement]);
+  }, [tool, strokeColor, strokeWidth, fillColor, opacity, strokeStyle, lineCap, connectorStyle, arrowStart, arrowEnd, cornerRadius, fillPattern, getMousePosition, elements, pan, zoom, selectedBounds, selectedElements, selectedIds, shiftPressed, onStartTransform, getElementsToErase, onDeleteElement]);
 
   const handleMouseUp = useCallback(() => {
     if (isPanning) {
@@ -2503,25 +2515,27 @@ export function Canvas({
     }
 
     const handleSize = 8;
+    const selectionPadding = 6 / zoom;
+    const visualBounds = expandBounds(selectedBounds, selectionPadding);
     const handles: { pos: ResizeHandle; x: number; y: number; cursor: string }[] = selectedIds.length === 1 ? [
-      { pos: 'nw', x: selectedBounds.x, y: selectedBounds.y, cursor: 'nwse-resize' },
-      { pos: 'n', x: selectedBounds.x + selectedBounds.width / 2, y: selectedBounds.y, cursor: 'ns-resize' },
-      { pos: 'ne', x: selectedBounds.x + selectedBounds.width, y: selectedBounds.y, cursor: 'nesw-resize' },
-      { pos: 'e', x: selectedBounds.x + selectedBounds.width, y: selectedBounds.y + selectedBounds.height / 2, cursor: 'ew-resize' },
-      { pos: 'se', x: selectedBounds.x + selectedBounds.width, y: selectedBounds.y + selectedBounds.height, cursor: 'nwse-resize' },
-      { pos: 's', x: selectedBounds.x + selectedBounds.width / 2, y: selectedBounds.y + selectedBounds.height, cursor: 'ns-resize' },
-      { pos: 'sw', x: selectedBounds.x, y: selectedBounds.y + selectedBounds.height, cursor: 'nesw-resize' },
-      { pos: 'w', x: selectedBounds.x, y: selectedBounds.y + selectedBounds.height / 2, cursor: 'ew-resize' },
+      { pos: 'nw', x: visualBounds.x, y: visualBounds.y, cursor: 'nwse-resize' },
+      { pos: 'n', x: visualBounds.x + visualBounds.width / 2, y: visualBounds.y, cursor: 'ns-resize' },
+      { pos: 'ne', x: visualBounds.x + visualBounds.width, y: visualBounds.y, cursor: 'nesw-resize' },
+      { pos: 'e', x: visualBounds.x + visualBounds.width, y: visualBounds.y + visualBounds.height / 2, cursor: 'ew-resize' },
+      { pos: 'se', x: visualBounds.x + visualBounds.width, y: visualBounds.y + visualBounds.height, cursor: 'nwse-resize' },
+      { pos: 's', x: visualBounds.x + visualBounds.width / 2, y: visualBounds.y + visualBounds.height, cursor: 'ns-resize' },
+      { pos: 'sw', x: visualBounds.x, y: visualBounds.y + visualBounds.height, cursor: 'nesw-resize' },
+      { pos: 'w', x: visualBounds.x, y: visualBounds.y + visualBounds.height / 2, cursor: 'ew-resize' },
     ] : [];
 
     return (
       <g>
         {/* Selection border */}
         <rect
-          x={selectedBounds.x}
-          y={selectedBounds.y}
-          width={selectedBounds.width}
-          height={selectedBounds.height}
+          x={visualBounds.x}
+          y={visualBounds.y}
+          width={visualBounds.width}
+          height={visualBounds.height}
           fill="none"
           stroke="var(--accent)"
           strokeWidth={2}
