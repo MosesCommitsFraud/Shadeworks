@@ -14,6 +14,8 @@ import {
   Check,
   Pointer,
   Lasso,
+  Lock,
+  Unlock,
 } from 'lucide-react';
 import { Tool } from '@/lib/board-types';
 import type { ConnectionStatus } from '@/lib/collaboration';
@@ -40,6 +42,8 @@ interface ToolbarProps {
   collaboratorUsers: Array<{ id: string; name: string; color: string; viewport?: { pan: { x: number; y: number }; zoom: number } }>;
   onFollowUser: (userId: string) => void;
   followedUserId: string | null;
+  isToolLocked: boolean;
+  onToggleToolLock: () => void;
 }
 
 const tools: { id: Tool; icon: React.ElementType; label: string; hotkey: number | string }[] = [
@@ -71,6 +75,8 @@ export function Toolbar({
   collaboratorUsers,
   onFollowUser,
   followedUserId,
+  isToolLocked,
+  onToggleToolLock,
 }: ToolbarProps) {
   const [copied, setCopied] = useState(false);
 
@@ -109,6 +115,40 @@ export function Toolbar({
 
   return (
     <div className="absolute top-4 left-1/2 -translate-x-1/2 z-50 flex items-stretch gap-2">
+      {/* Lock Button */}
+      <div className="flex items-center gap-1 bg-card/95 backdrop-blur-md border border-border rounded-md p-1.5 shadow-2xl">
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <button
+              onClick={onToggleToolLock}
+              className={cn(
+                'p-2 rounded-sm transition-all duration-200',
+                'hover:bg-secondary/80',
+                isToolLocked
+                  ? 'bg-accent text-accent-foreground shadow-lg'
+                  : 'text-muted-foreground hover:text-foreground'
+              )}
+            >
+              {isToolLocked ? (
+                <Lock className="w-4 h-4" />
+              ) : (
+                <Unlock className="w-4 h-4" />
+              )}
+            </button>
+          </TooltipTrigger>
+          <TooltipContent>
+            <div className="flex flex-col gap-1">
+              <span>{isToolLocked ? 'Tool Locked' : 'Tool Unlocked'}</span>
+              <span className="text-xs text-muted-foreground">
+                {isToolLocked
+                  ? 'Tool will not switch after drawing'
+                  : 'Tool will switch to select after drawing'}
+              </span>
+            </div>
+          </TooltipContent>
+        </Tooltip>
+      </div>
+
       {/* Main Tools */}
       <div className="flex items-center gap-1 bg-card/95 backdrop-blur-md border border-border rounded-md p-1.5 shadow-2xl">
         {tools.map((tool) => (

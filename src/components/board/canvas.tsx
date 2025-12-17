@@ -42,6 +42,7 @@ interface CanvasProps {
   onFillColorChange?: (color: string) => void;
   canvasBackground?: 'none' | 'dots' | 'lines' | 'grid';
   highlightedElementIds?: string[];
+  isToolLocked?: boolean;
 }
 
 interface RemoteCursor {
@@ -272,6 +273,7 @@ export function Canvas({
   onFillColorChange,
   canvasBackground = 'grid',
   highlightedElementIds = [],
+  isToolLocked = false,
 }: CanvasProps) {
   const svgRef = useRef<SVGSVGElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -1308,7 +1310,8 @@ export function Canvas({
       }
 
       // Switch back to select tool and select the new element (except for pen tool)
-      if (elementAdded && currentElement.type !== 'pen') {
+      // Only auto-switch if tool is not locked
+      if (elementAdded && currentElement.type !== 'pen' && !isToolLocked) {
         setSelectedIds([currentElement.id]);
         if (onToolChange) {
           onToolChange('select');

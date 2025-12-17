@@ -22,6 +22,7 @@ const MAX_UNDO_STACK = 100;
 export function Whiteboard({ roomId }: WhiteboardProps) {
   const { theme, resolvedTheme } = useTheme();
   const [tool, setTool] = useState<Tool>('select');
+  const [isToolLocked, setIsToolLocked] = useState(false);
 
   // Default color based on theme: black in light mode, white in dark mode
   const getDefaultStrokeColor = () => {
@@ -794,6 +795,8 @@ export function Whiteboard({ roomId }: WhiteboardProps) {
         collaboratorUsers={collaboratorUsers}
         onFollowUser={handleFollowUser}
         followedUserId={followedUserId}
+        isToolLocked={isToolLocked}
+        onToggleToolLock={() => setIsToolLocked(!isToolLocked)}
       />
 
       <ToolSidebar
@@ -872,6 +875,7 @@ export function Whiteboard({ roomId }: WhiteboardProps) {
         onFillColorChange={handleFillColorChange}
         canvasBackground={canvasBackground}
         highlightedElementIds={highlightedElementIds}
+        isToolLocked={isToolLocked}
       />
 
       {/* Save File Dialog */}
