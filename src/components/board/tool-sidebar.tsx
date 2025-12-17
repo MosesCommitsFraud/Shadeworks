@@ -2,7 +2,32 @@
 
 import { useMemo, useRef, useState } from 'react';
 import { useTheme } from 'next-themes';
-import { ChevronLeft, ChevronRight, Circle, Minus, Square, Type, Pencil, ArrowUpToLine, ArrowDownToLine, X, AlignLeft, AlignCenter, AlignRight, ArrowRight } from 'lucide-react';
+import {
+  ChevronLeft,
+  ChevronRight,
+  Circle,
+  Minus,
+  Square,
+  Type,
+  Pencil,
+  ArrowUpToLine,
+  ArrowDownToLine,
+  X,
+  AlignLeft,
+  AlignCenter,
+  AlignRight,
+  ArrowRight,
+  Copy,
+  Trash2,
+  Group,
+  Ungroup,
+  AlignHorizontalJustifyStart,
+  AlignHorizontalJustifyCenter,
+  AlignHorizontalJustifyEnd,
+  AlignVerticalJustifyStart,
+  AlignVerticalJustifyCenter,
+  AlignVerticalJustifyEnd,
+} from 'lucide-react';
 import { Tool, COLORS, STROKE_WIDTHS, FONTS, FONT_SIZES, BoardElement } from '@/lib/board-types';
 import { cn } from '@/lib/utils';
 import { Slider } from '@/components/ui/slider';
@@ -50,6 +75,15 @@ interface ToolSidebarProps {
   onSendToBack?: () => void;
   onMoveForward?: () => void;
   onMoveBackward?: () => void;
+  onAlignLeft?: () => void;
+  onAlignCenterHorizontal?: () => void;
+  onAlignRight?: () => void;
+  onAlignTop?: () => void;
+  onAlignCenterVertical?: () => void;
+  onAlignBottom?: () => void;
+  onCopySelected?: () => void;
+  onDeleteSelected?: () => void;
+  onToggleGroupSelection?: () => void;
 }
 
 // Tools that have adjustable properties
@@ -102,6 +136,15 @@ export function ToolSidebar({
   onSendToBack,
   onMoveForward,
   onMoveBackward,
+  onAlignLeft,
+  onAlignCenterHorizontal,
+  onAlignRight,
+  onAlignTop,
+  onAlignCenterVertical,
+  onAlignBottom,
+  onCopySelected,
+  onDeleteSelected,
+  onToggleGroupSelection,
 }: ToolSidebarProps) {
   const { theme, resolvedTheme } = useTheme();
   const [isCollapsed, setIsCollapsed] = useState(false);
@@ -226,6 +269,20 @@ export function ToolSidebar({
   }
 
   const hasSelectedElements = selectedElements.length > 0;
+  const isMultiSelection = selectedElements.length > 1;
+  const selectionGroupId = selectedElements[0]?.groupId;
+  const isSelectionSingleGroup =
+    !!selectionGroupId && selectedElements.every((el) => el.groupId === selectionGroupId);
+  const showAlign =
+    hasSelectedElements &&
+    selectedElements.length > 1 &&
+    !!onAlignLeft &&
+    !!onAlignCenterHorizontal &&
+    !!onAlignRight &&
+    !!onAlignTop &&
+    !!onAlignCenterVertical &&
+    !!onAlignBottom;
+  const showActions = hasSelectedElements && (!!onCopySelected || !!onDeleteSelected || !!onToggleGroupSelection);
 
   // Reorder colors based on theme: black first in light mode, white first in dark mode
   const currentTheme = resolvedTheme || theme;
@@ -924,6 +981,116 @@ export function ToolSidebar({
                 >
                   <ArrowDownToLine className="w-3.5 h-3.5" />
                 </button>
+              </div>
+            </div>
+          )}
+
+          {/* Align (multi selection) */}
+          {showAlign && (
+            <div className="space-y-2 pt-2 border-t border-border">
+              <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                Align
+              </label>
+              <div className="grid grid-cols-3 gap-1">
+                <button
+                  onClick={onAlignLeft}
+                  className={cn(CONTROL_BUTTON, 'h-9 flex items-center justify-center')}
+                  title="Align left"
+                  aria-label="Align left"
+                >
+                  <AlignHorizontalJustifyStart className="w-3.5 h-3.5" />
+                </button>
+                <button
+                  onClick={onAlignCenterHorizontal}
+                  className={cn(CONTROL_BUTTON, 'h-9 flex items-center justify-center')}
+                  title="Align center (horizontal)"
+                  aria-label="Align center (horizontal)"
+                >
+                  <AlignHorizontalJustifyCenter className="w-3.5 h-3.5" />
+                </button>
+                <button
+                  onClick={onAlignRight}
+                  className={cn(CONTROL_BUTTON, 'h-9 flex items-center justify-center')}
+                  title="Align right"
+                  aria-label="Align right"
+                >
+                  <AlignHorizontalJustifyEnd className="w-3.5 h-3.5" />
+                </button>
+              </div>
+              <div className="grid grid-cols-3 gap-1">
+                <button
+                  onClick={onAlignTop}
+                  className={cn(CONTROL_BUTTON, 'h-9 flex items-center justify-center')}
+                  title="Align top"
+                  aria-label="Align top"
+                >
+                  <AlignVerticalJustifyStart className="w-3.5 h-3.5" />
+                </button>
+                <button
+                  onClick={onAlignCenterVertical}
+                  className={cn(CONTROL_BUTTON, 'h-9 flex items-center justify-center')}
+                  title="Align center (vertical)"
+                  aria-label="Align center (vertical)"
+                >
+                  <AlignVerticalJustifyCenter className="w-3.5 h-3.5" />
+                </button>
+                <button
+                  onClick={onAlignBottom}
+                  className={cn(CONTROL_BUTTON, 'h-9 flex items-center justify-center')}
+                  title="Align bottom"
+                  aria-label="Align bottom"
+                >
+                  <AlignVerticalJustifyEnd className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Actions */}
+          {showActions && (
+            <div className="space-y-2 pt-2 border-t border-border">
+              <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                Actions
+              </label>
+              <div className="grid grid-cols-3 gap-1">
+                {onCopySelected && (
+                  <button
+                    onClick={onCopySelected}
+                    className={cn(CONTROL_BUTTON, 'h-9 flex items-center justify-center', !isMultiSelection && 'text-xs')}
+                    title="Copy"
+                    aria-label="Copy"
+                  >
+                    {isMultiSelection ? <Copy className="w-3.5 h-3.5" /> : 'Copy'}
+                  </button>
+                )}
+                {onDeleteSelected && (
+                  <button
+                    onClick={onDeleteSelected}
+                    className={cn(CONTROL_BUTTON, 'h-9 flex items-center justify-center', !isMultiSelection && 'text-xs')}
+                    title="Delete"
+                    aria-label="Delete"
+                  >
+                    {isMultiSelection ? <Trash2 className="w-3.5 h-3.5" /> : 'Delete'}
+                  </button>
+                )}
+                {onToggleGroupSelection && (selectedElements.length > 1 || isSelectionSingleGroup) && (
+                  <button
+                    onClick={onToggleGroupSelection}
+                    className={cn(CONTROL_BUTTON, 'h-9 flex items-center justify-center', !isMultiSelection && 'text-xs')}
+                    title={isSelectionSingleGroup ? 'Ungroup' : 'Group'}
+                    aria-label={isSelectionSingleGroup ? 'Ungroup' : 'Group'}
+                  >
+                    {isMultiSelection ? (
+                      isSelectionSingleGroup ? (
+                        <Ungroup className="w-3.5 h-3.5" />
+                      ) : (
+                        <Group className="w-3.5 h-3.5" />
+                      )
+                    ) : (
+                      (isSelectionSingleGroup ? 'Ungroup' : 'Group')
+                    )}
+                  </button>
+                )}
               </div>
             </div>
           )}

@@ -72,6 +72,57 @@ function expandBounds(bounds: BoundingBox, padding: number): BoundingBox {
   };
 }
 
+function isBoundsFullyInsideBox(bounds: BoundingBox, box: BoundingBox) {
+  return (
+    bounds.x >= box.x &&
+    bounds.y >= box.y &&
+    bounds.x + bounds.width <= box.x + box.width &&
+    bounds.y + bounds.height <= box.y + box.height
+  );
+}
+
+function getGroupSelectionIds(element: BoardElement, elements: BoardElement[]): string[] {
+  if (!element.groupId) return [element.id];
+  return elements.filter((el) => el.type !== 'laser' && el.groupId === element.groupId).map((el) => el.id);
+}
+
+function getBoxSelectedIds(elements: BoardElement[], selectionBox: BoundingBox): string[] {
+  const ungrouped: BoardElement[] = [];
+  const groups = new Map<string, BoardElement[]>();
+
+  for (const el of elements) {
+    if (el.type === 'laser') continue;
+    if (!el.groupId) {
+      ungrouped.push(el);
+      continue;
+    }
+    const existing = groups.get(el.groupId) ?? [];
+    existing.push(el);
+    groups.set(el.groupId, existing);
+  }
+
+  const selected: string[] = [];
+
+  for (const el of ungrouped) {
+    const bounds = getBoundingBox(el);
+    if (bounds && isBoundsFullyInsideBox(bounds, selectionBox)) {
+      selected.push(el.id);
+    }
+  }
+
+  for (const groupElements of groups.values()) {
+    const allInside = groupElements.every((el) => {
+      const bounds = getBoundingBox(el);
+      return bounds ? isBoundsFullyInsideBox(bounds, selectionBox) : false;
+    });
+    if (allInside) {
+      selected.push(...groupElements.map((el) => el.id));
+    }
+  }
+
+  return selected;
+}
+
 // Convert perfect-freehand points to SVG path
 function getSvgPathFromStroke(stroke: number[][]) {
   if (!stroke.length) return '';
@@ -647,7 +698,16 @@ export function Canvas({
       const y = Math.min(startPoint.y, point.y);
       const width = Math.abs(point.x - startPoint.x);
       const height = Math.abs(point.y - startPoint.y);
-      setSelectionBox({ x, y, width, height });
+      const nextSelectionBox = { x, y, width, height };
+      setSelectionBox(nextSelectionBox);
+
+      // Live-update selection while dragging: only select elements that are fully inside the box.
+      const minBoxSize = 5;
+      if (nextSelectionBox.width >= minBoxSize || nextSelectionBox.height >= minBoxSize) {
+        setSelectedIds(getBoxSelectedIds(elements, nextSelectionBox));
+      } else {
+        setSelectedIds([]);
+      }
       return;
     }
 
@@ -717,23 +777,22 @@ export function Canvas({
       return;
     }
 
-    // Handle resizing (single element only for now)
-    if (isResizing && selectedIds.length === 1 && dragStart && originalBounds && resizeHandle && originalElements.length === 1) {
-      const originalElement = originalElements[0];
+    // Handle resizing (single element or multi-selection group)
+    if (isResizing && dragStart && originalBounds && resizeHandle && originalElements.length > 0) {
       const dx = point.x - dragStart.x;
       const dy = point.y - dragStart.y;
-      
+
       let newX = originalBounds.x;
       let newY = originalBounds.y;
       let newWidth = originalBounds.width;
       let newHeight = originalBounds.height;
-      
-      const aspectRatio = originalBounds.width / originalBounds.height;
+
+      const aspectRatio = originalBounds.height === 0 ? 1 : originalBounds.width / originalBounds.height;
       const originalLeft = originalBounds.x;
       const originalTop = originalBounds.y;
       const originalRight = originalBounds.x + originalBounds.width;
       const originalBottom = originalBounds.y + originalBounds.height;
-       
+
       switch (resizeHandle) {
         case 'nw':
           newX = originalBounds.x + dx;
@@ -810,91 +869,161 @@ export function Canvas({
           }
           break;
       }
-      
-      const minAbsSize =
-        originalElement.type === 'rectangle' ||
-        originalElement.type === 'ellipse' ||
-        originalElement.type === 'frame' ||
-        originalElement.type === 'web-embed' ||
-        originalElement.type === 'text'
-          ? 2
-          : 0;
 
-      // Avoid snapping/flipping when elements get very small (especially lines/pen),
-      // while still keeping box-like elements at a small minimum size.
-      const clampSignedSize = (size: number) => {
-        if (Number.isNaN(size)) return minAbsSize;
-        if (minAbsSize <= 0) return size;
-        if (size === 0) return 0;
-        if (Math.abs(size) < minAbsSize) return Math.sign(size) * minAbsSize;
-        return size;
-      };
+      // Single element resize keeps the existing behavior (including mirroring for point-based shapes).
+      if (selectedIds.length === 1 && originalElements.length === 1) {
+        const originalElement = originalElements[0];
 
-      const nextWidth = clampSignedSize(newWidth);
-      if (nextWidth !== newWidth) {
-        if (resizeHandle.includes('w') && !resizeHandle.includes('e')) {
-          newX = originalRight - nextWidth;
-        } else if (resizeHandle.includes('e') && !resizeHandle.includes('w')) {
-          newX = originalLeft;
-        } else {
-          const centerX = newX + newWidth / 2;
-          newX = centerX - nextWidth / 2;
+        const minAbsSize =
+          originalElement.type === 'rectangle' ||
+          originalElement.type === 'ellipse' ||
+          originalElement.type === 'frame' ||
+          originalElement.type === 'web-embed' ||
+          originalElement.type === 'text'
+            ? 2
+            : 0;
+
+        // Avoid snapping/flipping when elements get very small (especially lines/pen),
+        // while still keeping box-like elements at a small minimum size.
+        const clampSignedSize = (size: number) => {
+          if (Number.isNaN(size)) return minAbsSize;
+          if (minAbsSize <= 0) return size;
+          if (size === 0) return 0;
+          if (Math.abs(size) < minAbsSize) return Math.sign(size) * minAbsSize;
+          return size;
+        };
+
+        const nextWidth = clampSignedSize(newWidth);
+        if (nextWidth !== newWidth) {
+          if (resizeHandle.includes('w') && !resizeHandle.includes('e')) {
+            newX = originalRight - nextWidth;
+          } else if (resizeHandle.includes('e') && !resizeHandle.includes('w')) {
+            newX = originalLeft;
+          } else {
+            const centerX = newX + newWidth / 2;
+            newX = centerX - nextWidth / 2;
+          }
+          newWidth = nextWidth;
         }
-        newWidth = nextWidth;
+
+        const nextHeight = clampSignedSize(newHeight);
+        if (nextHeight !== newHeight) {
+          if (resizeHandle.includes('n') && !resizeHandle.includes('s')) {
+            newY = originalBottom - nextHeight;
+          } else if (resizeHandle.includes('s') && !resizeHandle.includes('n')) {
+            newY = originalTop;
+          } else {
+            const centerY = newY + newHeight / 2;
+            newY = centerY - nextHeight / 2;
+          }
+          newHeight = nextHeight;
+        }
+
+        if (
+          originalElement.type === 'rectangle' ||
+          originalElement.type === 'ellipse' ||
+          originalElement.type === 'frame' ||
+          originalElement.type === 'web-embed'
+        ) {
+          const normalizedX = Math.min(newX, newX + newWidth);
+          const normalizedY = Math.min(newY, newY + newHeight);
+          const normalizedWidth = Math.abs(newWidth);
+          const normalizedHeight = Math.abs(newHeight);
+          onUpdateElement(selectedIds[0], {
+            x: normalizedX,
+            y: normalizedY,
+            width: normalizedWidth,
+            height: normalizedHeight,
+          });
+        } else if (
+          originalElement.type === 'pen' ||
+          originalElement.type === 'line' ||
+          originalElement.type === 'arrow' ||
+          originalElement.type === 'laser'
+        ) {
+          // `newWidth/newHeight` can be negative here, which intentionally mirrors the element.
+          const scaleX = newWidth / (originalBounds.width || 1);
+          const scaleY = newHeight / (originalBounds.height || 1);
+          const newPoints = originalElement.points.map((p) => ({
+            x: newX + (p.x - originalBounds.x) * scaleX,
+            y: newY + (p.y - originalBounds.y) * scaleY,
+          }));
+          onUpdateElement(selectedIds[0], { points: newPoints });
+        } else if (originalElement.type === 'text') {
+          const normalizedX = Math.min(newX, newX + newWidth);
+          const normalizedY = Math.min(newY, newY + newHeight);
+          const normalizedWidth = Math.abs(newWidth);
+          const normalizedHeight = Math.abs(newHeight);
+          const scaleX = normalizedWidth / (originalBounds.width || 1);
+          const scaleY = normalizedHeight / (originalBounds.height || 1);
+          const origScaleX = originalElement.scaleX ?? 1;
+          const origScaleY = originalElement.scaleY ?? 1;
+
+          onUpdateElement(selectedIds[0], {
+            x: normalizedX,
+            y: normalizedY,
+            width: normalizedWidth,
+            height: normalizedHeight,
+            scaleX: origScaleX * scaleX,
+            scaleY: origScaleY * scaleY,
+          });
+        }
+        return;
       }
 
-      const nextHeight = clampSignedSize(newHeight);
-      if (nextHeight !== newHeight) {
-        if (resizeHandle.includes('n') && !resizeHandle.includes('s')) {
-          newY = originalBottom - nextHeight;
-        } else if (resizeHandle.includes('s') && !resizeHandle.includes('n')) {
-          newY = originalTop;
-        } else {
-          const centerY = newY + newHeight / 2;
-          newY = centerY - nextHeight / 2;
+      // Multi-selection: scale all elements relative to the original selection bounds.
+      const normalizedX = Math.min(newX, newX + newWidth);
+      const normalizedY = Math.min(newY, newY + newHeight);
+      const normalizedWidth = Math.max(1, Math.abs(newWidth));
+      const normalizedHeight = Math.max(1, Math.abs(newHeight));
+
+      const scaleX = normalizedWidth / (originalBounds.width || 1);
+      const scaleY = normalizedHeight / (originalBounds.height || 1);
+
+      originalElements.forEach((origEl) => {
+        if (origEl.type === 'pen' || origEl.type === 'line' || origEl.type === 'arrow' || origEl.type === 'laser') {
+          const newPoints = origEl.points.map((p) => ({
+            x: normalizedX + (p.x - originalBounds.x) * scaleX,
+            y: normalizedY + (p.y - originalBounds.y) * scaleY,
+          }));
+          onUpdateElement(origEl.id, { points: newPoints });
+          return;
         }
-        newHeight = nextHeight;
-      }
-       
-      if (originalElement.type === 'rectangle' || originalElement.type === 'ellipse' || originalElement.type === 'frame' || originalElement.type === 'web-embed') {
-        const normalizedX = Math.min(newX, newX + newWidth);
-        const normalizedY = Math.min(newY, newY + newHeight);
-        const normalizedWidth = Math.abs(newWidth);
-        const normalizedHeight = Math.abs(newHeight);
-        onUpdateElement(selectedIds[0], {
-          x: normalizedX,
-          y: normalizedY,
-          width: normalizedWidth,
-          height: normalizedHeight,
-        });
-      } else if (originalElement.type === 'pen' || originalElement.type === 'line' || originalElement.type === 'arrow' || originalElement.type === 'laser') {
-        // `newWidth/newHeight` can be negative here, which intentionally mirrors the element.
-        const scaleX = newWidth / originalBounds.width;
-        const scaleY = newHeight / originalBounds.height;
-        const newPoints = originalElement.points.map(p => ({
-          x: newX + (p.x - originalBounds.x) * scaleX,
-          y: newY + (p.y - originalBounds.y) * scaleY,
-        }));
-        onUpdateElement(selectedIds[0], { points: newPoints });
-      } else if (originalElement.type === 'text') {
-        const normalizedX = Math.min(newX, newX + newWidth);
-        const normalizedY = Math.min(newY, newY + newHeight);
-        const normalizedWidth = Math.abs(newWidth);
-        const normalizedHeight = Math.abs(newHeight);
-        const scaleX = normalizedWidth / originalBounds.width;
-        const scaleY = normalizedHeight / originalBounds.height;
-        const origScaleX = originalElement.scaleX ?? 1;
-        const origScaleY = originalElement.scaleY ?? 1;
-        
-        onUpdateElement(selectedIds[0], { 
-          x: normalizedX,
-          y: normalizedY,
-          width: normalizedWidth,
-          height: normalizedHeight,
-          scaleX: origScaleX * scaleX,
-          scaleY: origScaleY * scaleY,
-        });
-      }
+
+        const ox = origEl.x ?? 0;
+        const oy = origEl.y ?? 0;
+        const ow = origEl.width ?? 0;
+        const oh = origEl.height ?? 0;
+
+        const left = ox;
+        const top = oy;
+        const right = ox + ow;
+        const bottom = oy + oh;
+
+        const nextLeft = normalizedX + (left - originalBounds.x) * scaleX;
+        const nextTop = normalizedY + (top - originalBounds.y) * scaleY;
+        const nextRight = normalizedX + (right - originalBounds.x) * scaleX;
+        const nextBottom = normalizedY + (bottom - originalBounds.y) * scaleY;
+
+        const nextX = Math.min(nextLeft, nextRight);
+        const nextY = Math.min(nextTop, nextBottom);
+        const nextW = Math.abs(nextRight - nextLeft);
+        const nextH = Math.abs(nextBottom - nextTop);
+
+        if (origEl.type === 'text') {
+          onUpdateElement(origEl.id, {
+            x: nextX,
+            y: nextY,
+            width: nextW,
+            height: nextH,
+            scaleX: (origEl.scaleX ?? 1) * scaleX,
+            scaleY: (origEl.scaleY ?? 1) * scaleY,
+          });
+          return;
+        }
+
+        onUpdateElement(origEl.id, { x: nextX, y: nextY, width: nextW, height: nextH });
+      });
       return;
     }
 
@@ -983,7 +1112,7 @@ export function Canvas({
         break;
       }
     }
-  }, [isDrawing, currentElement, startPoint, tool, collaboration, getMousePosition, isPanning, panStart, elements, onDeleteElement, strokeWidth, isDragging, isResizing, selectedIds, dragStart, originalElements, originalBounds, resizeHandle, onUpdateElement, shiftPressed, isBoxSelecting, lastMousePos, setLastMousePos, isDraggingLineEndpoint, lineEndpointIndex, isDraggingConnectorCorner, connectorStyle, getElementsToErase]);
+  }, [isDrawing, currentElement, startPoint, tool, collaboration, getMousePosition, isPanning, panStart, elements, onDeleteElement, strokeWidth, isDragging, isResizing, selectedIds, dragStart, originalElements, originalBounds, resizeHandle, onUpdateElement, shiftPressed, isBoxSelecting, lastMousePos, setLastMousePos, setSelectedIds, isDraggingLineEndpoint, lineEndpointIndex, isDraggingConnectorCorner, connectorStyle, getElementsToErase]);
 
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
     // Middle mouse button for panning OR hand tool with left click
@@ -1019,8 +1148,8 @@ export function Canvas({
     const selectableClickedElement = clickedElement?.type === 'laser' ? null : clickedElement;
 
     if (tool === 'select') {
-      // Check if clicking on a resize handle first (single selection only)
-      if (selectedBounds && selectedIds.length === 1) {
+      // Check if clicking on a resize handle first (supports multi-selection)
+      if (selectedBounds && selectedIds.length >= 1) {
         const handleSize = 10 / zoom;
         const selectionPadding = 6 / zoom;
         const visualBounds = expandBounds(selectedBounds, selectionPadding);
@@ -1065,19 +1194,22 @@ export function Canvas({
       
       // Use clicked element from event target
       if (selectableClickedElement) {
+        const clickedIds = getGroupSelectionIds(selectableClickedElement, elements);
+        const clickedAllSelected = clickedIds.every((id) => selectedIds.includes(id));
+
         // Shift-click to add to selection
         if (shiftPressed) {
-          if (selectedIds.includes(selectableClickedElement.id)) {
-            setSelectedIds(selectedIds.filter(id => id !== selectableClickedElement.id));
+          if (clickedAllSelected) {
+            setSelectedIds(selectedIds.filter((id) => !clickedIds.includes(id)));
           } else {
-            setSelectedIds([...selectedIds, selectableClickedElement.id]);
+            setSelectedIds([...selectedIds, ...clickedIds.filter((id) => !selectedIds.includes(id))]);
           }
         } else {
-          setSelectedIds([selectableClickedElement.id]);
+          setSelectedIds(clickedIds);
           onStartTransform?.();
           setIsDragging(true);
           setDragStart(point);
-          setOriginalElements([{ ...selectableClickedElement }]);
+          setOriginalElements(elements.filter((el) => clickedIds.includes(el.id)).map((el) => ({ ...el })));
         }
       } else {
         // Start box selection
@@ -1090,7 +1222,7 @@ export function Canvas({
 
     // For drawing tools, if we clicked on an element, select it instead
     if (tool !== 'eraser' && tool !== 'text' && selectableClickedElement) {
-      setSelectedIds([selectableClickedElement.id]);
+      setSelectedIds(getGroupSelectionIds(selectableClickedElement, elements));
       return;
     }
 
@@ -1214,24 +1346,7 @@ export function Canvas({
       // This prevents accidental selections from single clicks
       const minBoxSize = 5;
       if (selectionBox.width >= minBoxSize || selectionBox.height >= minBoxSize) {
-        const selected: string[] = [];
-        elements.forEach(el => {
-          if (el.type === 'laser') return;
-          const bounds = getBoundingBox(el);
-          if (bounds) {
-            // Check if element intersects with selection box (any overlap)
-            const intersects = !(
-              bounds.x + bounds.width < selectionBox.x ||
-              bounds.x > selectionBox.x + selectionBox.width ||
-              bounds.y + bounds.height < selectionBox.y ||
-              bounds.y > selectionBox.y + selectionBox.height
-            );
-            if (intersects) {
-              selected.push(el.id);
-            }
-          }
-        });
-        setSelectedIds(selected);
+        setSelectedIds(getBoxSelectedIds(elements, selectionBox));
       }
       setIsBoxSelecting(false);
       setSelectionBox(null);
@@ -2523,8 +2638,75 @@ export function Canvas({
       }
     }
 
-    const handleSize = 8 / zoom;
     const selectionPadding = 6 / zoom;
+
+    // For multi-selection, draw individual (solid) frames around each selected element.
+    if (selectedIds.length > 1) {
+      const combinedVisualBounds = expandBounds(selectedBounds, selectionPadding);
+      const handleSize = 8 / zoom;
+      const handlePoints: Array<{ pos: ResizeHandle; x: number; y: number; cursor: string }> = [
+        { pos: 'nw', x: combinedVisualBounds.x, y: combinedVisualBounds.y, cursor: 'nwse-resize' },
+        { pos: 'n', x: combinedVisualBounds.x + combinedVisualBounds.width / 2, y: combinedVisualBounds.y, cursor: 'ns-resize' },
+        { pos: 'ne', x: combinedVisualBounds.x + combinedVisualBounds.width, y: combinedVisualBounds.y, cursor: 'nesw-resize' },
+        { pos: 'e', x: combinedVisualBounds.x + combinedVisualBounds.width, y: combinedVisualBounds.y + combinedVisualBounds.height / 2, cursor: 'ew-resize' },
+        { pos: 'se', x: combinedVisualBounds.x + combinedVisualBounds.width, y: combinedVisualBounds.y + combinedVisualBounds.height, cursor: 'nwse-resize' },
+        { pos: 's', x: combinedVisualBounds.x + combinedVisualBounds.width / 2, y: combinedVisualBounds.y + combinedVisualBounds.height, cursor: 'ns-resize' },
+        { pos: 'sw', x: combinedVisualBounds.x, y: combinedVisualBounds.y + combinedVisualBounds.height, cursor: 'nesw-resize' },
+        { pos: 'w', x: combinedVisualBounds.x, y: combinedVisualBounds.y + combinedVisualBounds.height / 2, cursor: 'ew-resize' },
+      ];
+      return (
+        <g>
+          {selectedIds.map((id) => {
+            const el = elements.find((e) => e.id === id);
+            if (!el) return null;
+            const bounds = getBoundingBox(el);
+            if (!bounds) return null;
+            const vb = expandBounds(bounds, selectionPadding);
+            return (
+              <rect
+                key={id}
+                x={vb.x}
+                y={vb.y}
+                width={vb.width}
+                height={vb.height}
+                fill="none"
+                stroke="var(--accent)"
+                strokeWidth={2}
+                pointerEvents="none"
+              />
+            );
+          })}
+          {/* Combined multi-selection frame */}
+          <rect
+            x={combinedVisualBounds.x}
+            y={combinedVisualBounds.y}
+            width={combinedVisualBounds.width}
+            height={combinedVisualBounds.height}
+            fill="none"
+            stroke="var(--accent)"
+            strokeWidth={2}
+            strokeDasharray="5,5"
+            pointerEvents="none"
+          />
+          {handlePoints.map((h) => (
+            <rect
+              key={h.pos}
+              x={h.x - handleSize / 2}
+              y={h.y - handleSize / 2}
+              width={handleSize}
+              height={handleSize}
+              fill="var(--accent)"
+              stroke="var(--background)"
+              strokeWidth={1}
+              rx={2}
+              style={{ cursor: h.cursor }}
+            />
+          ))}
+        </g>
+      );
+    }
+
+    const handleSize = 8 / zoom;
     const visualBounds = expandBounds(selectedBounds, selectionPadding);
     const handles: { pos: ResizeHandle; x: number; y: number; cursor: string }[] = selectedIds.length === 1 ? [
       { pos: 'nw', x: visualBounds.x, y: visualBounds.y, cursor: 'nwse-resize' },
@@ -2762,6 +2944,7 @@ export function Canvas({
             <line x1="-12" y1="24" x2="12" y2="0" stroke="currentColor" strokeWidth="0.8" opacity="0.4" strokeLinecap="round" />
             <line x1="12" y1="24" x2="36" y2="0" stroke="currentColor" strokeWidth="1" opacity="0.4" strokeLinecap="round" />
           </pattern>
+
         </defs>
         <g transform={`translate(${pan.x}, ${pan.y}) scale(${zoom})`}>
           {/* Render all elements sorted by zIndex */}

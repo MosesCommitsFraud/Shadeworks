@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useTheme } from 'next-themes';
+import { v4 as uuid } from 'uuid';
 import { Canvas } from './canvas';
 import { Toolbar } from './toolbar';
 import { ToolSidebar } from './tool-sidebar';
@@ -19,6 +20,84 @@ interface WhiteboardProps {
 }
 
 const MAX_UNDO_STACK = 100;
+
+interface BoundingBox {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+function getBoundingBox(element: BoardElement): BoundingBox | null {
+  if (element.type === 'pen' || element.type === 'line' || element.type === 'arrow') {
+    if (element.points.length === 0) return null;
+    const xs = element.points.map((p) => p.x);
+    const ys = element.points.map((p) => p.y);
+    const minX = Math.min(...xs);
+    const minY = Math.min(...ys);
+    const maxX = Math.max(...xs);
+    const maxY = Math.max(...ys);
+    const padding = element.strokeWidth * 2;
+    return {
+      x: minX - padding,
+      y: minY - padding,
+      width: Math.max(maxX - minX + padding * 2, 20),
+      height: Math.max(maxY - minY + padding * 2, 20),
+    };
+  }
+
+  if (element.type === 'rectangle' || element.type === 'ellipse' || element.type === 'frame' || element.type === 'web-embed') {
+    return {
+      x: element.x ?? 0,
+      y: element.y ?? 0,
+      width: element.width ?? 0,
+      height: element.height ?? 0,
+    };
+  }
+
+  if (element.type === 'text') {
+    if (element.width !== undefined && element.height !== undefined) {
+      return {
+        x: element.x ?? 0,
+        y: element.y ?? 0,
+        width: element.width,
+        height: element.height,
+      };
+    }
+    const fontSize = element.strokeWidth * 4 + 12;
+    if (element.isTextBox) {
+      return {
+        x: element.x ?? 0,
+        y: element.y ?? 0,
+        width: element.width ?? 200,
+        height: element.height ?? 100,
+      };
+    }
+    const textWidth = (element.text?.length ?? 0) * fontSize * 0.55;
+    const textHeight = fontSize * 1.2;
+    return {
+      x: element.x ?? 0,
+      y: element.y ?? 0,
+      width: Math.max(textWidth, 60),
+      height: textHeight,
+    };
+  }
+
+  return null;
+}
+
+function translateElement(element: BoardElement, dx: number, dy: number): Partial<BoardElement> {
+  if (element.type === 'pen' || element.type === 'line' || element.type === 'arrow') {
+    return {
+      points: element.points.map((p) => ({ x: p.x + dx, y: p.y + dy })),
+    };
+  }
+
+  return {
+    x: (element.x ?? 0) + dx,
+    y: (element.y ?? 0) + dy,
+  };
+}
 
 export function Whiteboard({ roomId }: WhiteboardProps) {
   const { theme, resolvedTheme } = useTheme();
@@ -646,6 +725,157 @@ export function Whiteboard({ roomId }: WhiteboardProps) {
     });
   }, [selectedElements, saveToUndoStack, handleUpdateElement]);
 
+  const handleAlignLeft = useCallback(() => {
+    if (selectedElements.length < 2) return;
+    saveToUndoStack();
+    const bounds = selectedElements.map((el) => ({ el, b: getBoundingBox(el) })).filter((x) => x.b) as Array<{
+      el: BoardElement;
+      b: BoundingBox;
+    }>;
+    if (bounds.length < 2) return;
+    const target = Math.min(...bounds.map(({ b }) => b.x));
+    bounds.forEach(({ el, b }) => handleUpdateElement(el.id, translateElement(el, target - b.x, 0)));
+  }, [selectedElements, saveToUndoStack, handleUpdateElement]);
+
+  const handleAlignCenterHorizontal = useCallback(() => {
+    if (selectedElements.length < 2) return;
+    saveToUndoStack();
+    const bounds = selectedElements.map((el) => ({ el, b: getBoundingBox(el) })).filter((x) => x.b) as Array<{
+      el: BoardElement;
+      b: BoundingBox;
+    }>;
+    if (bounds.length < 2) return;
+    const minX = Math.min(...bounds.map(({ b }) => b.x));
+    const maxX = Math.max(...bounds.map(({ b }) => b.x + b.width));
+    const target = (minX + maxX) / 2;
+    bounds.forEach(({ el, b }) =>
+      handleUpdateElement(el.id, translateElement(el, target - (b.x + b.width / 2), 0))
+    );
+  }, [selectedElements, saveToUndoStack, handleUpdateElement]);
+
+  const handleAlignRight = useCallback(() => {
+    if (selectedElements.length < 2) return;
+    saveToUndoStack();
+    const bounds = selectedElements.map((el) => ({ el, b: getBoundingBox(el) })).filter((x) => x.b) as Array<{
+      el: BoardElement;
+      b: BoundingBox;
+    }>;
+    if (bounds.length < 2) return;
+    const target = Math.max(...bounds.map(({ b }) => b.x + b.width));
+    bounds.forEach(({ el, b }) => handleUpdateElement(el.id, translateElement(el, target - (b.x + b.width), 0)));
+  }, [selectedElements, saveToUndoStack, handleUpdateElement]);
+
+  const handleAlignTop = useCallback(() => {
+    if (selectedElements.length < 2) return;
+    saveToUndoStack();
+    const bounds = selectedElements.map((el) => ({ el, b: getBoundingBox(el) })).filter((x) => x.b) as Array<{
+      el: BoardElement;
+      b: BoundingBox;
+    }>;
+    if (bounds.length < 2) return;
+    const target = Math.min(...bounds.map(({ b }) => b.y));
+    bounds.forEach(({ el, b }) => handleUpdateElement(el.id, translateElement(el, 0, target - b.y)));
+  }, [selectedElements, saveToUndoStack, handleUpdateElement]);
+
+  const handleAlignCenterVertical = useCallback(() => {
+    if (selectedElements.length < 2) return;
+    saveToUndoStack();
+    const bounds = selectedElements.map((el) => ({ el, b: getBoundingBox(el) })).filter((x) => x.b) as Array<{
+      el: BoardElement;
+      b: BoundingBox;
+    }>;
+    if (bounds.length < 2) return;
+    const minY = Math.min(...bounds.map(({ b }) => b.y));
+    const maxY = Math.max(...bounds.map(({ b }) => b.y + b.height));
+    const target = (minY + maxY) / 2;
+    bounds.forEach(({ el, b }) =>
+      handleUpdateElement(el.id, translateElement(el, 0, target - (b.y + b.height / 2)))
+    );
+  }, [selectedElements, saveToUndoStack, handleUpdateElement]);
+
+  const handleAlignBottom = useCallback(() => {
+    if (selectedElements.length < 2) return;
+    saveToUndoStack();
+    const bounds = selectedElements.map((el) => ({ el, b: getBoundingBox(el) })).filter((x) => x.b) as Array<{
+      el: BoardElement;
+      b: BoundingBox;
+    }>;
+    if (bounds.length < 2) return;
+    const target = Math.max(...bounds.map(({ b }) => b.y + b.height));
+    bounds.forEach(({ el, b }) => handleUpdateElement(el.id, translateElement(el, 0, target - (b.y + b.height))));
+  }, [selectedElements, saveToUndoStack, handleUpdateElement]);
+
+  const handleCopySelected = useCallback(() => {
+    if (selectedElements.length === 0) return;
+    saveToUndoStack();
+
+    const selectionGroupId = selectedElements[0]?.groupId;
+    const isSelectionSingleGroup =
+      !!selectionGroupId && selectedElements.every((el) => el.groupId === selectionGroupId);
+    const newGroupId = isSelectionSingleGroup ? uuid() : undefined;
+    const offset = 12;
+
+    const copies = selectedElements
+      .filter((el) => el.type !== 'laser')
+      .map((el) => {
+        const next: BoardElement = {
+          ...el,
+          id: uuid(),
+          groupId: newGroupId,
+        };
+
+        if (el.type === 'pen' || el.type === 'line' || el.type === 'arrow') {
+          next.points = el.points.map((p) => ({ x: p.x + offset, y: p.y + offset }));
+        } else {
+          next.x = (el.x ?? 0) + offset;
+          next.y = (el.y ?? 0) + offset;
+        }
+
+        return next;
+      });
+
+    if (copies.length === 0) return;
+
+    if (collaboration) {
+      copies.forEach((el) => collaboration.addElement(el));
+    } else {
+      setElements((prev) => [...prev, ...copies]);
+    }
+  }, [selectedElements, saveToUndoStack, collaboration]);
+
+  const handleDeleteSelected = useCallback(() => {
+    if (selectedElements.length === 0) return;
+    saveToUndoStack();
+
+    const ids = new Set(selectedElements.map((el) => el.id));
+    if (collaboration) {
+      selectedElements.forEach((el) => collaboration.deleteElement(el.id));
+    } else {
+      setElements((prev) => prev.filter((el) => !ids.has(el.id)));
+    }
+  }, [selectedElements, saveToUndoStack, collaboration]);
+
+  const handleToggleGroupSelection = useCallback(() => {
+    if (selectedElements.length === 0) return;
+    saveToUndoStack();
+
+    const selectionGroupId = selectedElements[0]?.groupId;
+    const isSelectionSingleGroup =
+      !!selectionGroupId && selectedElements.every((el) => el.groupId === selectionGroupId);
+
+    if (isSelectionSingleGroup && selectionGroupId) {
+      elements
+        .filter((el) => el.groupId === selectionGroupId)
+        .forEach((el) => handleUpdateElement(el.id, { groupId: undefined }));
+      return;
+    }
+
+    if (selectedElements.length < 2) return;
+
+    const newGroupId = uuid();
+    selectedElements.forEach((el) => handleUpdateElement(el.id, { groupId: newGroupId }));
+  }, [selectedElements, elements, saveToUndoStack, handleUpdateElement]);
+
   // Sync sidebar properties with selected elements
   useEffect(() => {
     if (selectedElements.length > 0) {
@@ -674,8 +904,9 @@ export function Whiteboard({ roomId }: WhiteboardProps) {
       if (firstElement.arrowEnd !== undefined) {
         setArrowEnd(firstElement.arrowEnd);
       }
-      if (firstElement.cornerRadius !== undefined) {
-        setCornerRadius(firstElement.cornerRadius);
+      const cornerRadiusElements = selectedElements.filter((el) => el.type === 'rectangle' || el.type === 'frame');
+      if (cornerRadiusElements.length > 0) {
+        setCornerRadius(cornerRadiusElements[0].cornerRadius ?? 0);
       }
       if (firstElement.fontFamily !== undefined) {
         setFontFamily(firstElement.fontFamily);
@@ -854,6 +1085,15 @@ export function Whiteboard({ roomId }: WhiteboardProps) {
         onSendToBack={handleSendToBack}
         onMoveForward={handleMoveForward}
         onMoveBackward={handleMoveBackward}
+        onAlignLeft={handleAlignLeft}
+        onAlignCenterHorizontal={handleAlignCenterHorizontal}
+        onAlignRight={handleAlignRight}
+        onAlignTop={handleAlignTop}
+        onAlignCenterVertical={handleAlignCenterVertical}
+        onAlignBottom={handleAlignBottom}
+        onCopySelected={handleCopySelected}
+        onDeleteSelected={handleDeleteSelected}
+        onToggleGroupSelection={handleToggleGroupSelection}
       />
 
       <Canvas

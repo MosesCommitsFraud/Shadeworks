@@ -18,6 +18,7 @@ export interface Point {
 export interface BoardElement {
   id: string;
   type: 'pen' | 'line' | 'arrow' | 'rectangle' | 'ellipse' | 'text' | 'frame' | 'web-embed' | 'laser';
+  groupId?: string;
   points: Point[];
   strokeColor: string;
   strokeWidth: number;
