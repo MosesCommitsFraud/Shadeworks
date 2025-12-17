@@ -935,8 +935,8 @@ export function Canvas({
   }, [isDrawing, currentElement, startPoint, tool, collaboration, getMousePosition, isPanning, panStart, elements, onDeleteElement, strokeWidth, isDragging, isResizing, selectedIds, dragStart, originalElements, originalBounds, resizeHandle, onUpdateElement, shiftPressed, isBoxSelecting, lassoPoints, lastMousePos, setLastMousePos, isDraggingLineEndpoint, lineEndpointIndex, isDraggingConnectorCorner, connectorStyle, getElementsToErase]);
 
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
-    // Middle mouse button for panning
-    if (e.button === 1) {
+    // Middle mouse button for panning OR hand tool with left click
+    if (e.button === 1 || (e.button === 0 && tool === 'hand')) {
       setIsPanning(true);
       setPanStart({ x: e.clientX - pan.x, y: e.clientY - pan.y });
       return;
@@ -2538,6 +2538,7 @@ export function Canvas({
 
   const getCursorStyle = () => {
     if (isDragging) return 'grabbing';
+    if (isPanning) return 'grabbing';
     if (isResizing) {
       switch (resizeHandle) {
         case 'nw':
@@ -2556,6 +2557,8 @@ export function Canvas({
     }
 
     switch (tool) {
+      case 'hand':
+        return 'grab';
       case 'pen':
       case 'line':
       case 'arrow':

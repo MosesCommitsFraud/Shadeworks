@@ -1,4 +1,5 @@
 export type Tool =
+  | 'hand'
   | 'select'
   | 'pen'
   | 'line'

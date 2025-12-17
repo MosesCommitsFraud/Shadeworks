@@ -16,6 +16,7 @@ import {
   Lasso,
   Lock,
   Unlock,
+  Hand,
 } from 'lucide-react';
 import { Tool } from '@/lib/board-types';
 import type { ConnectionStatus } from '@/lib/collaboration';
@@ -47,6 +48,7 @@ interface ToolbarProps {
 }
 
 const tools: { id: Tool; icon: React.ElementType; label: string; hotkey: number | string }[] = [
+  { id: 'hand', icon: Hand, label: 'Hand', hotkey: 'H' },
   { id: 'select', icon: MousePointer2, label: 'Select', hotkey: 'V' },
   { id: 'pen', icon: Pencil, label: 'Pen', hotkey: 1 },
   { id: 'line', icon: Minus, label: 'Line', hotkey: 2 },
@@ -95,7 +97,11 @@ export function Toolbar({
         return;
       }
 
-      // V for select tool
+      // Letter keys for tools
+      if (e.key === 'h' || e.key === 'H') {
+        onToolChange('hand');
+        return;
+      }
       if (e.key === 'v' || e.key === 'V') {
         onToolChange('select');
         return;
