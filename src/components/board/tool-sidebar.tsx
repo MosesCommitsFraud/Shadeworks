@@ -269,7 +269,6 @@ export function ToolSidebar({
   }
 
   const hasSelectedElements = selectedElements.length > 0;
-  const isMultiSelection = selectedElements.length > 1;
   const selectionGroupId = selectedElements[0]?.groupId;
   const isSelectionSingleGroup =
     !!selectionGroupId && selectedElements.every((el) => el.groupId === selectionGroupId);
@@ -1056,38 +1055,34 @@ export function ToolSidebar({
                 {onCopySelected && (
                   <button
                     onClick={onCopySelected}
-                    className={cn(CONTROL_BUTTON, 'h-9 flex items-center justify-center', !isMultiSelection && 'text-xs')}
+                    className={cn(CONTROL_BUTTON, 'h-9 flex items-center justify-center')}
                     title="Copy"
                     aria-label="Copy"
                   >
-                    {isMultiSelection ? <Copy className="w-3.5 h-3.5" /> : 'Copy'}
+                    <Copy className="w-3.5 h-3.5" />
                   </button>
                 )}
                 {onDeleteSelected && (
                   <button
                     onClick={onDeleteSelected}
-                    className={cn(CONTROL_BUTTON, 'h-9 flex items-center justify-center', !isMultiSelection && 'text-xs')}
+                    className={cn(CONTROL_BUTTON, 'h-9 flex items-center justify-center')}
                     title="Delete"
                     aria-label="Delete"
                   >
-                    {isMultiSelection ? <Trash2 className="w-3.5 h-3.5" /> : 'Delete'}
+                    <Trash2 className="w-3.5 h-3.5" />
                   </button>
                 )}
                 {onToggleGroupSelection && (selectedElements.length > 1 || isSelectionSingleGroup) && (
                   <button
                     onClick={onToggleGroupSelection}
-                    className={cn(CONTROL_BUTTON, 'h-9 flex items-center justify-center', !isMultiSelection && 'text-xs')}
+                    className={cn(CONTROL_BUTTON, 'h-9 flex items-center justify-center')}
                     title={isSelectionSingleGroup ? 'Ungroup' : 'Group'}
                     aria-label={isSelectionSingleGroup ? 'Ungroup' : 'Group'}
                   >
-                    {isMultiSelection ? (
-                      isSelectionSingleGroup ? (
-                        <Ungroup className="w-3.5 h-3.5" />
-                      ) : (
-                        <Group className="w-3.5 h-3.5" />
-                      )
+                    {isSelectionSingleGroup ? (
+                      <Ungroup className="w-3.5 h-3.5" />
                     ) : (
-                      (isSelectionSingleGroup ? 'Ungroup' : 'Group')
+                      <Group className="w-3.5 h-3.5" />
                     )}
                   </button>
                 )}
