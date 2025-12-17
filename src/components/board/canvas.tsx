@@ -198,20 +198,7 @@ function getBoundingBox(element: BoardElement): BoundingBox | null {
   }
 
   if (element.type === 'laser') {
-    if (element.points.length === 0) return null;
-    const xs = element.points.map(p => p.x);
-    const ys = element.points.map(p => p.y);
-    const minX = Math.min(...xs);
-    const minY = Math.min(...ys);
-    const maxX = Math.max(...xs);
-    const maxY = Math.max(...ys);
-    const padding = 20;
-    return {
-      x: minX - padding,
-      y: minY - padding,
-      width: Math.max(maxX - minX + padding * 2, 20),
-      height: Math.max(maxY - minY + padding * 2, 20),
-    };
+    return null;
   }
 
   return null;
@@ -971,6 +958,7 @@ export function Canvas({
     }
 
     const clickedElement = clickedElementId ? elements.find(el => el.id === clickedElementId) : null;
+    const selectableClickedElement = clickedElement?.type === 'laser' ? null : clickedElement;
 
     if (tool === 'select') {
       // Check if clicking on a resize handle first (single selection only)
@@ -1002,7 +990,7 @@ export function Canvas({
       
       // Check if clicking inside the selection box (for moving)
       // Only allow drag if we actually clicked on an element (not just in the bounding box)
-      if (clickedElement && selectedIds.includes(clickedElement.id) && selectedBounds &&
+      if (selectableClickedElement && selectedIds.includes(selectableClickedElement.id) && selectedBounds &&
         point.x >= selectedBounds.x &&
         point.x <= selectedBounds.x + selectedBounds.width &&
         point.y >= selectedBounds.y &&
@@ -1016,20 +1004,20 @@ export function Canvas({
       }
       
       // Use clicked element from event target
-      if (clickedElement) {
+      if (selectableClickedElement) {
         // Shift-click to add to selection
         if (shiftPressed) {
-          if (selectedIds.includes(clickedElement.id)) {
-            setSelectedIds(selectedIds.filter(id => id !== clickedElement.id));
+          if (selectedIds.includes(selectableClickedElement.id)) {
+            setSelectedIds(selectedIds.filter(id => id !== selectableClickedElement.id));
           } else {
-            setSelectedIds([...selectedIds, clickedElement.id]);
+            setSelectedIds([...selectedIds, selectableClickedElement.id]);
           }
         } else {
-          setSelectedIds([clickedElement.id]);
+          setSelectedIds([selectableClickedElement.id]);
           onStartTransform?.();
           setIsDragging(true);
           setDragStart(point);
-          setOriginalElements([{ ...clickedElement }]);
+          setOriginalElements([{ ...selectableClickedElement }]);
         }
       } else {
         // Start box selection
@@ -1041,8 +1029,8 @@ export function Canvas({
     }
 
     // For drawing tools, if we clicked on an element, select it instead
-    if (tool !== 'eraser' && tool !== 'text' && clickedElement) {
-      setSelectedIds([clickedElement.id]);
+    if (tool !== 'eraser' && tool !== 'text' && selectableClickedElement) {
+      setSelectedIds([selectableClickedElement.id]);
       return;
     }
 
@@ -1168,6 +1156,7 @@ export function Canvas({
       if (selectionBox.width >= minBoxSize || selectionBox.height >= minBoxSize) {
         const selected: string[] = [];
         elements.forEach(el => {
+          if (el.type === 'laser') return;
           const bounds = getBoundingBox(el);
           if (bounds) {
             // Check if element intersects with selection box (any overlap)
@@ -2292,7 +2281,7 @@ export function Canvas({
         const centerLineData = getSvgPathFromStroke(centerStroke);
 
         return (
-          <g key={element.id}>
+          <g key={element.id} pointerEvents="none" className="select-none">
             {/* Main red glowing path */}
             <path
               data-element-id={element.id}
@@ -2300,7 +2289,7 @@ export function Canvas({
               fill="#ef4444"
               opacity={isMarkedForDeletion ? elOpacity * 0.8 * 0.3 : elOpacity * 0.8}
               filter="url(#laser-glow)"
-              pointerEvents="auto"
+              pointerEvents="none"
             />
             {/* Smooth white center line */}
             <path
