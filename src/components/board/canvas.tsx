@@ -1175,21 +1175,23 @@ export function Canvas({
             return;
           }
         }
-      }
-      
-      // Check if clicking inside the selection box (for moving)
-      // Only allow drag if we actually clicked on an element (not just in the bounding box)
-      if (selectableClickedElement && selectedIds.includes(selectableClickedElement.id) && selectedBounds &&
-        point.x >= selectedBounds.x &&
-        point.x <= selectedBounds.x + selectedBounds.width &&
-        point.y >= selectedBounds.y &&
-        point.y <= selectedBounds.y + selectedBounds.height
-      ) {
-        onStartTransform?.();
-        setIsDragging(true);
-        setDragStart(point);
-        setOriginalElements(selectedElements.map(el => ({ ...el })));
-        return;
+
+        // Allow dragging the current selection by grabbing anywhere inside its visual frame.
+        // Clicking inside the frame should not clear the selection.
+        const clickedIsInSelection = selectableClickedElement ? selectedIds.includes(selectableClickedElement.id) : true;
+        const pointInSelectionFrame =
+          point.x >= visualBounds.x &&
+          point.x <= visualBounds.x + visualBounds.width &&
+          point.y >= visualBounds.y &&
+          point.y <= visualBounds.y + visualBounds.height;
+
+        if (pointInSelectionFrame && clickedIsInSelection) {
+          onStartTransform?.();
+          setIsDragging(true);
+          setDragStart(point);
+          setOriginalElements(selectedElements.map((el) => ({ ...el })));
+          return;
+        }
       }
       
       // Use clicked element from event target
