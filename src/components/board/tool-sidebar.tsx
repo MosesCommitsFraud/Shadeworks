@@ -9,6 +9,7 @@ import { Slider } from '@/components/ui/slider';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { Button } from '@/components/ui/button';
+import { ColorPicker } from '@/components/ui/color-picker';
 
 interface ToolSidebarProps {
   selectedTool: Tool;
@@ -106,8 +107,6 @@ export function ToolSidebar({
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [showStrokeColorPicker, setShowStrokeColorPicker] = useState(false);
   const [showFillColorPicker, setShowFillColorPicker] = useState(false);
-  const [customStrokeColor, setCustomStrokeColor] = useState(strokeColor);
-  const [customFillColor, setCustomFillColor] = useState(fillColor);
   const [openArrowEndMenu, setOpenArrowEndMenu] = useState<'start' | 'end' | null>(null);
   const [arrowEndMenuPos, setArrowEndMenuPos] = useState<{ left: number; top: number } | null>(null);
   const arrowStartButtonRef = useRef<HTMLButtonElement | null>(null);
@@ -935,159 +934,31 @@ export function ToolSidebar({
       </div>
       </div>
 
-      {/* Stroke Color Picker Modal - Outside overflow container */}
-      {showStrokeColorPicker && (
-        <>
-          <div className="fixed inset-0 z-[9998] bg-black/50" onClick={() => setShowStrokeColorPicker(false)} />
-          <div
-            className="fixed right-80 top-1/2 -translate-y-1/2 z-[9999] bg-card border border-border rounded-md p-6 shadow-2xl w-80"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-sm font-semibold text-foreground">Custom Stroke Color</h3>
-              <Button
-                onClick={() => setShowStrokeColorPicker(false)}
-                variant="ghost"
-                size="icon-sm"
-                className="text-muted-foreground hover:text-foreground"
-              >
-                <X className="w-4 h-4" />
-              </Button>
-            </div>
-            <div className="space-y-4">
-              {/* Color Wheel */}
-              <div>
-                <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2 block">
-                  Color Picker
-                </label>
-                <div className="flex justify-center">
-                  <input
-                    type="color"
-                    value={customStrokeColor}
-                    onChange={(e) => setCustomStrokeColor(e.target.value)}
-                    className="w-32 h-32 rounded-md cursor-pointer border border-border/60 shadow-sm"
-                  />
-                </div>
-              </div>
-              <div>
-                <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2 block">
-                  Hex Code
-                </label>
-                <input
-                  type="text"
-                  value={customStrokeColor}
-                  onChange={(e) => {
-                    const value = e.target.value;
-                    if (/^#[0-9A-F]{0,6}$/i.test(value)) {
-                      setCustomStrokeColor(value);
-                    }
-                  }}
-                  className="w-full px-3 py-2 bg-background border border-input rounded-md text-foreground font-mono text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                  placeholder="#FFFFFF"
-                />
-              </div>
-              <div>
-                <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2 block">
-                  Preview
-                </label>
-                <div
-                  className="w-full h-16 rounded-md border border-border/60 shadow-sm"
-                  style={{ backgroundColor: customStrokeColor }}
-                />
-              </div>
-              <div className="flex gap-2">
-                <Button
-                  onClick={() => {
-                    onStrokeColorChange(customStrokeColor);
-                    setShowStrokeColorPicker(false);
-                  }}
-                  className="flex-1"
-                >
-                  Apply Color
-                </Button>
-              </div>
-            </div>
-          </div>
-        </>
-      )}
+      {/* Stroke Color Picker Modal */}
+      <ColorPicker
+        value={strokeColor}
+        onChange={onStrokeColorChange}
+        isOpen={showStrokeColorPicker}
+        onClose={() => setShowStrokeColorPicker(false)}
+        title="Custom Stroke Color"
+        position="auto"
+        showAlpha={true}
+        showEyedropper={true}
+        showSwatches={true}
+      />
 
-      {/* Fill Color Picker Modal - Outside overflow container */}
-      {showFillColorPicker && (
-        <>
-          <div className="fixed inset-0 z-[9998] bg-black/50" onClick={() => setShowFillColorPicker(false)} />
-          <div
-            className="fixed right-80 top-1/2 -translate-y-1/2 z-[9999] bg-card border border-border rounded-md p-6 shadow-2xl w-80"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-sm font-semibold text-foreground">Custom Fill Color</h3>
-              <Button
-                onClick={() => setShowFillColorPicker(false)}
-                variant="ghost"
-                size="icon-sm"
-                className="text-muted-foreground hover:text-foreground"
-              >
-                <X className="w-4 h-4" />
-              </Button>
-            </div>
-            <div className="space-y-4">
-              {/* Color Wheel */}
-              <div>
-                <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2 block">
-                  Color Picker
-                </label>
-                <div className="flex justify-center">
-                  <input
-                    type="color"
-                    value={customFillColor === 'transparent' ? '#ffffff' : customFillColor}
-                    onChange={(e) => setCustomFillColor(e.target.value)}
-                    className="w-32 h-32 rounded-md cursor-pointer border border-border/60 shadow-sm"
-                  />
-                </div>
-              </div>
-              <div>
-                <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2 block">
-                  Hex Code
-                </label>
-                <input
-                  type="text"
-                  value={customFillColor === 'transparent' ? '' : customFillColor}
-                  onChange={(e) => {
-                    const value = e.target.value;
-                    if (/^#[0-9A-F]{0,6}$/i.test(value)) {
-                      setCustomFillColor(value);
-                    }
-                  }}
-                  className="w-full px-3 py-2 bg-background border border-input rounded-md text-foreground font-mono text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                  placeholder="#FFFFFF"
-                />
-              </div>
-              <div>
-                <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2 block">
-                  Preview
-                </label>
-                <div
-                  className="w-full h-16 rounded-md border border-border/60 shadow-sm"
-                  style={{ backgroundColor: customFillColor === 'transparent' ? '#ffffff' : customFillColor }}
-                />
-              </div>
-              <div className="flex gap-2">
-                <Button
-                  onClick={() => {
-                    if (onFillColorChange) {
-                      onFillColorChange(customFillColor);
-                    }
-                    setShowFillColorPicker(false);
-                  }}
-                  className="flex-1"
-                >
-                  Apply Color
-                </Button>
-              </div>
-            </div>
-          </div>
-        </>
-      )}
+      {/* Fill Color Picker Modal */}
+      <ColorPicker
+        value={fillColor}
+        onChange={(color) => onFillColorChange?.(color)}
+        isOpen={showFillColorPicker}
+        onClose={() => setShowFillColorPicker(false)}
+        title="Custom Fill Color"
+        position="auto"
+        showAlpha={true}
+        showEyedropper={true}
+        showSwatches={true}
+      />
 
       {/* Arrow End Picker Menu - Outside overflow container */}
       {openArrowEndMenu && arrowEndMenuPos && (
