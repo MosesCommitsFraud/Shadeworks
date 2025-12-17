@@ -1133,8 +1133,8 @@ export function Canvas({
       // Rotated resize for box-like elements: keep opposite handle fixed in world space,
       // compute size in local space (similar to Excalidraw).
       if (supportsRotatedResize && centerForResize && rotationDeg && selectedIds.length === 1 && originalElements.length === 1) {
-        const draggedHandle = resizeHandle as Exclude<ResizeHandle, null>;
-        const fixedHandle = getOppositeResizeHandle(draggedHandle);
+        const startHandle = resizeHandle as Exclude<ResizeHandle, null>;
+        const fixedHandle = getOppositeResizeHandle(startHandle);
 
         const fixedLocalPoint = getHandlePointFromBounds(originalBounds, fixedHandle);
         const fixedWorldPoint = rotatePoint(fixedLocalPoint, centerForResize, rotationDeg);
@@ -1142,44 +1142,55 @@ export function Canvas({
         const vWorld = { x: point.x - fixedWorldPoint.x, y: point.y - fixedWorldPoint.y };
         const vLocal = rotateVector(vWorld, -rotationDeg);
 
-        const minAbsSize =
-          originalElement.type === 'rectangle' ||
-          originalElement.type === 'ellipse' ||
-          originalElement.type === 'frame' ||
-          originalElement.type === 'web-embed' ||
-          originalElement.type === 'text'
-            ? 2
-            : 0;
+        const minAbsSize = 0;
+        const clampSigned = (value: number) => {
+          const s = value === 0 ? 1 : Math.sign(value);
+          const abs = Math.abs(value);
+          if (abs < minAbsSize) return s * minAbsSize;
+          return value;
+        };
 
-        const clampSize = (size: number) => Math.max(minAbsSize, Math.abs(size));
+        let widthSigned = originalBounds.width;
+        let heightSigned = originalBounds.height;
 
-        let nextW = originalBounds.width;
-        let nextH = originalBounds.height;
-
-        const isCorner = draggedHandle.length === 2;
+        const isCorner = startHandle.length === 2;
         if (isCorner) {
-          nextW = clampSize(vLocal.x);
-          nextH = clampSize(vLocal.y);
+          widthSigned = clampSigned(vLocal.x);
+          heightSigned = clampSigned(vLocal.y);
 
           if (shiftPressed) {
             const aspect = originalBounds.height === 0 ? 1 : originalBounds.width / originalBounds.height;
-            const wFromH = nextH * aspect;
-            const hFromW = nextW / aspect;
-            if (Math.abs(wFromH - nextW) < Math.abs(hFromW - nextH)) {
-              nextW = wFromH;
+            const signX = widthSigned === 0 ? 1 : Math.sign(widthSigned);
+            const signY = heightSigned === 0 ? 1 : Math.sign(heightSigned);
+            const absW = Math.abs(widthSigned);
+            const absH = Math.abs(heightSigned);
+            const wFromH = absH * aspect;
+            const hFromW = absW / aspect;
+            if (Math.abs(wFromH - absW) < Math.abs(hFromW - absH)) {
+              widthSigned = signX * wFromH;
             } else {
-              nextH = hFromW;
+              heightSigned = signY * hFromW;
             }
           }
-        } else if (draggedHandle === 'e' || draggedHandle === 'w') {
-          nextW = clampSize(vLocal.x);
-        } else if (draggedHandle === 'n' || draggedHandle === 's') {
-          nextH = clampSize(vLocal.y);
+        } else if (startHandle === 'e' || startHandle === 'w') {
+          widthSigned = clampSigned(vLocal.x);
+          heightSigned = originalBounds.height;
+        } else if (startHandle === 'n' || startHandle === 's') {
+          widthSigned = originalBounds.width;
+          heightSigned = clampSigned(vLocal.y);
         }
 
-        const fixedOffsetLocal = getHandleLocalOffset(fixedHandle, nextW, nextH);
-        const fixedOffsetWorld = rotateVector(fixedOffsetLocal, rotationDeg);
-        const nextCenter = { x: fixedWorldPoint.x - fixedOffsetWorld.x, y: fixedWorldPoint.y - fixedOffsetWorld.y };
+        const nextW = Math.abs(widthSigned);
+        const nextH = Math.abs(heightSigned);
+
+        const centerOffsetLocal = isCorner
+          ? { x: widthSigned / 2, y: heightSigned / 2 }
+          : startHandle === 'e' || startHandle === 'w'
+            ? { x: widthSigned / 2, y: 0 }
+            : { x: 0, y: heightSigned / 2 };
+
+        const centerOffsetWorld = rotateVector(centerOffsetLocal, rotationDeg);
+        const nextCenter = { x: fixedWorldPoint.x + centerOffsetWorld.x, y: fixedWorldPoint.y + centerOffsetWorld.y };
 
         const nextX = nextCenter.x - nextW / 2;
         const nextY = nextCenter.y - nextH / 2;
