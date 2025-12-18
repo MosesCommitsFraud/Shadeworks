@@ -627,6 +627,7 @@ export function Whiteboard({ roomId }: WhiteboardProps) {
         selectedElements.forEach((el) => {
           if (
             el.type === "rectangle" ||
+            el.type === "diamond" ||
             el.type === "ellipse" ||
             el.type === "frame" ||
             (el.type === "pen" && el.isClosed && el.fillPattern !== "none")
@@ -671,7 +672,11 @@ export function Whiteboard({ roomId }: WhiteboardProps) {
       if (selectedElements.length > 0) {
         saveToUndoStack();
         selectedElements.forEach((el) => {
-          if (el.type === "rectangle" || el.type === "frame") {
+          if (
+            el.type === "rectangle" ||
+            el.type === "diamond" ||
+            el.type === "frame"
+          ) {
             handleUpdateElement(el.id, { cornerRadius: radius });
           }
         });

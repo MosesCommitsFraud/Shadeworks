@@ -547,19 +547,24 @@ export function ToolSidebar({
     ? selectedElements.some(
         (el) =>
           el.type === "rectangle" ||
+          el.type === "diamond" ||
           el.type === "ellipse" ||
           el.type === "frame" ||
           (el.type === "pen" && el.isClosed && fillPattern !== "none"),
       )
     : selectedTool === "rectangle" ||
+      selectedTool === "diamond" ||
       selectedTool === "ellipse" ||
       (selectedTool === "pen" && fillPattern !== "none");
 
   const showCornerRadius = hasSelectedElements
     ? selectedElements.some(
-        (el) => el.type === "rectangle" || el.type === "frame",
+        (el) =>
+          el.type === "rectangle" ||
+          el.type === "diamond" ||
+          el.type === "frame",
       )
-    : selectedTool === "rectangle";
+    : selectedTool === "rectangle" || selectedTool === "diamond";
 
   const isTextTool = hasSelectedElements
     ? selectedElements.some((el) => el.type === "text")

@@ -752,6 +752,7 @@ function getBoundingBox(element: BoardElement): BoundingBox | null {
 
   if (
     element.type === "rectangle" ||
+    element.type === "diamond" ||
     element.type === "ellipse" ||
     element.type === "frame" ||
     element.type === "web-embed"
@@ -1764,6 +1765,7 @@ export function Canvas({
         const supportsRotatedResize =
           !!originalElement &&
           (originalElement.type === "rectangle" ||
+            originalElement.type === "diamond" ||
             originalElement.type === "ellipse" ||
             originalElement.type === "frame" ||
             originalElement.type === "web-embed" ||
@@ -1865,6 +1867,7 @@ export function Canvas({
 
           if (
             originalElement.type === "rectangle" ||
+            originalElement.type === "diamond" ||
             originalElement.type === "ellipse" ||
             originalElement.type === "frame" ||
             originalElement.type === "web-embed"
@@ -1993,6 +1996,7 @@ export function Canvas({
 
           const minAbsSize =
             originalElement.type === "rectangle" ||
+            originalElement.type === "diamond" ||
             originalElement.type === "ellipse" ||
             originalElement.type === "frame" ||
             originalElement.type === "web-embed" ||
@@ -2045,6 +2049,7 @@ export function Canvas({
 
           if (
             originalElement.type === "rectangle" ||
+            originalElement.type === "diamond" ||
             originalElement.type === "ellipse" ||
             originalElement.type === "frame" ||
             originalElement.type === "web-embed"
@@ -4052,6 +4057,7 @@ export function Canvas({
                 ? "stroke"
                 : "none";
         const hitboxStrokeWidth = Math.max(element.strokeWidth * 6, 16);
+        const elCornerRadius = element.cornerRadius ?? 0;
 
         // Diamond points: top, right, bottom, left
         const x = element.x ?? 0;
@@ -4060,6 +4066,64 @@ export function Canvas({
         const h = element.height ?? 0;
         const cx = x + w / 2;
         const cy = y + h / 2;
+
+        // Create diamond path with optional rounded corners
+        const top = { x: cx, y: y };
+        const right = { x: x + w, y: cy };
+        const bottom = { x: cx, y: y + h };
+        const left = { x: x, y: cy };
+
+        let diamondPath: string;
+        if (elCornerRadius > 0) {
+          // Calculate the maximum radius based on the shortest edge
+          const edgeLength = Math.min(
+            Math.hypot(right.x - top.x, right.y - top.y),
+            Math.hypot(bottom.x - right.x, bottom.y - right.y),
+          );
+          const maxRadius = edgeLength / 3;
+          const r = Math.min(elCornerRadius, maxRadius);
+
+          // Helper to get point along edge at distance from corner
+          const getPointAlongEdge = (
+            from: { x: number; y: number },
+            to: { x: number; y: number },
+            dist: number,
+          ) => {
+            const len = Math.hypot(to.x - from.x, to.y - from.y);
+            const t = dist / len;
+            return {
+              x: from.x + (to.x - from.x) * t,
+              y: from.y + (to.y - from.y) * t,
+            };
+          };
+
+          // Points before and after each corner
+          const topToRight = getPointAlongEdge(top, right, r);
+          const rightFromTop = getPointAlongEdge(right, top, r);
+          const rightToBottom = getPointAlongEdge(right, bottom, r);
+          const bottomFromRight = getPointAlongEdge(bottom, right, r);
+          const bottomToLeft = getPointAlongEdge(bottom, left, r);
+          const leftFromBottom = getPointAlongEdge(left, bottom, r);
+          const leftToTop = getPointAlongEdge(left, top, r);
+          const topFromLeft = getPointAlongEdge(top, left, r);
+
+          diamondPath = `
+            M ${topToRight.x},${topToRight.y}
+            L ${rightFromTop.x},${rightFromTop.y}
+            Q ${right.x},${right.y} ${rightToBottom.x},${rightToBottom.y}
+            L ${bottomFromRight.x},${bottomFromRight.y}
+            Q ${bottom.x},${bottom.y} ${bottomToLeft.x},${bottomToLeft.y}
+            L ${leftFromBottom.x},${leftFromBottom.y}
+            Q ${left.x},${left.y} ${leftToTop.x},${leftToTop.y}
+            L ${topFromLeft.x},${topFromLeft.y}
+            Q ${top.x},${top.y} ${topToRight.x},${topToRight.y}
+            Z
+          `;
+        } else {
+          diamondPath = `M ${top.x},${top.y} L ${right.x},${right.y} L ${bottom.x},${bottom.y} L ${left.x},${left.y} Z`;
+        }
+
+        // Simple polygon points for hitbox
         const diamondPoints = `${cx},${y} ${x + w},${cy} ${cx},${y + h} ${x},${cy}`;
 
         return (
@@ -4076,13 +4140,13 @@ export function Canvas({
               />
             )}
             {/* Visible diamond */}
-            <polygon
+            <path
               data-element-id={
                 !hasVisibleFill && element.strokeWidth > 0
                   ? undefined
                   : element.id
               }
-              points={diamondPoints}
+              d={diamondPath}
               stroke={element.strokeColor}
               strokeWidth={element.strokeWidth}
               strokeDasharray={strokeDasharray}
@@ -4096,8 +4160,8 @@ export function Canvas({
               }
             />
             {isMarkedForDeletion && (
-              <polygon
-                points={diamondPoints}
+              <path
+                d={diamondPath}
                 fill="rgba(0, 0, 0, 0.7)"
                 pointerEvents="none"
               />
