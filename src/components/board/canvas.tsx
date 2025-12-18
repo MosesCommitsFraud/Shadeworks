@@ -43,6 +43,7 @@ interface CanvasProps {
   canvasBackground?: 'none' | 'dots' | 'lines' | 'grid';
   highlightedElementIds?: string[];
   isToolLocked?: boolean;
+  isEditArrowMode?: boolean;
 }
 
 interface RemoteCursor {
@@ -55,6 +56,7 @@ interface RemoteCursor {
 
 type ResizeHandle = 'nw' | 'n' | 'ne' | 'e' | 'se' | 's' | 'sw' | 'w' | null;
 type RotateHandleSide = 'n' | 'e' | 's' | 'w';
+type ConnectorDragKind = 'normal' | 'createCorner' | 'curvedMid' | 'elbowHandle';
 
 interface BoundingBox {
   x: number;
@@ -623,6 +625,7 @@ export function Canvas({
   canvasBackground = 'none',
   highlightedElementIds = [],
   isToolLocked = false,
+  isEditArrowMode = false,
 }: CanvasProps) {
   const svgRef = useRef<SVGSVGElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -669,10 +672,7 @@ export function Canvas({
   const lastSingleSelectedIdRef = useRef<string | null>(null);
   const [hoverCursor, setHoverCursor] = useState<string | null>(null);
 
-  // Line endpoint dragging state
-  const [isDraggingLineEndpoint, setIsDraggingLineEndpoint] = useState(false);
-  const [lineEndpointIndex, setLineEndpointIndex] = useState<number | null>(null);
-  const [isDraggingConnectorCorner, setIsDraggingConnectorCorner] = useState(false);
+  const [draggingConnectorPoint, setDraggingConnectorPoint] = useState<{ index: number; kind: ConnectorDragKind } | null>(null);
 
   // Box selection state
   const [isBoxSelecting, setIsBoxSelecting] = useState(false);
@@ -1121,82 +1121,69 @@ export function Canvas({
       setHoverCursor(null);
     }
 
-    // Handle connector endpoint dragging (line/arrow)
-    if (isDraggingLineEndpoint && lineEndpointIndex !== null && originalElements.length === 1) {
+    // Handle connector point dragging (line/arrow)
+    if (draggingConnectorPoint && originalElements.length === 1) {
       const originalElement = originalElements[0];
       if ((originalElement.type === 'line' || originalElement.type === 'arrow') && originalElement.points.length >= 2) {
         const rotationDeg = originalElement.rotation ?? 0;
-        let nextPoint = point;
+        let localPoint = point;
         if (rotationDeg) {
           const bounds = getBoundingBox(originalElement);
           if (bounds) {
             const center = getBoundsCenter(bounds);
-            nextPoint = rotatePoint(point, center, -rotationDeg);
+            localPoint = rotatePoint(point, center, -rotationDeg);
           }
         }
 
-        const newPoints = [...originalElement.points];
-        if (lineEndpointIndex === 0) {
-          newPoints[0] = nextPoint;
-        } else {
-          newPoints[newPoints.length - 1] = nextPoint;
-        }
-        onUpdateElement(originalElement.id, { points: newPoints });
-      }
-      return;
-    }
-
-    // Handle connector corner dragging (line/arrow)
-    if (isDraggingConnectorCorner && originalElements.length === 1) {
-      const originalElement = originalElements[0];
-      if ((originalElement.type === 'line' || originalElement.type === 'arrow') && originalElement.points.length >= 2) {
-        const pStart = originalElement.points[0];
-        const pEnd = originalElement.points[originalElement.points.length - 1];
         const style = originalElement.connectorStyle ?? connectorStyle;
+        const index = draggingConnectorPoint.index;
+        let newPoints = [...originalElement.points];
 
-        const rotationDeg = originalElement.rotation ?? 0;
-        let cornerPoint = point;
-        if (rotationDeg) {
-          const bounds = getBoundingBox(originalElement);
-          if (bounds) {
-            const center = getBoundsCenter(bounds);
-            cornerPoint = rotatePoint(point, center, -rotationDeg);
+        if (draggingConnectorPoint.kind === 'createCorner' && index === 1 && newPoints.length === 2) {
+          const pStart = newPoints[0];
+          const pEnd = newPoints[newPoints.length - 1];
+
+          if (style === 'curved') {
+            newPoints = [
+              pStart,
+              {
+                x: 2 * localPoint.x - (pStart.x + pEnd.x) / 2,
+                y: 2 * localPoint.y - (pStart.y + pEnd.y) / 2,
+              },
+              pEnd,
+            ];
+            onUpdateElement(originalElement.id, { points: newPoints });
+            return;
           }
+
+          const updates: Partial<BoardElement> = { points: [pStart, localPoint, pEnd] };
+          if (style === 'elbow' && originalElement.elbowRoute === undefined) {
+            updates.elbowRoute = Math.abs(pEnd.x - pStart.x) >= Math.abs(pEnd.y - pStart.y) ? 'vertical' : 'horizontal';
+          }
+          onUpdateElement(originalElement.id, updates);
+          return;
         }
 
-        const elbowRoute =
-          originalElement.elbowRoute ??
-          (Math.abs(pEnd.x - pStart.x) >= Math.abs(pEnd.y - pStart.y) ? 'vertical' : 'horizontal');
-
-        let newPoints: Point[];
-        if (style === 'curved') {
-          // Keep the handle *on* the curve at t=0.5 by storing the corresponding quadratic control point.
-          // Quadratic midpoint: P(0.5) = (P0 + 2*C + P1) / 4  =>  C = 2*P(0.5) - (P0 + P1)/2
-          const controlPoint = {
-            x: 2 * cornerPoint.x - (pStart.x + pEnd.x) / 2,
-            y: 2 * cornerPoint.y - (pStart.y + pEnd.y) / 2,
+        if (draggingConnectorPoint.kind === 'curvedMid' && style === 'curved' && index === 1 && newPoints.length >= 3) {
+          const pStart = newPoints[0];
+          const pEnd = newPoints[newPoints.length - 1];
+          newPoints[1] = {
+            x: 2 * localPoint.x - (pStart.x + pEnd.x) / 2,
+            y: 2 * localPoint.y - (pStart.y + pEnd.y) / 2,
           };
-          if (originalElement.points.length === 2) {
-            newPoints = [pStart, controlPoint, pEnd];
-          } else {
-            newPoints = [...originalElement.points];
-            newPoints[1] = controlPoint;
-          }
-        } else {
-          if (originalElement.points.length === 2) {
-            newPoints = [pStart, cornerPoint, pEnd];
-          } else {
-            newPoints = [...originalElement.points];
-            newPoints[1] = cornerPoint;
-          }
+        } else if (draggingConnectorPoint.kind === 'elbowHandle' && style === 'elbow' && index === 1 && newPoints.length >= 3) {
+          const pStart = newPoints[0];
+          const pEnd = newPoints[newPoints.length - 1];
+          const route =
+            originalElement.elbowRoute ??
+            (Math.abs(pEnd.x - pStart.x) >= Math.abs(pEnd.y - pStart.y) ? 'vertical' : 'horizontal');
+          const existingControl = newPoints[1];
+          newPoints[1] = route === 'vertical' ? { x: localPoint.x, y: existingControl.y } : { x: existingControl.x, y: localPoint.y };
+        } else if (index >= 0 && index < newPoints.length) {
+          newPoints[index] = localPoint;
         }
 
-        const updates: Partial<BoardElement> = { points: newPoints, connectorStyle: style };
-        if (style === 'elbow' && originalElement.elbowRoute === undefined) {
-          updates.elbowRoute = elbowRoute;
-        }
-
-        onUpdateElement(originalElement.id, updates);
+        onUpdateElement(originalElement.id, { points: newPoints });
       }
       return;
     }
@@ -1660,7 +1647,7 @@ export function Canvas({
         break;
       }
     }
-  }, [isDrawing, currentElement, startPoint, tool, collaboration, getMousePosition, isPanning, panStart, elements, onDeleteElement, strokeWidth, isDragging, isResizing, isRotating, rotateStart, selectedIds, dragStart, originalElements, originalBounds, resizeHandle, onUpdateElement, shiftPressed, isBoxSelecting, lastMousePos, setLastMousePos, setSelectedIds, isDraggingLineEndpoint, lineEndpointIndex, isDraggingConnectorCorner, connectorStyle, getElementsToErase]);
+  }, [isDrawing, currentElement, startPoint, tool, collaboration, getMousePosition, isPanning, panStart, elements, onDeleteElement, strokeWidth, isDragging, isResizing, isRotating, rotateStart, selectedIds, dragStart, originalElements, originalBounds, resizeHandle, onUpdateElement, shiftPressed, isBoxSelecting, lastMousePos, setLastMousePos, setSelectedIds, draggingConnectorPoint, connectorStyle, getElementsToErase]);
 
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
     // Middle mouse button for panning OR hand tool with left click
@@ -1993,15 +1980,8 @@ export function Canvas({
       return;
     }
 
-    if (isDraggingLineEndpoint) {
-      setIsDraggingLineEndpoint(false);
-      setLineEndpointIndex(null);
-      setOriginalElements([]);
-      return;
-    }
-
-    if (isDraggingConnectorCorner) {
-      setIsDraggingConnectorCorner(false);
+    if (draggingConnectorPoint) {
+      setDraggingConnectorPoint(null);
       setOriginalElements([]);
       return;
     }
@@ -2133,7 +2113,7 @@ export function Canvas({
     setIsDrawing(false);
     setCurrentElement(null);
     setStartPoint(null);
-  }, [currentElement, isDrawing, onAddElement, isPanning, isDragging, isResizing, isRotating, isBoxSelecting, selectionBox, elements, tool, onDeleteElement, onToolChange, lastMousePos, startPoint, textInputRef, setTextInput, setTextValue, setIsDrawing, setStartPoint, setSelectedIds, isDraggingLineEndpoint, isDraggingConnectorCorner, eraserMarkedIds]);
+  }, [currentElement, isDrawing, onAddElement, isPanning, isDragging, isResizing, isRotating, isBoxSelecting, selectionBox, elements, tool, onDeleteElement, onToolChange, lastMousePos, startPoint, textInputRef, setTextInput, setTextValue, setIsDrawing, setStartPoint, setSelectedIds, draggingConnectorPoint, eraserMarkedIds]);
 
   const handleMouseLeave = useCallback(() => {
     // Clear eraser cursor when mouse leaves canvas
@@ -2428,7 +2408,7 @@ export function Canvas({
                 ? [start, { x: control.x, y: start.y }, { x: control.x, y: end.y }, end]
                 : [start, { x: start.x, y: control.y }, { x: end.x, y: control.y }, end];
           } else {
-            polyPoints = [start, control, end];
+            polyPoints = element.points;
           }
         }
 
@@ -3161,71 +3141,117 @@ export function Canvas({
     const route = element.elbowRoute ?? (Math.abs(end.x - start.x) >= Math.abs(end.y - start.y) ? 'vertical' : 'horizontal');
     const control = element.points.length >= 3 ? element.points[1] : { x: midX, y: midY };
 
-    const handlePos =
-      style === 'curved'
-        ? { x: (start.x + 2 * control.x + end.x) / 4, y: (start.y + 2 * control.y + end.y) / 4 }
-        : style === 'elbow'
-          ? route === 'vertical'
-            ? { x: control.x, y: midY }
-            : { x: midX, y: control.y }
-          : control;
-
     const dotSize = 8 / zoom;
     const dotStrokeWidth = 2 / zoom;
+    const baseRadius = dotSize / 2;
+    const existingRadius = isEditArrowMode ? baseRadius * 1.6 : baseRadius;
 
-    const handleEndpointMouseDown = (e: React.MouseEvent, endpointIndex: number) => {
+    const handlePosCurved = { x: (start.x + 2 * control.x + end.x) / 4, y: (start.y + 2 * control.y + end.y) / 4 };
+    const handlePosElbow = route === 'vertical' ? { x: control.x, y: midY } : { x: midX, y: control.y };
+
+    const handles: Array<{ pos: Point; index: number; kind: ConnectorDragKind }> =
+      element.points.length === 2
+        ? [
+            { pos: start, index: 0, kind: 'normal' },
+            { pos: { x: midX, y: midY }, index: 1, kind: 'createCorner' },
+            { pos: end, index: 2, kind: 'normal' },
+          ]
+        : style === 'curved' && element.points.length === 3
+          ? [
+              { pos: start, index: 0, kind: 'normal' },
+              { pos: handlePosCurved, index: 1, kind: 'curvedMid' },
+              { pos: end, index: 2, kind: 'normal' },
+            ]
+          : style === 'elbow' && element.points.length === 3
+            ? [
+                { pos: start, index: 0, kind: 'normal' },
+                { pos: handlePosElbow, index: 1, kind: 'elbowHandle' },
+                { pos: end, index: 2, kind: 'normal' },
+              ]
+            : element.points.map((p, i) => ({ pos: p, index: i, kind: 'normal' as const }));
+
+    const toLocalPoint = (worldPoint: Point) => {
+      if (!rotationDeg) return worldPoint;
+      const b = getBoundingBox(element);
+      if (!b) return worldPoint;
+      const center = getBoundsCenter(b);
+      return rotatePoint(worldPoint, center, -rotationDeg);
+    };
+
+    const startDrag = (e: React.MouseEvent, index: number, kind: ConnectorDragKind) => {
       e.stopPropagation();
       onStartTransform?.();
-      setIsDraggingLineEndpoint(true);
-      setLineEndpointIndex(endpointIndex);
+      setDraggingConnectorPoint({ index, kind });
       setOriginalElements([{ ...element }]);
     };
 
-    const handleCornerMouseDown = (e: React.MouseEvent) => {
+    const insertCornerBetween = (e: React.MouseEvent, segmentIndex: number) => {
       e.stopPropagation();
       onStartTransform?.();
-      setIsDraggingConnectorCorner(true);
-      setOriginalElements([{ ...element }]);
+
+      const pointerWorld = getMousePosition(e);
+      const pointerLocal = toLocalPoint(pointerWorld);
+
+      // Convert the current visible 3-handle connector into a polyline in point space,
+      // then insert a new point between segment endpoints.
+      const basePoints = handles.map((h) => h.pos);
+      const insertIndex = Math.max(1, Math.min(basePoints.length - 1, segmentIndex + 1));
+      const nextPoints = [...basePoints];
+      nextPoints.splice(insertIndex, 0, pointerLocal);
+
+      const updates: Partial<BoardElement> = {
+        points: nextPoints,
+        connectorStyle: 'sharp',
+        elbowRoute: undefined,
+      };
+
+      setOriginalElements([{ ...element, ...updates, points: nextPoints }]);
+      setDraggingConnectorPoint({ index: insertIndex, kind: 'normal' });
+      onUpdateElement(element.id, updates);
     };
 
     return (
       <g transform={rotationTransform}>
-        {/* Endpoint dots */}
-        <circle
-          cx={start.x}
-          cy={start.y}
-          r={dotSize / 2}
-          fill="var(--background)"
-          stroke="var(--accent)"
-          strokeWidth={dotStrokeWidth}
-          style={{ cursor: 'move' }}
-          onMouseDown={(e) => handleEndpointMouseDown(e, 0)}
-        />
-        <circle
-          cx={end.x}
-          cy={end.y}
-          r={dotSize / 2}
-          fill="var(--background)"
-          stroke="var(--accent)"
-          strokeWidth={dotStrokeWidth}
-          style={{ cursor: 'move' }}
-          onMouseDown={(e) => handleEndpointMouseDown(e, 1)}
-        />
+        {handles.map((h) => (
+          <circle
+            key={`${element.id}-pt-${h.index}`}
+            cx={h.pos.x}
+            cy={h.pos.y}
+            r={existingRadius}
+            fill="var(--background)"
+            stroke="var(--accent)"
+            strokeWidth={dotStrokeWidth}
+            style={{ cursor: 'move' }}
+            onMouseDown={(e) => startDrag(e, h.index, h.kind)}
+          />
+        ))}
 
-        {/* Middle control for corner */}
-        <circle
-          cx={handlePos.x}
-          cy={handlePos.y}
-          r={dotSize / 2}
-          fill="var(--background)"
-          stroke="var(--accent)"
-          strokeWidth={dotStrokeWidth}
-          style={{ cursor: 'move' }}
-          onMouseDown={handleCornerMouseDown}
-        />
+        {/* Insert controls (edit arrow mode) */}
+        {isEditArrowMode && handles.length >= 3 && (
+          <g>
+            {handles.slice(0, -1).map((h, i) => {
+              const next = handles[i + 1];
+              const cx = (h.pos.x + next.pos.x) / 2;
+              const cy = (h.pos.y + next.pos.y) / 2;
+              return (
+                <circle
+                  key={`${element.id}-ins-${i}`}
+                  cx={cx}
+                  cy={cy}
+                  r={baseRadius}
+                  fill="var(--accent)"
+                  stroke="var(--background)"
+                  strokeWidth={dotStrokeWidth}
+                  style={{ cursor: 'copy' }}
+                  onMouseDown={(e) => insertCornerBetween(e, i)}
+                />
+              );
+            })}
+          </g>
+        )}
       </g>
     );
-  }, [onStartTransform, connectorStyle, zoom]);
+  }, [onStartTransform, connectorStyle, zoom, isEditArrowMode, getMousePosition, onUpdateElement]);
 
   // Render selection box with handles
   const renderSelectionBox = () => {

@@ -136,6 +136,7 @@ export function Whiteboard({ roomId }: WhiteboardProps) {
   const [isReady, setIsReady] = useState(false);
   const [followedUserId, setFollowedUserId] = useState<string | null>(null);
   const [selectedElements, setSelectedElements] = useState<BoardElement[]>([]);
+  const [isEditArrowMode, setIsEditArrowMode] = useState(false);
   const [canvasBackground, setCanvasBackground] = useState<'none' | 'dots' | 'lines' | 'grid'>('none');
   const [showSaveDialog, setShowSaveDialog] = useState(false);
   const [saveFileName, setSaveFileName] = useState('');
@@ -856,6 +857,24 @@ export function Whiteboard({ roomId }: WhiteboardProps) {
     }
   }, [selectedElements, saveToUndoStack, collaboration]);
 
+  const canEditArrow =
+    selectedElements.length === 1 &&
+    (selectedElements[0].type === 'line' || selectedElements[0].type === 'arrow') &&
+    (selectedElements[0].points?.length ?? 0) >= 3;
+
+  useEffect(() => {
+    if (!canEditArrow) setIsEditArrowMode(false);
+  }, [canEditArrow]);
+
+  useEffect(() => {
+    if (tool !== 'select') setIsEditArrowMode(false);
+  }, [tool]);
+
+  const handleToggleEditArrowMode = useCallback(() => {
+    if (!canEditArrow) return;
+    setIsEditArrowMode((v) => !v);
+  }, [canEditArrow]);
+
   const handleToggleGroupSelection = useCallback(() => {
     if (selectedElements.length === 0) return;
     saveToUndoStack();
@@ -1106,6 +1125,8 @@ export function Whiteboard({ roomId }: WhiteboardProps) {
         onCopySelected={handleCopySelected}
         onDeleteSelected={handleDeleteSelected}
         onToggleGroupSelection={handleToggleGroupSelection}
+        isEditArrowMode={isEditArrowMode}
+        onToggleEditArrowMode={handleToggleEditArrowMode}
       />
 
       <Canvas
@@ -1144,6 +1165,7 @@ export function Whiteboard({ roomId }: WhiteboardProps) {
         canvasBackground={canvasBackground}
         highlightedElementIds={highlightedElementIds}
         isToolLocked={isToolLocked}
+        isEditArrowMode={isEditArrowMode}
       />
 
       {/* Save File Dialog */}

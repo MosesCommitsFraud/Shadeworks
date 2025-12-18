@@ -29,6 +29,7 @@ import {
   AlignVerticalJustifyEnd,
   MoreHorizontal,
   SlidersHorizontal,
+  Spline,
 } from 'lucide-react';
 import { Tool, COLORS, STROKE_WIDTHS, FONTS, FONT_SIZES, BoardElement } from '@/lib/board-types';
 import { cn } from '@/lib/utils';
@@ -87,6 +88,8 @@ interface ToolSidebarProps {
   onCopySelected?: () => void;
   onDeleteSelected?: () => void;
   onToggleGroupSelection?: () => void;
+  isEditArrowMode?: boolean;
+  onToggleEditArrowMode?: () => void;
 }
 
 // Tools that have adjustable properties
@@ -148,6 +151,8 @@ export function ToolSidebar({
   onCopySelected,
   onDeleteSelected,
   onToggleGroupSelection,
+  isEditArrowMode = false,
+  onToggleEditArrowMode,
 }: ToolSidebarProps) {
   const { theme, resolvedTheme } = useTheme();
   const [isCollapsed, setIsCollapsed] = useState(false);
@@ -300,6 +305,11 @@ export function ToolSidebar({
     !!onAlignCenterVertical &&
     !!onAlignBottom;
   const showActions = hasSelectedElements && (!!onCopySelected || !!onDeleteSelected || !!onToggleGroupSelection);
+  const canEditArrow =
+    selectedElements.length === 1 &&
+    (selectedElements[0].type === 'line' || selectedElements[0].type === 'arrow') &&
+    (selectedElements[0].points?.length ?? 0) >= 3 &&
+    !!onToggleEditArrowMode;
   const showGroupAction = hasSelectedElements && !!onToggleGroupSelection && (selectedElements.length > 1 || isSelectionSingleGroup);
   const showLayerOrderActions =
     hasSelectedElements && !!onBringToFront && !!onSendToBack && !!onMoveForward && !!onMoveBackward;
@@ -1437,7 +1447,7 @@ export function ToolSidebar({
               <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
                 Actions
               </label>
-              <div className="grid grid-cols-3 gap-1">
+              <div className={cn("grid gap-1", canEditArrow ? "grid-cols-4" : "grid-cols-3")}>
                 {onCopySelected && (
                   <button
                     onClick={onCopySelected}
@@ -1470,6 +1480,20 @@ export function ToolSidebar({
                     ) : (
                       <Group className="w-3.5 h-3.5" />
                     )}
+                  </button>
+                )}
+                {canEditArrow && (
+                  <button
+                    onClick={onToggleEditArrowMode}
+                    className={cn(
+                      CONTROL_BUTTON,
+                      'h-9 flex items-center justify-center',
+                      isEditArrowMode && CONTROL_BUTTON_SELECTED
+                    )}
+                    title="Edit arrow"
+                    aria-label="Edit arrow"
+                  >
+                    <Spline className="w-3.5 h-3.5" />
                   </button>
                 )}
               </div>
