@@ -56,7 +56,7 @@ interface RemoteCursor {
 
 type ResizeHandle = 'nw' | 'n' | 'ne' | 'e' | 'se' | 's' | 'sw' | 'w' | null;
 type RotateHandleSide = 'n' | 'e' | 's' | 'w';
-type ConnectorDragKind = 'normal' | 'createCorner' | 'curvedMid' | 'elbowHandle';
+type ConnectorDragKind = 'normal' | 'createCorner' | 'curvedMid' | 'elbowHandle' | 'elbowOrtho' | 'elbowEdge';
 
 interface BoundingBox {
   x: number;
@@ -540,12 +540,55 @@ function getElbowPolylineForVertices(points: Point[]): Point[] {
     const b = points[i + 1];
     const dx = b.x - a.x;
     const dy = b.y - a.y;
+    // If the segment is already axis-aligned, keep it as-is.
+    if (dx === 0 || dy === 0) {
+      out.push(b);
+      continue;
+    }
     const vertical = Math.abs(dx) >= Math.abs(dy);
     const mid = vertical ? { x: b.x, y: a.y } : { x: a.x, y: b.y };
     if (mid.x !== a.x || mid.y !== a.y) out.push(mid);
     out.push(b);
   }
   return out;
+}
+
+function simplifyElbowPolyline(points: Point[], eps: number): Point[] {
+  if (points.length < 2) return points;
+
+  const cleaned = points.reduce<Point[]>((acc, p) => {
+    const last = acc[acc.length - 1];
+    if (!last || Math.hypot(p.x - last.x, p.y - last.y) > eps) acc.push(p);
+    return acc;
+  }, []);
+
+  if (cleaned.length <= 2) return cleaned;
+
+  const same = (a: number, b: number) => Math.abs(a - b) <= eps;
+  const out: Point[] = [];
+  for (const p of cleaned) {
+    out.push(p);
+    while (out.length >= 3) {
+      const c = out[out.length - 1];
+      const b = out[out.length - 2];
+      const a = out[out.length - 3];
+      const collinearVertical = same(a.x, b.x) && same(b.x, c.x);
+      const collinearHorizontal = same(a.y, b.y) && same(b.y, c.y);
+      if (collinearVertical || collinearHorizontal) {
+        out.splice(out.length - 2, 1);
+      } else {
+        break;
+      }
+    }
+  }
+
+  const deduped = out.reduce<Point[]>((acc, p) => {
+    const last = acc[acc.length - 1];
+    if (!last || Math.hypot(p.x - last.x, p.y - last.y) > eps) acc.push(p);
+    return acc;
+  }, []);
+
+  return deduped.length >= 2 ? deduped : points;
 }
 
 // Get bounding box for any element
@@ -766,7 +809,15 @@ export function Canvas({
   const lastSingleSelectedIdRef = useRef<string | null>(null);
   const [hoverCursor, setHoverCursor] = useState<string | null>(null);
 
-  const [draggingConnectorPoint, setDraggingConnectorPoint] = useState<{ index: number; kind: ConnectorDragKind } | null>(null);
+  const [draggingConnectorPoint, setDraggingConnectorPoint] = useState<{
+    index: number;
+    kind: ConnectorDragKind;
+    axis?: 'x' | 'y';
+    indices?: [number, number];
+    range?: [number, number];
+    edgeKey?: string;
+    anchor?: Point;
+  } | null>(null);
 
   // Box selection state
   const [isBoxSelecting, setIsBoxSelecting] = useState(false);
@@ -1233,6 +1284,62 @@ export function Canvas({
         const index = draggingConnectorPoint.index;
         let newPoints = [...originalElement.points];
 
+        if (draggingConnectorPoint.kind === 'elbowOrtho' && style === 'elbow' && index >= 0 && index < newPoints.length) {
+          const axis = draggingConnectorPoint.axis ?? 'x';
+          const current = newPoints[index];
+          const eps = 0.5 / zoom;
+
+          const delta = axis === 'x' ? localPoint.x - current.x : localPoint.y - current.y;
+          const same = (a: number, b: number) => Math.abs(a - b) <= eps;
+
+          let left = index;
+          let right = index;
+
+          if (axis === 'x') {
+            const base = current.x;
+            while (left > 0 && same(newPoints[left - 1].x, base)) left--;
+            while (right < newPoints.length - 1 && same(newPoints[right + 1].x, base)) right++;
+
+            for (let i = left; i <= right; i++) {
+              newPoints[i] = { x: newPoints[i].x + delta, y: newPoints[i].y };
+            }
+          } else {
+            const base = current.y;
+            while (left > 0 && same(newPoints[left - 1].y, base)) left--;
+            while (right < newPoints.length - 1 && same(newPoints[right + 1].y, base)) right++;
+
+            for (let i = left; i <= right; i++) {
+              newPoints[i] = { x: newPoints[i].x, y: newPoints[i].y + delta };
+            }
+          }
+
+          onUpdateElement(originalElement.id, { points: newPoints });
+          return;
+        }
+
+        if (
+          draggingConnectorPoint.kind === 'elbowEdge' &&
+          style === 'elbow' &&
+          draggingConnectorPoint.range &&
+          draggingConnectorPoint.anchor
+        ) {
+          const [r0, r1] = draggingConnectorPoint.range;
+          if (r0 >= 0 && r1 >= r0 && r1 < newPoints.length) {
+            const axis = draggingConnectorPoint.axis ?? 'x';
+            const delta = axis === 'x' ? localPoint.x - draggingConnectorPoint.anchor.x : localPoint.y - draggingConnectorPoint.anchor.y;
+            const orig = originalElement.points;
+            const nextPoints = orig.map((p) => ({ ...p }));
+            for (let i = r0; i <= r1; i++) {
+              nextPoints[i] =
+                axis === 'x'
+                  ? { x: nextPoints[i].x + delta, y: nextPoints[i].y }
+                  : { x: nextPoints[i].x, y: nextPoints[i].y + delta };
+            }
+            onUpdateElement(originalElement.id, { points: nextPoints });
+            return;
+          }
+        }
+
         if (draggingConnectorPoint.kind === 'createCorner' && index === 1 && newPoints.length === 2) {
           const pStart = newPoints[0];
           const pEnd = newPoints[newPoints.length - 1];
@@ -1685,10 +1792,24 @@ export function Canvas({
       }
       case 'line':
       case 'arrow': {
-        setCurrentElement({
-          ...currentElement,
-          points: [startPoint, point],
-        });
+        const endPoint = point;
+        const activeConnectorStyle = currentElement.connectorStyle ?? connectorStyle;
+        if (activeConnectorStyle === 'elbow') {
+          const dx = endPoint.x - startPoint.x;
+          const dy = endPoint.y - startPoint.y;
+          const elbowRoute = Math.abs(dx) >= Math.abs(dy) ? 'vertical' : 'horizontal';
+          setCurrentElement({
+            ...currentElement,
+            points: [startPoint, { x: (startPoint.x + endPoint.x) / 2, y: (startPoint.y + endPoint.y) / 2 }, endPoint],
+            connectorStyle: 'elbow',
+            elbowRoute,
+          });
+        } else {
+          setCurrentElement({
+            ...currentElement,
+            points: [startPoint, endPoint],
+          });
+        }
         break;
       }
       case 'rectangle': {
@@ -2075,6 +2196,27 @@ export function Canvas({
     }
 
     if (draggingConnectorPoint) {
+      // Cleanup elbow polylines after edge drags so temporary points don't "stick" until the next drag.
+      if (originalElements.length === 1) {
+        const orig = originalElements[0];
+        if ((orig.type === 'line' || orig.type === 'arrow') && (orig.connectorStyle ?? connectorStyle) === 'elbow') {
+          const current = elements.find((el) => el.id === orig.id);
+          if (current?.points && current.points.length >= 2) {
+            const eps = 0.5 / zoom;
+            const hasDiagonal = current.points.some((p, i) => {
+              const prev = current.points[i - 1];
+              if (!prev) return false;
+              return Math.abs(p.x - prev.x) > eps && Math.abs(p.y - prev.y) > eps;
+            });
+            if (!hasDiagonal) {
+              const simplified = simplifyElbowPolyline(current.points, eps);
+              if (simplified.length !== current.points.length) {
+                onUpdateElement(current.id, { points: simplified, elbowRoute: undefined, connectorStyle: 'elbow' });
+              }
+            }
+          }
+        }
+      }
       setDraggingConnectorPoint(null);
       setOriginalElements([]);
       return;
@@ -2207,7 +2349,35 @@ export function Canvas({
     setIsDrawing(false);
     setCurrentElement(null);
     setStartPoint(null);
-  }, [currentElement, isDrawing, onAddElement, isPanning, isDragging, isResizing, isRotating, isBoxSelecting, selectionBox, elements, tool, onDeleteElement, onToolChange, lastMousePos, startPoint, textInputRef, setTextInput, setTextValue, setIsDrawing, setStartPoint, setSelectedIds, draggingConnectorPoint, eraserMarkedIds]);
+  }, [
+    currentElement,
+    isDrawing,
+    onAddElement,
+    isPanning,
+    isDragging,
+    isResizing,
+    isRotating,
+    isBoxSelecting,
+    selectionBox,
+    elements,
+    tool,
+    onDeleteElement,
+    onUpdateElement,
+    onToolChange,
+    lastMousePos,
+    startPoint,
+    textInputRef,
+    setTextInput,
+    setTextValue,
+    setIsDrawing,
+    setStartPoint,
+    setSelectedIds,
+    draggingConnectorPoint,
+    eraserMarkedIds,
+    zoom,
+    connectorStyle,
+    originalElements,
+  ]);
 
   const handleMouseLeave = useCallback(() => {
     // Clear eraser cursor when mouse leaves canvas
@@ -2350,28 +2520,154 @@ export function Canvas({
     }
   }, [textValue, textInput, zoom]);
 
+  const getConnectorDragPreviewElement = useCallback(
+    (element: BoardElement): BoardElement => {
+      if (!draggingConnectorPoint || originalElements.length !== 1) return element;
+
+      const originalElement = originalElements[0];
+      if (originalElement.id !== element.id) return element;
+      if (originalElement.type !== 'line' && originalElement.type !== 'arrow') return element;
+      if (!lastMousePos) return element;
+
+      const rotationDeg = originalElement.rotation ?? 0;
+      let localPoint = lastMousePos;
+      if (rotationDeg) {
+        const bounds = getBoundingBox(originalElement);
+        if (bounds) {
+          const center = getBoundsCenter(bounds);
+          localPoint = rotatePoint(lastMousePos, center, -rotationDeg);
+        }
+      }
+
+      const style = originalElement.connectorStyle ?? connectorStyle;
+      const index = draggingConnectorPoint.index;
+      const originalPoints = originalElement.points;
+
+      // Preview for simple point drags (covers edit-arrow inserted points too).
+      if (draggingConnectorPoint.kind === 'normal' && index >= 0 && index < originalPoints.length) {
+        const nextPoints = originalPoints.map((p) => ({ ...p }));
+        nextPoints[index] = localPoint;
+        return { ...element, points: nextPoints };
+      }
+
+      if (draggingConnectorPoint.kind === 'curvedMid' && style === 'curved' && index === 1 && originalPoints.length >= 3) {
+        const pStart = originalPoints[0];
+        const pEnd = originalPoints[originalPoints.length - 1];
+        const nextPoints = originalPoints.map((p) => ({ ...p }));
+        nextPoints[1] = {
+          x: 2 * localPoint.x - (pStart.x + pEnd.x) / 2,
+          y: 2 * localPoint.y - (pStart.y + pEnd.y) / 2,
+        };
+        return { ...element, points: nextPoints, connectorStyle: 'curved' };
+      }
+
+      if (draggingConnectorPoint.kind === 'elbowHandle' && style === 'elbow' && index === 1 && originalPoints.length >= 3) {
+        const pStart = originalPoints[0];
+        const pEnd = originalPoints[originalPoints.length - 1];
+        const route =
+          originalElement.elbowRoute ?? (Math.abs(pEnd.x - pStart.x) >= Math.abs(pEnd.y - pStart.y) ? 'vertical' : 'horizontal');
+        const existingControl = originalPoints[1];
+        const nextPoints = originalPoints.map((p) => ({ ...p }));
+        nextPoints[1] = route === 'vertical' ? { x: localPoint.x, y: existingControl.y } : { x: existingControl.x, y: localPoint.y };
+        return { ...element, points: nextPoints, connectorStyle: 'elbow', elbowRoute: originalElement.elbowRoute };
+      }
+
+      if (draggingConnectorPoint.kind === 'elbowOrtho' && style === 'elbow' && index >= 0 && index < originalPoints.length) {
+        const axis = draggingConnectorPoint.axis ?? 'x';
+        const eps = 0.5 / zoom;
+        const current = originalPoints[index];
+        const delta = axis === 'x' ? localPoint.x - current.x : localPoint.y - current.y;
+        const same = (a: number, b: number) => Math.abs(a - b) <= eps;
+
+        let left = index;
+        let right = index;
+        if (axis === 'x') {
+          const base = current.x;
+          while (left > 0 && same(originalPoints[left - 1].x, base)) left--;
+          while (right < originalPoints.length - 1 && same(originalPoints[right + 1].x, base)) right++;
+        } else {
+          const base = current.y;
+          while (left > 0 && same(originalPoints[left - 1].y, base)) left--;
+          while (right < originalPoints.length - 1 && same(originalPoints[right + 1].y, base)) right++;
+        }
+
+        const nextPoints = originalPoints.map((p) => ({ ...p }));
+        for (let i = left; i <= right; i++) {
+          nextPoints[i] =
+            axis === 'x' ? { x: nextPoints[i].x + delta, y: nextPoints[i].y } : { x: nextPoints[i].x, y: nextPoints[i].y + delta };
+        }
+        return { ...element, points: nextPoints, connectorStyle: 'elbow', elbowRoute: undefined };
+      }
+
+      // Preview for elbow edge dragging (including insert handles)
+      if (
+        draggingConnectorPoint.kind === 'elbowEdge' &&
+        style === 'elbow' &&
+        draggingConnectorPoint.range &&
+        draggingConnectorPoint.anchor
+      ) {
+        const [r0, r1] = draggingConnectorPoint.range;
+        if (r0 >= 0 && r1 >= r0 && r1 < originalPoints.length) {
+          const axis = draggingConnectorPoint.axis ?? 'x';
+          const delta = axis === 'x' ? localPoint.x - draggingConnectorPoint.anchor.x : localPoint.y - draggingConnectorPoint.anchor.y;
+          const nextPoints = originalPoints.map((p) => ({ ...p }));
+          for (let i = r0; i <= r1; i++) {
+            nextPoints[i] =
+              axis === 'x' ? { x: nextPoints[i].x + delta, y: nextPoints[i].y } : { x: nextPoints[i].x, y: nextPoints[i].y + delta };
+          }
+          return { ...element, points: nextPoints, connectorStyle: 'elbow', elbowRoute: undefined };
+        }
+      }
+
+      // Preview for initial corner creation (so the handle doesn't "stick" until mouseup in collab mode)
+      if (draggingConnectorPoint.kind === 'createCorner' && index === 1 && originalPoints.length === 2) {
+        const pStart = originalPoints[0];
+        const pEnd = originalPoints[1];
+
+        if (style === 'curved') {
+          const nextPoints = [
+            pStart,
+            { x: 2 * localPoint.x - (pStart.x + pEnd.x) / 2, y: 2 * localPoint.y - (pStart.y + pEnd.y) / 2 },
+            pEnd,
+          ];
+          return { ...element, points: nextPoints, connectorStyle: 'curved' };
+        }
+
+        const nextUpdates: Partial<BoardElement> = { points: [pStart, localPoint, pEnd] };
+        if (style === 'elbow' && originalElement.elbowRoute === undefined) {
+          nextUpdates.elbowRoute = Math.abs(pEnd.x - pStart.x) >= Math.abs(pEnd.y - pStart.y) ? 'vertical' : 'horizontal';
+        }
+        return { ...element, ...nextUpdates, connectorStyle: style };
+      }
+
+      return element;
+    },
+    [connectorStyle, draggingConnectorPoint, lastMousePos, originalElements, zoom]
+  );
+
   const renderElement = (element: BoardElement, isPreview = false) => {
+    const effectiveElement = !isPreview ? getConnectorDragPreviewElement(element) : element;
     const opacity = isPreview ? 0.7 : 1;
-    const isMarkedForDeletion = eraserMarkedIds.has(element.id);
-    const rotationDeg = element.rotation ?? 0;
-    const boundsForRotation = rotationDeg ? getBoundingBox(element) : null;
+    const isMarkedForDeletion = eraserMarkedIds.has(effectiveElement.id);
+    const rotationDeg = effectiveElement.rotation ?? 0;
+    const boundsForRotation = rotationDeg ? getBoundingBox(effectiveElement) : null;
     const rotationTransform =
       boundsForRotation && rotationDeg
         ? `rotate(${rotationDeg} ${boundsForRotation.x + boundsForRotation.width / 2} ${boundsForRotation.y + boundsForRotation.height / 2})`
         : undefined;
 
-    switch (element.type) {
+    switch (effectiveElement.type) {
       case 'pen': {
-        const elOpacity = (element.opacity ?? 100) / 100;
-        const elStrokeStyle = element.strokeStyle || 'solid';
-        const elFillPattern = element.fillPattern || 'none';
-        const elFillColor = element.fillColor || '#d1d5db';
-        const shouldFill = element.isClosed && elFillPattern !== 'none';
+        const elOpacity = (effectiveElement.opacity ?? 100) / 100;
+        const elStrokeStyle = effectiveElement.strokeStyle || 'solid';
+        const elFillPattern = effectiveElement.fillPattern || 'none';
+        const elFillColor = effectiveElement.fillColor || '#d1d5db';
+        const shouldFill = effectiveElement.isClosed && elFillPattern !== 'none';
 
         // For solid strokes, use the filled path approach
         if (elStrokeStyle === 'solid') {
-          const stroke = getStroke(element.points.map((p) => [p.x, p.y]), {
-            size: element.strokeWidth * 2,
+          const stroke = getStroke(effectiveElement.points.map((p) => [p.x, p.y]), {
+            size: effectiveElement.strokeWidth * 2,
             thinning: 0.5,
             smoothing: 0.5,
             streamline: 0.5,
@@ -2380,11 +2676,11 @@ export function Canvas({
 
           // Create a simple polygon path from the original points for the fill
           const fillPath = shouldFill
-            ? `M ${element.points.map(p => `${p.x},${p.y}`).join(' L ')} Z`
+            ? `M ${effectiveElement.points.map(p => `${p.x},${p.y}`).join(' L ')} Z`
             : '';
 
           return (
-            <g key={element.id} transform={rotationTransform}>
+            <g key={effectiveElement.id} transform={rotationTransform}>
               {/* Fill layer - renders under stroke using original points */}
               {shouldFill && (
                 <path
@@ -2399,9 +2695,9 @@ export function Canvas({
               )}
               {/* Stroke layer */}
               <path
-                data-element-id={element.id}
+                data-element-id={effectiveElement.id}
                 d={pathData}
-                fill={element.strokeColor}
+                fill={effectiveElement.strokeColor}
                 opacity={isMarkedForDeletion ? elOpacity * 0.3 : elOpacity}
                 pointerEvents="auto"
               />
@@ -2418,12 +2714,12 @@ export function Canvas({
 
         // For dashed/dotted strokes, use polyline with stroke
         const strokeDasharray = elStrokeStyle === 'dashed' ? '10,10' : elStrokeStyle === 'dotted' ? '2,6' : 'none';
-        const points = element.points.map(p => `${p.x},${p.y}`).join(' ');
-        const elLineCap = element.lineCap || 'round';
+        const points = effectiveElement.points.map(p => `${p.x},${p.y}`).join(' ');
+        const elLineCap = effectiveElement.lineCap || 'round';
         // Create a wider invisible hitbox for easier clicking (minimum 16px)
-        const hitboxWidth = Math.max(element.strokeWidth * 6, 16);
+        const hitboxWidth = Math.max(effectiveElement.strokeWidth * 6, 16);
         return (
-          <g key={element.id} transform={rotationTransform}>
+          <g key={effectiveElement.id} transform={rotationTransform}>
             {/* Fill layer for dashed/dotted strokes */}
             {shouldFill && (
               <polygon
@@ -2438,7 +2734,7 @@ export function Canvas({
             )}
             {/* Invisible wider hitbox for easier clicking */}
             <polyline
-              data-element-id={element.id}
+              data-element-id={effectiveElement.id}
               points={points}
               stroke="transparent"
               strokeWidth={hitboxWidth}
@@ -2450,8 +2746,8 @@ export function Canvas({
             {/* Visible dashed/dotted stroke */}
             <polyline
               points={points}
-              stroke={element.strokeColor}
-              strokeWidth={element.strokeWidth}
+              stroke={effectiveElement.strokeColor}
+              strokeWidth={effectiveElement.strokeWidth}
               strokeLinecap={elLineCap}
               strokeLinejoin="round"
               strokeDasharray={strokeDasharray}
@@ -2475,46 +2771,46 @@ export function Canvas({
       }
       case 'line':
       case 'arrow': {
-        if (element.points.length < 2) return null;
-        const isArrow = element.type === 'arrow';
-        const elOpacity = (element.opacity ?? 100) / 100;
-        const elStrokeStyle = element.strokeStyle || 'solid';
-        const elLineCap = element.lineCap || 'round';
+        if (effectiveElement.points.length < 2) return null;
+        const isArrow = effectiveElement.type === 'arrow';
+        const elOpacity = (effectiveElement.opacity ?? 100) / 100;
+        const elStrokeStyle = effectiveElement.strokeStyle || 'solid';
+        const elLineCap = effectiveElement.lineCap || 'round';
         const strokeDasharray = elStrokeStyle === 'dashed' ? '10,10' : elStrokeStyle === 'dotted' ? '2,6' : 'none';
-        const hitboxWidth = Math.max(element.strokeWidth * 6, 16);
+        const hitboxWidth = Math.max(effectiveElement.strokeWidth * 6, 16);
 
-        const start = element.points[0];
-        const end = element.points[element.points.length - 1];
-        const hasCorner = element.points.length >= 3;
-        const style = element.connectorStyle || 'sharp';
-        const route = element.elbowRoute || (Math.abs(end.x - start.x) >= Math.abs(end.y - start.y) ? 'vertical' : 'horizontal');
-        const control = hasCorner ? element.points[1] : null;
+        const start = effectiveElement.points[0];
+        const end = effectiveElement.points[effectiveElement.points.length - 1];
+        const hasCorner = effectiveElement.points.length >= 3;
+        const style = effectiveElement.connectorStyle || 'sharp';
+        const route = effectiveElement.elbowRoute || (Math.abs(end.x - start.x) >= Math.abs(end.y - start.y) ? 'vertical' : 'horizontal');
+        const control = hasCorner ? effectiveElement.points[1] : null;
 
         let pathD: string | null = null;
         let polyPoints: Point[] | null = null;
 
         if (hasCorner && control) {
           if (style === 'curved') {
-            if (element.points.length === 3) {
+            if (effectiveElement.points.length === 3) {
               pathD = `M ${start.x} ${start.y} Q ${control.x} ${control.y} ${end.x} ${end.y}`;
             } else {
-              pathD = getCatmullRomPath(element.points);
+              pathD = getCatmullRomPath(effectiveElement.points);
             }
           } else if (style === 'elbow') {
             polyPoints =
-              element.points.length === 3
+              effectiveElement.points.length === 3
                 ? route === 'vertical'
                   ? [start, { x: control.x, y: start.y }, { x: control.x, y: end.y }, end]
                   : [start, { x: start.x, y: control.y }, { x: end.x, y: control.y }, end]
-                : getElbowPolylineForVertices(element.points);
+                : getElbowPolylineForVertices(effectiveElement.points);
           } else {
-            polyPoints = element.points;
+            polyPoints = effectiveElement.points;
           }
         }
 
-        const markerSize = Math.max(6, element.strokeWidth * 3);
-        const markerStart = element.arrowStart || 'none';
-        const markerEnd = element.arrowEnd || 'arrow';
+        const markerSize = Math.max(6, effectiveElement.strokeWidth * 3);
+        const markerStart = effectiveElement.arrowStart || 'none';
+        const markerEnd = effectiveElement.arrowEnd || 'arrow';
 
         const arrowTangentForEnd = () => {
           if (pathD && control) return { tip: end, from: control };
@@ -2534,8 +2830,8 @@ export function Canvas({
 
           const { bx, by, px, py, ux, uy } = getMarkerBasis(tip, from);
           const size = markerSize;
-          const stroke = element.strokeColor;
-          const strokeWidth = Math.max(1.5, element.strokeWidth);
+          const stroke = effectiveElement.strokeColor;
+          const strokeWidth = Math.max(1.5, effectiveElement.strokeWidth);
           const outlineStrokeWidth = Math.min(strokeWidth, 6);
 
           // Push arrowhead forward to sit at the very end of the line
@@ -3223,23 +3519,24 @@ export function Canvas({
 
   // Render connector (line/arrow) control points
   const renderConnectorControls = useCallback((element: BoardElement) => {
-    if (element.points.length < 2) return null;
+    const el = getConnectorDragPreviewElement(element);
+    if (el.points.length < 2) return null;
 
-    const start = element.points[0];
-    const end = element.points[element.points.length - 1];
+    const start = el.points[0];
+    const end = el.points[el.points.length - 1];
     const midX = (start.x + end.x) / 2;
     const midY = (start.y + end.y) / 2;
 
-    const rotationDeg = element.rotation ?? 0;
-    const boundsForRotation = rotationDeg ? getBoundingBox(element) : null;
+    const rotationDeg = el.rotation ?? 0;
+    const boundsForRotation = rotationDeg ? getBoundingBox(el) : null;
     const rotationTransform =
       boundsForRotation && rotationDeg
         ? `rotate(${rotationDeg} ${boundsForRotation.x + boundsForRotation.width / 2} ${boundsForRotation.y + boundsForRotation.height / 2})`
         : undefined;
 
-    const style = element.connectorStyle ?? connectorStyle;
-    const route = element.elbowRoute ?? (Math.abs(end.x - start.x) >= Math.abs(end.y - start.y) ? 'vertical' : 'horizontal');
-    const control = element.points.length >= 3 ? element.points[1] : { x: midX, y: midY };
+    const style = el.connectorStyle ?? connectorStyle;
+    const route = el.elbowRoute ?? (Math.abs(end.x - start.x) >= Math.abs(end.y - start.y) ? 'vertical' : 'horizontal');
+    const control = el.points.length >= 3 ? el.points[1] : { x: midX, y: midY };
 
     const dotSize = 8 / zoom;
     const dotStrokeWidth = 2 / zoom;
@@ -3281,6 +3578,329 @@ export function Canvas({
       return len;
     };
 
+    const toLocalPoint = (worldPoint: Point) => {
+      if (!rotationDeg) return worldPoint;
+      const b = getBoundingBox(el);
+      if (!b) return worldPoint;
+      const center = getBoundsCenter(b);
+      return rotatePoint(worldPoint, center, -rotationDeg);
+    };
+
+    // Special elbow UI: hide corner points; show start/end big + one insert handle per edge.
+    if (style === 'elbow') {
+      const baseRadius = dotSize / 2;
+      const bigRadius = baseRadius * 1.6;
+      const eps = 0.5 / zoom;
+      const isDraggingThisElbow = originalElements.length === 1 && originalElements[0].id === element.id;
+
+      const elbowPolylineRaw =
+        el.points.length === 2
+          ? [start, end]
+          : el.points.length === 3
+            ? route === 'vertical'
+              ? [start, { x: control.x, y: start.y }, { x: control.x, y: end.y }, end]
+              : [start, { x: start.x, y: control.y }, { x: end.x, y: control.y }, end]
+            : getElbowPolylineForVertices(el.points);
+
+      // Normalize: remove consecutive duplicate points (avoids zero-length segments causing duplicate handles).
+      const elbowPolyline = elbowPolylineRaw.reduce<Point[]>((acc, p) => {
+        const last = acc[acc.length - 1];
+        if (!last || Math.hypot(p.x - last.x, p.y - last.y) > eps) acc.push(p);
+        return acc;
+      }, []);
+
+      const runs: Array<{ startIdx: number; endIdx: number; orientation: 'h' | 'v' }> = [];
+      for (let i = 0; i < elbowPolyline.length - 1; i++) {
+        const a = elbowPolyline[i];
+        const b = elbowPolyline[i + 1];
+        const dx = Math.abs(a.x - b.x);
+        const dy = Math.abs(a.y - b.y);
+        if (dx <= eps && dy <= eps) continue;
+        const orientation: 'h' | 'v' = dy <= eps ? 'h' : dx <= eps ? 'v' : dx >= dy ? 'h' : 'v';
+        if (runs.length === 0) {
+          runs.push({ startIdx: i, endIdx: i + 1, orientation });
+          continue;
+        }
+        const last = runs[runs.length - 1];
+        if (last.endIdx === i && last.orientation === orientation) {
+          last.endIdx = i + 1;
+        } else {
+          runs.push({ startIdx: i, endIdx: i + 1, orientation });
+        }
+      }
+
+      const startDragWithExplicit = (e: React.MouseEvent, drag: { kind: ConnectorDragKind; index: number }) => {
+        e.stopPropagation();
+        onStartTransform?.();
+        const updates: Partial<BoardElement> = { points: elbowPolyline, connectorStyle: 'elbow', elbowRoute: undefined };
+        setOriginalElements([{ ...element, ...updates, points: elbowPolyline }]);
+        setDraggingConnectorPoint(drag);
+        onUpdateElement(element.id, updates);
+      };
+
+      const startElbowOffsetRun = (e: React.MouseEvent, run: { startIdx: number; endIdx: number; orientation: 'h' | 'v' }) => {
+        e.stopPropagation();
+        onStartTransform?.();
+
+        const a = elbowPolyline[run.startIdx];
+        const b = elbowPolyline[run.endIdx];
+        const axis: 'x' | 'y' = run.orientation === 'h' ? 'y' : 'x';
+
+        // Replace the straight run with a parallel-offset segment whose endpoints can move,
+        // while keeping the original run endpoints fixed (so existing circles/anchors stay put).
+        const reduced = [...elbowPolyline.slice(0, run.startIdx + 1), ...elbowPolyline.slice(run.endIdx)];
+        const insertAt = run.startIdx + 1;
+
+        const offsetStart = { ...a };
+        const offsetEnd = { ...b };
+        reduced.splice(insertAt, 0, offsetStart, offsetEnd);
+
+        const pointerWorld = getMousePosition(e);
+        const anchor = toLocalPoint(pointerWorld);
+        const edgeKey = `${element.id}-elbow-offset-${run.startIdx}-${run.endIdx}`;
+
+        const updates: Partial<BoardElement> = { points: reduced, connectorStyle: 'elbow', elbowRoute: undefined };
+        setOriginalElements([{ ...element, ...updates, points: reduced }]);
+        setDraggingConnectorPoint({
+          kind: 'elbowEdge',
+          index: insertAt,
+          range: [insertAt, insertAt + 1],
+          axis,
+          edgeKey,
+          anchor,
+        });
+        onUpdateElement(element.id, updates);
+      };
+
+      const startElbowMoveEdge = (e: React.MouseEvent, segIndex: number) => {
+        e.stopPropagation();
+        onStartTransform?.();
+
+        const a = elbowPolyline[segIndex];
+        const b = elbowPolyline[segIndex + 1];
+        const dx = Math.abs(b.x - a.x);
+        const dy = Math.abs(b.y - a.y);
+        const isHorizontal = dy <= eps ? true : dx <= eps ? false : dx >= dy;
+        const axis: 'x' | 'y' = isHorizontal ? 'y' : 'x';
+
+        // Expand to the full contiguous run (so dragging moves the entire edge, not a sub-segment).
+        let left = segIndex;
+        let right = segIndex + 1;
+        if (isHorizontal) {
+          const baseY = a.y;
+          while (left > 0 && Math.abs(elbowPolyline[left - 1].y - baseY) <= eps) left--;
+          while (right < elbowPolyline.length - 1 && Math.abs(elbowPolyline[right + 1].y - baseY) <= eps) right++;
+        } else {
+          const baseX = a.x;
+          while (left > 0 && Math.abs(elbowPolyline[left - 1].x - baseX) <= eps) left--;
+          while (right < elbowPolyline.length - 1 && Math.abs(elbowPolyline[right + 1].x - baseX) <= eps) right++;
+        }
+
+        const pointerWorld = getMousePosition(e);
+        const anchor = toLocalPoint(pointerWorld);
+        const edgeKey = `${element.id}-elbow-edge-${segIndex}`;
+
+        // Only global start/end are anchored. If the dragged run touches either endpoint,
+        // insert a duplicate point next to the endpoint so the run can move while the endpoint stays fixed.
+        const pointsForDrag = [...elbowPolyline];
+        let leftIdx = left;
+        let rightIdx = right;
+
+        if (leftIdx === 0 && pointsForDrag.length >= 2) {
+          const first = pointsForDrag[0];
+          const next = pointsForDrag[1];
+          if (Math.hypot((next?.x ?? first.x) - first.x, (next?.y ?? first.y) - first.y) > eps) {
+            pointsForDrag.splice(1, 0, { ...first });
+            rightIdx += 1;
+          }
+          leftIdx = 1;
+        }
+
+        const lastIndexBefore = pointsForDrag.length - 1;
+        if (rightIdx === lastIndexBefore && pointsForDrag.length >= 2) {
+          const last = pointsForDrag[lastIndexBefore];
+          const prev = pointsForDrag[lastIndexBefore - 1];
+          if (Math.hypot((prev?.x ?? last.x) - last.x, (prev?.y ?? last.y) - last.y) > eps) {
+            pointsForDrag.splice(lastIndexBefore, 0, { ...last });
+          }
+          rightIdx = pointsForDrag.length - 2; // the inserted duplicate (just before the true end)
+        }
+
+        const updates: Partial<BoardElement> = { points: pointsForDrag, connectorStyle: 'elbow', elbowRoute: undefined };
+        setOriginalElements([{ ...element, ...updates, points: pointsForDrag }]);
+        setDraggingConnectorPoint({ kind: 'elbowEdge', index: segIndex, range: [leftIdx, rightIdx], axis, edgeKey, anchor });
+        onUpdateElement(element.id, updates);
+      };
+
+      const minGapPx = 6;
+      const existingDiameterPx = bigRadius * 2 * zoom;
+      const insertDiameterPx = baseRadius * 2 * zoom;
+      const minDistFromEndpointPx = (bigRadius + baseRadius) * zoom + 2;
+
+      const insertCenters: Point[] = [];
+      const renderInsertForRun = (run: { startIdx: number; endIdx: number; orientation: 'h' | 'v' }) => {
+        // While dragging an elbow edge/insert, hide insert handles (prevents a "left behind" small circle).
+        if (
+          isDraggingThisElbow &&
+          (draggingConnectorPoint?.kind === 'elbowEdge' ||
+            draggingConnectorPoint?.kind === 'createCorner' ||
+            draggingConnectorPoint?.kind === 'elbowOrtho')
+        ) {
+          return null;
+        }
+
+        const a = elbowPolyline[run.startIdx];
+        const b = elbowPolyline[run.endIdx];
+        const segLenPx = Math.hypot(b.x - a.x, b.y - a.y) * zoom;
+        const canShow = segLenPx >= existingDiameterPx + insertDiameterPx + minGapPx;
+        if (!canShow) return null;
+
+        const cx = (a.x + b.x) / 2;
+        const cy = (a.y + b.y) / 2;
+        const dStart = Math.hypot(cx - elbowPolyline[0].x, cy - elbowPolyline[0].y) * zoom;
+        const dEnd = Math.hypot(cx - elbowPolyline[elbowPolyline.length - 1].x, cy - elbowPolyline[elbowPolyline.length - 1].y) * zoom;
+        if (dStart < minDistFromEndpointPx || dEnd < minDistFromEndpointPx) return null;
+
+        // Avoid inserts on top of existing points (big or small).
+        const overlapsPoint = elbowPolyline.some((p, idx) => {
+          if (idx === run.startIdx || idx === run.endIdx) return false;
+          return Math.hypot(cx - p.x, cy - p.y) * zoom < insertDiameterPx + 2;
+        });
+        if (overlapsPoint) return null;
+
+        // Avoid double circles on elbow: no insert if too close to another insert.
+        const overlapsInsert = insertCenters.some((p) => Math.hypot(cx - p.x, cy - p.y) * zoom < insertDiameterPx + 2);
+        if (overlapsInsert) return null;
+        insertCenters.push({ x: cx, y: cy });
+
+        return (
+          <circle
+            key={`${element.id}-elbow-insert-${run.startIdx}-${run.endIdx}`}
+            cx={cx}
+            cy={cy}
+            r={baseRadius}
+            fill="var(--accent)"
+            stroke="var(--background)"
+            strokeWidth={dotStrokeWidth}
+            style={{ cursor: 'copy' }}
+            onMouseDown={(e) => startElbowOffsetRun(e, run)}
+          />
+        );
+      };
+
+      const activeEdgeCircle =
+        draggingConnectorPoint?.kind === 'elbowEdge' && draggingConnectorPoint?.range && draggingConnectorPoint.edgeKey?.startsWith(`${element.id}-elbow-`)
+          ? (() => {
+              const [i1, i2] = draggingConnectorPoint.range;
+              const p1 = el.points[i1];
+              const p2 = el.points[i2];
+              if (!p1 || !p2) return null;
+              const cx = (p1.x + p2.x) / 2;
+              const cy = (p1.y + p2.y) / 2;
+              return (
+                <circle
+                  cx={cx}
+                  cy={cy}
+                  r={bigRadius}
+                  fill="var(--background)"
+                  stroke="var(--accent)"
+                  strokeWidth={dotStrokeWidth}
+                  pointerEvents="none"
+                />
+              );
+            })()
+          : null;
+
+      const activeCreateCornerCircle =
+        draggingConnectorPoint?.kind === 'createCorner' && isDraggingThisElbow
+          ? (
+              <circle
+                cx={handlePosElbow.x}
+                cy={handlePosElbow.y}
+                r={bigRadius}
+                fill="var(--background)"
+                stroke="var(--accent)"
+                strokeWidth={dotStrokeWidth}
+                pointerEvents="none"
+              />
+            )
+          : null;
+
+      return (
+        <g transform={rotationTransform}>
+          {/* Edge hitboxes (drag entire edge) */}
+          {element.points.length >= 3 &&
+            runs.map((run, idx) => {
+              const p = elbowPolyline[run.startIdx];
+              const q = elbowPolyline[run.endIdx];
+              const isHorizontal = run.orientation === 'h';
+              const cursor = isHorizontal ? 'ns-resize' : 'ew-resize';
+              return (
+                <line
+                  key={`${element.id}-elbow-hit-run-${idx}`}
+                  x1={p.x}
+                  y1={p.y}
+                  x2={q.x}
+                  y2={q.y}
+                  stroke="transparent"
+                  strokeWidth={Math.max(12 / zoom, 18 / zoom)}
+                  pointerEvents="stroke"
+                  style={{ cursor }}
+                  onMouseDown={(e) => startElbowMoveEdge(e, run.startIdx)}
+                />
+              );
+            })}
+
+          {/* Endpoints (always big for elbow) */}
+          <circle
+            cx={elbowPolyline[0].x}
+            cy={elbowPolyline[0].y}
+            r={bigRadius}
+            fill="var(--background)"
+            stroke="var(--accent)"
+            strokeWidth={dotStrokeWidth}
+            style={{ cursor: 'move' }}
+            onMouseDown={(e) => startDragWithExplicit(e, { kind: 'normal', index: 0 })}
+          />
+          <circle
+            cx={elbowPolyline[elbowPolyline.length - 1].x}
+            cy={elbowPolyline[elbowPolyline.length - 1].y}
+            r={bigRadius}
+            fill="var(--background)"
+            stroke="var(--accent)"
+            strokeWidth={dotStrokeWidth}
+            style={{ cursor: 'move' }}
+            onMouseDown={(e) => startDragWithExplicit(e, { kind: 'normal', index: elbowPolyline.length - 1 })}
+          />
+
+          {/* Insert handles: one per edge */}
+          {el.points.length >= 3 ? (
+            <g>{runs.map((r) => renderInsertForRun(r))}</g>
+          ) : (
+            <circle
+              cx={(start.x + end.x) / 2}
+              cy={(start.y + end.y) / 2}
+              r={baseRadius}
+              fill="var(--accent)"
+              stroke="var(--background)"
+              strokeWidth={dotStrokeWidth}
+              style={{ cursor: 'copy' }}
+              onMouseDown={(e) => {
+                e.stopPropagation();
+                onStartTransform?.();
+                setDraggingConnectorPoint({ index: 1, kind: 'createCorner' });
+                setOriginalElements([{ ...element }]);
+              }}
+            />
+          )}
+
+          {/* Active dragged edge handle (big) */}
+          {activeEdgeCircle}
+          {activeCreateCornerCircle}
+        </g>
+      );
+    }
+
     const handles: Array<{ pos: Point; index: number; kind: ConnectorDragKind }> =
       element.points.length === 2
         ? [
@@ -3294,25 +3914,33 @@ export function Canvas({
               { pos: handlePosCurved, index: 1, kind: 'curvedMid' },
               { pos: end, index: 2, kind: 'normal' },
             ]
-          : style === 'elbow' && element.points.length === 3
-            ? [
-                { pos: start, index: 0, kind: 'normal' },
-                { pos: handlePosElbow, index: 1, kind: 'elbowHandle' },
-                { pos: end, index: 2, kind: 'normal' },
-              ]
-            : element.points.map((p, i) => ({ pos: p, index: i, kind: 'normal' as const }));
-
-    const toLocalPoint = (worldPoint: Point) => {
-      if (!rotationDeg) return worldPoint;
-      const b = getBoundingBox(element);
-      if (!b) return worldPoint;
-      const center = getBoundsCenter(b);
-      return rotatePoint(worldPoint, center, -rotationDeg);
-    };
+          : element.points.map((p, i) => ({ pos: p, index: i, kind: 'normal' as const }));
 
     const startDrag = (e: React.MouseEvent, index: number, kind: ConnectorDragKind) => {
       e.stopPropagation();
       onStartTransform?.();
+
+      const actualStyle = element.connectorStyle ?? connectorStyle;
+      if (actualStyle === 'elbow' && kind === 'normal' && index > 0 && index < element.points.length - 1) {
+        const eps = 0.5 / zoom;
+        const p = element.points[index];
+        const prev = element.points[index - 1];
+        const next = element.points[index + 1];
+        const collinearHorizontal = Math.abs(prev.y - p.y) <= eps && Math.abs(next.y - p.y) <= eps;
+        const collinearVertical = Math.abs(prev.x - p.x) <= eps && Math.abs(next.x - p.x) <= eps;
+
+        if (collinearHorizontal) {
+          setDraggingConnectorPoint({ index, kind: 'elbowOrtho', axis: 'y' });
+          setOriginalElements([{ ...element }]);
+          return;
+        }
+        if (collinearVertical) {
+          setDraggingConnectorPoint({ index, kind: 'elbowOrtho', axis: 'x' });
+          setOriginalElements([{ ...element }]);
+          return;
+        }
+      }
+
       setDraggingConnectorPoint({ index, kind });
       setOriginalElements([{ ...element }]);
     };
@@ -3327,9 +3955,7 @@ export function Canvas({
       const basePoints =
         style === 'curved' && element.points.length === 3
           ? [start, handlePosCurved, end]
-          : style === 'elbow' && element.points.length === 3
-            ? [start, handlePosElbow, end]
-            : element.points;
+          : element.points;
 
       const insertIndex = Math.max(1, Math.min(basePoints.length - 1, segmentIndex + 1));
       const nextPoints = [...basePoints];
@@ -3361,48 +3987,6 @@ export function Canvas({
         return getCubicBezierPoint(p1, c1, c2, p2, 0.5);
       }
 
-      if (style === 'elbow') {
-        if (element.points.length === 3) {
-          const path =
-            route === 'vertical'
-              ? segmentIndex === 0
-                ? [start, { x: control.x, y: start.y }, handlePosElbow]
-                : [handlePosElbow, { x: control.x, y: end.y }, end]
-              : segmentIndex === 0
-                ? [start, { x: start.x, y: control.y }, handlePosElbow]
-                : [handlePosElbow, { x: end.x, y: control.y }, end];
-
-          const a = path[0];
-          const b = path[1];
-          const c = path[2];
-          const l1 = Math.hypot(b.x - a.x, b.y - a.y);
-          const l2 = Math.hypot(c.x - b.x, c.y - b.y);
-          const half = (l1 + l2) / 2;
-          if (half <= l1 || l2 === 0) {
-            const t = l1 === 0 ? 0 : half / l1;
-            return { x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t };
-          }
-          const t = (half - l1) / l2;
-          return { x: b.x + (c.x - b.x) * t, y: b.y + (c.y - b.y) * t };
-        }
-
-        const a = element.points[segmentIndex];
-        const b = element.points[segmentIndex + 1];
-        const dx = b.x - a.x;
-        const dy = b.y - a.y;
-        const vertical = Math.abs(dx) >= Math.abs(dy);
-        const mid = vertical ? { x: b.x, y: a.y } : { x: a.x, y: b.y };
-        const l1 = Math.hypot(mid.x - a.x, mid.y - a.y);
-        const l2 = Math.hypot(b.x - mid.x, b.y - mid.y);
-        const half = (l1 + l2) / 2;
-        if (half <= l1 || l2 === 0) {
-          const t = l1 === 0 ? 0 : half / l1;
-          return { x: a.x + (mid.x - a.x) * t, y: a.y + (mid.y - a.y) * t };
-        }
-        const t = (half - l1) / l2;
-        return { x: mid.x + (b.x - mid.x) * t, y: mid.y + (b.y - mid.y) * t };
-      }
-
       const a = handles[segmentIndex].pos;
       const b = handles[segmentIndex + 1].pos;
       return { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
@@ -3425,12 +4009,12 @@ export function Canvas({
         ))}
 
         {/* Insert controls (edit arrow mode) */}
-        {isEditArrowMode && handles.length >= 3 && (
+        {isEditArrowMode && handles.length >= 3 && !(draggingConnectorPoint && originalElements.length === 1 && originalElements[0].id === element.id) && (
           <g>
             {handles.slice(0, -1).map((h, i) => {
               const next = handles[i + 1];
 
-              // Use distance *along* the rendered connector, so elbow/curved behave correctly.
+              // Use distance *along* the rendered connector, so curved behaves correctly.
               let segLenWorld = Math.hypot(next.pos.x - h.pos.x, next.pos.y - h.pos.y);
               if (style === 'curved' && element.points.length === 3 && handles.length === 3) {
                 segLenWorld = approxQuadraticLength(start, control, end, i === 0 ? 0 : 0.5, i === 0 ? 0.5 : 1);
@@ -3442,20 +4026,6 @@ export function Canvas({
                 const p3 = pts[i + 2] ?? p2;
                 const { c1, c2 } = getCatmullRomControlPoints(p0, p1, p2, p3);
                 segLenWorld = approxCubicLength(p1, c1, c2, p2);
-              } else if (style === 'elbow' && element.points.length === 3 && handles.length === 3) {
-                if (route === 'vertical') {
-                  segLenWorld =
-                    i === 0
-                      ? Math.abs(control.x - start.x) + Math.abs(handlePosElbow.y - start.y)
-                      : Math.abs(end.x - control.x) + Math.abs(end.y - handlePosElbow.y);
-                } else {
-                  segLenWorld =
-                    i === 0
-                      ? Math.abs(control.y - start.y) + Math.abs(handlePosElbow.x - start.x)
-                      : Math.abs(end.y - control.y) + Math.abs(end.x - handlePosElbow.x);
-                }
-              } else if (style === 'elbow' && element.points.length > 3) {
-                segLenWorld = Math.abs(next.pos.x - h.pos.x) + Math.abs(next.pos.y - h.pos.y);
               }
 
               const segLenPx = segLenWorld * zoom;
@@ -3485,7 +4055,17 @@ export function Canvas({
         )}
       </g>
     );
-  }, [onStartTransform, connectorStyle, zoom, isEditArrowMode, getMousePosition, onUpdateElement]);
+  }, [
+    getConnectorDragPreviewElement,
+    onStartTransform,
+    connectorStyle,
+    zoom,
+    isEditArrowMode,
+    getMousePosition,
+    onUpdateElement,
+    draggingConnectorPoint,
+    originalElements,
+  ]);
 
   // Render selection box with handles
   const renderSelectionBox = () => {
