@@ -64,7 +64,8 @@ type ConnectorDragKind =
   | "curvedMid"
   | "elbowHandle"
   | "elbowOrtho"
-  | "elbowEdge";
+  | "elbowEdge"
+  | "elbowEndpoint";
 
 interface BoundingBox {
   x: number;
@@ -1647,6 +1648,69 @@ export function Canvas({
               route === "vertical"
                 ? { x: localPoint.x, y: existingControl.y }
                 : { x: existingControl.x, y: localPoint.y };
+          } else if (
+            draggingConnectorPoint.kind === "elbowEndpoint" &&
+            style === "elbow" &&
+            newPoints.length >= 3
+          ) {
+            // For elbow endpoints: move endpoint, adjust adjacent point to maintain
+            // the second edge's axis. All other edges stay completely fixed.
+            const isStart = index === 0;
+            const isEnd = index === newPoints.length - 1;
+            const eps = 0.5 / zoom;
+
+            if (isStart) {
+              // Dragging start (point 0):
+              // - Point 0 moves freely
+              // - Point 1 adjusts to maintain edge 1→2 on its axis
+              // - Points 2+ stay fixed
+              const p1 = newPoints[1];
+              const p2 = newPoints[2];
+
+              // Determine if edge 1→2 is horizontal or vertical
+              const edge12Horizontal = Math.abs(p1.y - p2.y) <= eps;
+              const edge12Vertical = Math.abs(p1.x - p2.x) <= eps;
+
+              newPoints[0] = localPoint;
+
+              if (edge12Vertical) {
+                // Edge 1→2 is vertical (same X), so point 1 keeps X from point 2
+                // but takes Y from new point 0 to connect the first edge
+                newPoints[1] = { x: p2.x, y: localPoint.y };
+              } else if (edge12Horizontal) {
+                // Edge 1→2 is horizontal (same Y), so point 1 keeps Y from point 2
+                // but takes X from new point 0 to connect the first edge
+                newPoints[1] = { x: localPoint.x, y: p2.y };
+              } else {
+                // Not axis-aligned, keep point 1 fixed
+              }
+            } else if (isEnd) {
+              // Dragging end (last point):
+              // - Last point moves freely
+              // - Second-to-last adjusts to maintain its edge to the third-to-last
+              // - All other points stay fixed
+              const lastIdx = newPoints.length - 1;
+              const p1 = newPoints[lastIdx - 1]; // second to last
+              const p2 = newPoints[lastIdx - 2]; // third to last
+
+              // Determine if edge p2→p1 is horizontal or vertical
+              const edgeHorizontal = Math.abs(p1.y - p2.y) <= eps;
+              const edgeVertical = Math.abs(p1.x - p2.x) <= eps;
+
+              newPoints[lastIdx] = localPoint;
+
+              if (edgeVertical) {
+                // Edge p2→p1 is vertical (same X), so p1 keeps X from p2
+                // but takes Y from new endpoint to connect the last edge
+                newPoints[lastIdx - 1] = { x: p2.x, y: localPoint.y };
+              } else if (edgeHorizontal) {
+                // Edge p2→p1 is horizontal (same Y), so p1 keeps Y from p2
+                // but takes X from new endpoint to connect the last edge
+                newPoints[lastIdx - 1] = { x: localPoint.x, y: p2.y };
+              } else {
+                // Not axis-aligned, keep p1 fixed
+              }
+            }
           } else if (index >= 0 && index < newPoints.length) {
             newPoints[index] = localPoint;
           }
@@ -3261,6 +3325,54 @@ export function Canvas({
         }
       }
 
+      // Preview for elbow endpoint dragging (moves endpoint + adjacent point)
+      if (
+        draggingConnectorPoint.kind === "elbowEndpoint" &&
+        style === "elbow" &&
+        originalPoints.length >= 3
+      ) {
+        const isStart = index === 0;
+        const isEnd = index === originalPoints.length - 1;
+        const nextPoints = originalPoints.map((p) => ({ ...p }));
+        const eps = 0.5 / zoom;
+
+        if (isStart) {
+          const p1 = originalPoints[1];
+          const p2 = originalPoints[2];
+          const edge12Horizontal = Math.abs(p1.y - p2.y) <= eps;
+          const edge12Vertical = Math.abs(p1.x - p2.x) <= eps;
+
+          nextPoints[0] = localPoint;
+
+          if (edge12Vertical) {
+            nextPoints[1] = { x: p2.x, y: localPoint.y };
+          } else if (edge12Horizontal) {
+            nextPoints[1] = { x: localPoint.x, y: p2.y };
+          }
+        } else if (isEnd) {
+          const lastIdx = originalPoints.length - 1;
+          const p1 = originalPoints[lastIdx - 1];
+          const p2 = originalPoints[lastIdx - 2];
+          const edgeHorizontal = Math.abs(p1.y - p2.y) <= eps;
+          const edgeVertical = Math.abs(p1.x - p2.x) <= eps;
+
+          nextPoints[lastIdx] = localPoint;
+
+          if (edgeVertical) {
+            nextPoints[lastIdx - 1] = { x: p2.x, y: localPoint.y };
+          } else if (edgeHorizontal) {
+            nextPoints[lastIdx - 1] = { x: localPoint.x, y: p2.y };
+          }
+        }
+
+        return {
+          ...element,
+          points: nextPoints,
+          connectorStyle: "elbow",
+          elbowRoute: undefined,
+        };
+      }
+
       // Preview for initial corner creation (so the handle doesn't "stick" until mouseup in collab mode)
       if (
         draggingConnectorPoint.kind === "createCorner" &&
@@ -4770,7 +4882,7 @@ export function Canvas({
               style={{ cursor: "move" }}
               onMouseDown={(e) =>
                 startDragWithExplicit(e, {
-                  kind: "normal",
+                  kind: "elbowEndpoint",
                   index: 0,
                 })
               }
@@ -4785,7 +4897,7 @@ export function Canvas({
               style={{ cursor: "move" }}
               onMouseDown={(e) =>
                 startDragWithExplicit(e, {
-                  kind: "normal",
+                  kind: "elbowEndpoint",
                   index: elbowPolyline.length - 1,
                 })
               }
@@ -5078,7 +5190,11 @@ export function Canvas({
         (selectedElement.type === "line" || selectedElement.type === "arrow")
       ) {
         const hasCorner = selectedElement.points.length >= 3;
-        if (!hasCorner) return renderConnectorControls(selectedElement);
+        const style = selectedElement.connectorStyle ?? connectorStyle;
+        // For elbow connectors or lines without corners, use connector controls (no frame)
+        if (!hasCorner || style === "elbow") {
+          return renderConnectorControls(selectedElement);
+        }
       }
     }
 
