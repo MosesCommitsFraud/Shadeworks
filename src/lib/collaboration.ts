@@ -1,210 +1,420 @@
-'use client';
+"use client";
 
-import * as Y from 'yjs';
-import YPartyKitProvider from 'y-partykit/provider';
-import type { BoardElement, Cursor } from './board-types';
-import { generateFunnyName } from './funny-names';
+import * as Y from "yjs";
+import YPartyKitProvider from "y-partykit/provider";
+import type { BoardElement, Cursor } from "./board-types";
+import { generateFunnyName } from "./funny-names";
+import {
+    encrypt,
+    decrypt,
+    isEncryptedElement,
+    type EncryptedElement,
+} from "./encryption";
 
-export type ConnectionStatus = 'connecting' | 'connected' | 'disconnected';
+export type ConnectionStatus = "connecting" | "connected" | "disconnected";
 
 export interface UserState {
-  id: string;
-  name: string;
-  color: string;
-  cursor?: { x: number; y: number } | null;
-  viewport?: { pan: { x: number; y: number }; zoom: number };
+    id: string;
+    name: string;
+    color: string;
+    cursor?: { x: number; y: number } | null;
+    viewport?: { pan: { x: number; y: number }; zoom: number };
 }
 
 // PartyKit host - set NEXT_PUBLIC_PARTYKIT_HOST in .env.local
 const PARTYKIT_HOST = process.env.NEXT_PUBLIC_PARTYKIT_HOST!;
 
+// Type for elements stored in Y.Array (can be encrypted or plain)
+type StoredElement = BoardElement | EncryptedElement;
+
 export class CollaborationManager {
-  private doc: Y.Doc;
-  private provider: YPartyKitProvider | null = null;
-  private elements: Y.Array<BoardElement>;
-  private awareness: Map<number, Cursor> | null = null;
-  private userId: string;
-  private userName: string;
-  private userColor: string;
-  private connectionStatus: ConnectionStatus = 'connecting';
+    private doc: Y.Doc;
+    private provider: YPartyKitProvider | null = null;
+    private elements: Y.Array<StoredElement>;
+    private awareness: Map<number, Cursor> | null = null;
+    private userId: string;
+    private userName: string;
+    private userColor: string;
+    private connectionStatus: ConnectionStatus = "connecting";
+    private encryptionKey: CryptoKey | null = null;
+    private decryptedElementsCache: Map<string, BoardElement> = new Map();
 
-  constructor(roomId: string, userName?: string) {
-    this.doc = new Y.Doc();
-    this.elements = this.doc.getArray<BoardElement>('elements');
-    this.userId = Math.random().toString(36).substring(2, 9);
-    // Use provided name or generate a funny random name
-    this.userName = userName || generateFunnyName();
-    this.userColor = this.getRandomColor();
+    constructor(roomId: string, userName?: string, encryptionKey?: CryptoKey) {
+        this.doc = new Y.Doc();
+        this.elements = this.doc.getArray<StoredElement>("elements");
+        this.userId = Math.random().toString(36).substring(2, 9);
+        // Use provided name or generate a funny random name
+        this.userName = userName || generateFunnyName();
+        this.userColor = this.getRandomColor();
+        this.encryptionKey = encryptionKey || null;
 
-    // Connect to PartyKit
-    this.provider = new YPartyKitProvider(PARTYKIT_HOST, `board-${roomId}`, this.doc, {
-      connect: true,
-    });
+        // Connect to PartyKit
+        this.provider = new YPartyKitProvider(
+            PARTYKIT_HOST,
+            `board-${roomId}`,
+            this.doc,
+            {
+                connect: true,
+            },
+        );
 
-    // Track connection status
-    this.provider.on('sync', (isSynced: boolean) => {
-      console.log('[Collaboration] Synced:', isSynced);
-      this.connectionStatus = isSynced ? 'connected' : 'connecting';
-    });
+        // Track connection status
+        this.provider.on("sync", (isSynced: boolean) => {
+            console.log("[Collaboration] Synced:", isSynced);
+            this.connectionStatus = isSynced ? "connected" : "connecting";
+        });
 
-    this.provider.on('status', ({ status }: { status: string }) => {
-      console.log('[Collaboration] Status:', status);
-      if (status === 'connected') {
-        this.connectionStatus = 'connected';
-      } else if (status === 'disconnected') {
-        this.connectionStatus = 'disconnected';
-      }
-    });
+        this.provider.on("status", ({ status }: { status: string }) => {
+            console.log("[Collaboration] Status:", status);
+            if (status === "connected") {
+                this.connectionStatus = "connected";
+            } else if (status === "disconnected") {
+                this.connectionStatus = "disconnected";
+            }
+        });
 
-    // Set user awareness
-    this.provider.awareness.setLocalStateField('user', {
-      id: this.userId,
-      name: this.userName,
-      color: this.userColor,
-      cursor: null,
-    });
+        // Set user awareness
+        this.provider.awareness.setLocalStateField("user", {
+            id: this.userId,
+            name: this.userName,
+            color: this.userColor,
+            cursor: null,
+        });
 
-    console.log('[Collaboration] Initialized for room:', roomId, 'as:', this.userName);
-  }
-
-  private getRandomColor(): string {
-    const colors = [
-      '#f87171', '#fb923c', '#fbbf24', '#a3e635', '#4ade80',
-      '#34d399', '#22d3d8', '#38bdf8', '#60a5fa', '#818cf8',
-      '#a78bfa', '#c084fc', '#e879f9', '#f472b6',
-    ];
-    return colors[Math.floor(Math.random() * colors.length)];
-  }
-
-  getElements(): BoardElement[] {
-    return this.elements.toArray();
-  }
-
-  addElement(element: BoardElement): void {
-    this.elements.push([element]);
-  }
-
-  updateElement(id: string, updates: Partial<BoardElement>): void {
-    const index = this.elements.toArray().findIndex(el => el.id === id);
-    if (index !== -1) {
-      const element = this.elements.get(index);
-      this.elements.delete(index, 1);
-      this.elements.insert(index, [{ ...element, ...updates }]);
+        console.log(
+            "[Collaboration] Initialized for room:",
+            roomId,
+            "as:",
+            this.userName,
+        );
     }
-  }
 
-  deleteElement(id: string): void {
-    const index = this.elements.toArray().findIndex(el => el.id === id);
-    if (index !== -1) {
-      this.elements.delete(index, 1);
+    private getRandomColor(): string {
+        const colors = [
+            "#f87171",
+            "#fb923c",
+            "#fbbf24",
+            "#a3e635",
+            "#4ade80",
+            "#34d399",
+            "#22d3d8",
+            "#38bdf8",
+            "#60a5fa",
+            "#818cf8",
+            "#a78bfa",
+            "#c084fc",
+            "#e879f9",
+            "#f472b6",
+        ];
+        return colors[Math.floor(Math.random() * colors.length)];
     }
-  }
 
-  clearAll(): void {
-    this.elements.delete(0, this.elements.length);
-  }
-
-  onElementsChange(callback: (elements: BoardElement[]) => void): () => void {
-    const handler = () => {
-      callback(this.elements.toArray());
-    };
-    this.elements.observe(handler);
-    return () => this.elements.unobserve(handler);
-  }
-
-  updateCursor(x: number, y: number): void {
-    if (this.provider) {
-      const currentState = this.provider.awareness.getLocalState() as { user?: any } | null;
-      this.provider.awareness.setLocalStateField('user', {
-        ...(currentState?.user || {}),
-        id: this.userId,
-        name: this.userName,
-        color: this.userColor,
-        cursor: { x, y },
-      });
+    /**
+     * Check if encryption is enabled
+     */
+    isEncrypted(): boolean {
+        return this.encryptionKey !== null;
     }
-  }
 
-  updateViewport(pan: { x: number; y: number }, zoom: number): void {
-    if (this.provider) {
-      const currentState = this.provider.awareness.getLocalState() as { user?: any } | null;
-      this.provider.awareness.setLocalStateField('user', {
-        ...(currentState?.user || {}),
-        id: this.userId,
-        name: this.userName,
-        color: this.userColor,
-        viewport: { pan, zoom },
-      });
+    /**
+     * Decrypt a single stored element
+     */
+    private async decryptElement(
+        stored: StoredElement,
+    ): Promise<BoardElement | null> {
+        if (!isEncryptedElement(stored)) {
+            // Element is not encrypted, return as-is
+            return stored as BoardElement;
+        }
+
+        if (!this.encryptionKey) {
+            console.warn(
+                "[Collaboration] Cannot decrypt element: no encryption key",
+            );
+            return null;
+        }
+
+        // Check cache first
+        const cached = this.decryptedElementsCache.get(stored.id);
+        if (cached) {
+            return cached;
+        }
+
+        try {
+            const decrypted = await decrypt<BoardElement>(
+                this.encryptionKey,
+                stored.ciphertext,
+                stored.iv,
+            );
+            // Cache the decrypted element
+            this.decryptedElementsCache.set(stored.id, decrypted);
+            return decrypted;
+        } catch (error) {
+            console.error("[Collaboration] Failed to decrypt element:", error);
+            return null;
+        }
     }
-  }
 
-  onAwarenessChange(callback: (users: Map<number, { user: UserState }>) => void): () => void {
-    if (!this.provider) return () => {};
+    /**
+     * Get all elements (decrypted if encryption is enabled)
+     * Note: Returns cached elements for sync access
+     */
+    getElements(): BoardElement[] {
+        const stored = this.elements.toArray();
+        const result: BoardElement[] = [];
 
-    const handler = () => {
-      const states = this.provider!.awareness.getStates() as Map<number, { user: UserState }>;
-      callback(states);
-    };
-    
-    this.provider.awareness.on('change', handler);
-    handler(); // Initial call
-    
-    return () => {
-      this.provider?.awareness.off('change', handler);
-    };
-  }
+        for (const el of stored) {
+            if (isEncryptedElement(el)) {
+                // Try to get from cache
+                const cached = this.decryptedElementsCache.get(el.id);
+                if (cached) {
+                    result.push(cached);
+                }
+                // If not cached, it will be decrypted asynchronously
+            } else {
+                result.push(el as BoardElement);
+            }
+        }
 
-  getConnectedUsers(): number {
-    if (!this.provider) return 1;
-    return this.provider.awareness.getStates().size;
-  }
+        return result;
+    }
 
-  getUserInfo() {
-    return {
-      id: this.userId,
-      name: this.userName,
-      color: this.userColor,
-    };
-  }
+    /**
+     * Get all elements asynchronously (ensures all are decrypted)
+     */
+    async getElementsAsync(): Promise<BoardElement[]> {
+        const stored = this.elements.toArray();
+        const decrypted = await Promise.all(
+            stored.map((el) => this.decryptElement(el)),
+        );
+        return decrypted.filter((el): el is BoardElement => el !== null);
+    }
 
-  getConnectionStatus(): ConnectionStatus {
-    return this.connectionStatus;
-  }
+    /**
+     * Add a new element (encrypts if encryption is enabled)
+     */
+    async addElement(element: BoardElement): Promise<void> {
+        if (this.encryptionKey) {
+            const { ciphertext, iv } = await encrypt(
+                this.encryptionKey,
+                element,
+            );
+            const encrypted: EncryptedElement = {
+                id: element.id,
+                encrypted: true,
+                ciphertext,
+                iv,
+            };
+            this.elements.push([encrypted]);
+            // Pre-cache the decrypted element
+            this.decryptedElementsCache.set(element.id, element);
+        } else {
+            this.elements.push([element]);
+        }
+    }
 
-  onConnectionChange(callback: (status: ConnectionStatus, peers: number) => void): () => void {
-    if (!this.provider) return () => {};
+    /**
+     * Update an existing element (re-encrypts if encryption is enabled)
+     */
+    async updateElement(
+        id: string,
+        updates: Partial<BoardElement>,
+    ): Promise<void> {
+        const storedArray = this.elements.toArray();
+        const index = storedArray.findIndex((el) => el.id === id);
 
-    const syncHandler = (isSynced: boolean) => {
-      this.connectionStatus = isSynced ? 'connected' : 'connecting';
-      callback(this.connectionStatus, this.getConnectedUsers() - 1);
-    };
+        if (index !== -1) {
+            const stored = storedArray[index];
+            let currentElement: BoardElement;
 
-    const statusHandler = ({ status }: { status: string }) => {
-      if (status === 'connected') {
-        this.connectionStatus = 'connected';
-      } else if (status === 'disconnected') {
-        this.connectionStatus = 'disconnected';
-      }
-      callback(this.connectionStatus, this.getConnectedUsers() - 1);
-    };
+            if (isEncryptedElement(stored)) {
+                // Get from cache or decrypt
+                const cached = this.decryptedElementsCache.get(id);
+                if (cached) {
+                    currentElement = cached;
+                } else if (this.encryptionKey) {
+                    const decrypted = await decrypt<BoardElement>(
+                        this.encryptionKey,
+                        stored.ciphertext,
+                        stored.iv,
+                    );
+                    currentElement = decrypted;
+                } else {
+                    console.error(
+                        "[Collaboration] Cannot update encrypted element without key",
+                    );
+                    return;
+                }
+            } else {
+                currentElement = stored as BoardElement;
+            }
 
-    const awarenessHandler = () => {
-      callback(this.connectionStatus, this.getConnectedUsers() - 1);
-    };
+            const updated = { ...currentElement, ...updates };
 
-    this.provider.on('sync', syncHandler);
-    this.provider.on('status', statusHandler);
-    this.provider.awareness.on('change', awarenessHandler);
+            this.elements.delete(index, 1);
 
-    return () => {
-      this.provider?.off('sync', syncHandler);
-      this.provider?.off('status', statusHandler);
-      this.provider?.awareness.off('change', awarenessHandler);
-    };
-  }
+            if (this.encryptionKey) {
+                const { ciphertext, iv } = await encrypt(
+                    this.encryptionKey,
+                    updated,
+                );
+                const encrypted: EncryptedElement = {
+                    id: updated.id,
+                    encrypted: true,
+                    ciphertext,
+                    iv,
+                };
+                this.elements.insert(index, [encrypted]);
+                // Update cache
+                this.decryptedElementsCache.set(id, updated);
+            } else {
+                this.elements.insert(index, [updated]);
+            }
+        }
+    }
 
-  destroy(): void {
-    this.provider?.destroy();
-    this.doc.destroy();
-  }
+    /**
+     * Delete an element
+     */
+    deleteElement(id: string): void {
+        const index = this.elements.toArray().findIndex((el) => el.id === id);
+        if (index !== -1) {
+            this.elements.delete(index, 1);
+            // Remove from cache
+            this.decryptedElementsCache.delete(id);
+        }
+    }
+
+    /**
+     * Clear all elements
+     */
+    clearAll(): void {
+        this.elements.delete(0, this.elements.length);
+        this.decryptedElementsCache.clear();
+    }
+
+    /**
+     * Subscribe to element changes
+     * Callback receives decrypted elements
+     */
+    onElementsChange(callback: (elements: BoardElement[]) => void): () => void {
+        const handler = async () => {
+            if (this.encryptionKey) {
+                // Decrypt all elements asynchronously
+                const decrypted = await this.getElementsAsync();
+                callback(decrypted);
+            } else {
+                callback(this.elements.toArray() as BoardElement[]);
+            }
+        };
+        this.elements.observe(handler);
+        return () => this.elements.unobserve(handler);
+    }
+
+    updateCursor(x: number, y: number): void {
+        if (this.provider) {
+            const currentState = this.provider.awareness.getLocalState() as {
+                user?: any;
+            } | null;
+            this.provider.awareness.setLocalStateField("user", {
+                ...(currentState?.user || {}),
+                id: this.userId,
+                name: this.userName,
+                color: this.userColor,
+                cursor: { x, y },
+            });
+        }
+    }
+
+    updateViewport(pan: { x: number; y: number }, zoom: number): void {
+        if (this.provider) {
+            const currentState = this.provider.awareness.getLocalState() as {
+                user?: any;
+            } | null;
+            this.provider.awareness.setLocalStateField("user", {
+                ...(currentState?.user || {}),
+                id: this.userId,
+                name: this.userName,
+                color: this.userColor,
+                viewport: { pan, zoom },
+            });
+        }
+    }
+
+    onAwarenessChange(
+        callback: (users: Map<number, { user: UserState }>) => void,
+    ): () => void {
+        if (!this.provider) return () => {};
+
+        const handler = () => {
+            const states = this.provider!.awareness.getStates() as Map<
+                number,
+                { user: UserState }
+            >;
+            callback(states);
+        };
+
+        this.provider.awareness.on("change", handler);
+        handler(); // Initial call
+
+        return () => {
+            this.provider?.awareness.off("change", handler);
+        };
+    }
+
+    getConnectedUsers(): number {
+        if (!this.provider) return 1;
+        return this.provider.awareness.getStates().size;
+    }
+
+    getUserInfo() {
+        return {
+            id: this.userId,
+            name: this.userName,
+            color: this.userColor,
+        };
+    }
+
+    getConnectionStatus(): ConnectionStatus {
+        return this.connectionStatus;
+    }
+
+    onConnectionChange(
+        callback: (status: ConnectionStatus, peers: number) => void,
+    ): () => void {
+        if (!this.provider) return () => {};
+
+        const syncHandler = (isSynced: boolean) => {
+            this.connectionStatus = isSynced ? "connected" : "connecting";
+            callback(this.connectionStatus, this.getConnectedUsers() - 1);
+        };
+
+        const statusHandler = ({ status }: { status: string }) => {
+            if (status === "connected") {
+                this.connectionStatus = "connected";
+            } else if (status === "disconnected") {
+                this.connectionStatus = "disconnected";
+            }
+            callback(this.connectionStatus, this.getConnectedUsers() - 1);
+        };
+
+        const awarenessHandler = () => {
+            callback(this.connectionStatus, this.getConnectedUsers() - 1);
+        };
+
+        this.provider.on("sync", syncHandler);
+        this.provider.on("status", statusHandler);
+        this.provider.awareness.on("change", awarenessHandler);
+
+        return () => {
+            this.provider?.off("sync", syncHandler);
+            this.provider?.off("status", statusHandler);
+            this.provider?.awareness.off("change", awarenessHandler);
+        };
+    }
+
+    destroy(): void {
+        this.provider?.destroy();
+        this.doc.destroy();
+    }
 }
