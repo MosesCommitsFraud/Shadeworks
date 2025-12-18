@@ -298,8 +298,39 @@ export class CollaborationManager {
      * Callback receives decrypted elements
      */
     onElementsChange(callback: (elements: BoardElement[]) => void): () => void {
-        const handler = async () => {
+        const handler = async (event: Y.YArrayEvent<StoredElement>) => {
             if (this.encryptionKey) {
+                // Invalidate cache for changed elements
+                // When elements change from remote, we need to re-decrypt them
+                const currentStored = this.elements.toArray();
+                const currentIds = new Set(currentStored.map((el) => el.id));
+
+                // Remove deleted elements from cache
+                for (const cachedId of this.decryptedElementsCache.keys()) {
+                    if (!currentIds.has(cachedId)) {
+                        this.decryptedElementsCache.delete(cachedId);
+                    }
+                }
+
+                // Invalidate cache for elements that were modified
+                // We detect this by comparing ciphertext - if it changed, invalidate
+                for (const stored of currentStored) {
+                    if (isEncryptedElement(stored)) {
+                        const cached = this.decryptedElementsCache.get(
+                            stored.id,
+                        );
+                        if (cached) {
+                            // Check if this element was in the delta (changed)
+                            // Simple approach: always re-decrypt on remote changes
+                            // by checking if the event came from a remote source
+                            if (event.transaction.origin !== null) {
+                                // Remote change - invalidate cache for this element
+                                this.decryptedElementsCache.delete(stored.id);
+                            }
+                        }
+                    }
+                }
+
                 // Decrypt all elements asynchronously
                 const decrypted = await this.getElementsAsync();
                 callback(decrypted);
