@@ -469,6 +469,85 @@ function getQuadraticBezierBounds(p0: Point, c: Point, p1: Point): BoundingBox {
   return { x: minX, y: minY, width: maxX - minX, height: maxY - minY };
 }
 
+function getCubicBezierPoint(p0: Point, c1: Point, c2: Point, p1: Point, t: number): Point {
+  const mt = 1 - t;
+  const mt2 = mt * mt;
+  const t2 = t * t;
+  return {
+    x: p0.x * mt2 * mt + 3 * c1.x * mt2 * t + 3 * c2.x * mt * t2 + p1.x * t2 * t,
+    y: p0.y * mt2 * mt + 3 * c1.y * mt2 * t + 3 * c2.y * mt * t2 + p1.y * t2 * t,
+  };
+}
+
+function getCatmullRomControlPoints(p0: Point, p1: Point, p2: Point, p3: Point) {
+  const t = 1; // tension
+  return {
+    c1: { x: p1.x + ((p2.x - p0.x) * t) / 6, y: p1.y + ((p2.y - p0.y) * t) / 6 },
+    c2: { x: p2.x - ((p3.x - p1.x) * t) / 6, y: p2.y - ((p3.y - p1.y) * t) / 6 },
+  };
+}
+
+function getCatmullRomPath(points: Point[]): string | null {
+  if (points.length < 2) return null;
+  if (points.length === 2) return `M ${points[0].x} ${points[0].y} L ${points[1].x} ${points[1].y}`;
+
+  let d = `M ${points[0].x} ${points[0].y}`;
+  for (let i = 0; i < points.length - 1; i++) {
+    const p0 = points[i - 1] ?? points[i];
+    const p1 = points[i];
+    const p2 = points[i + 1];
+    const p3 = points[i + 2] ?? p2;
+    const { c1, c2 } = getCatmullRomControlPoints(p0, p1, p2, p3);
+    d += ` C ${c1.x} ${c1.y} ${c2.x} ${c2.y} ${p2.x} ${p2.y}`;
+  }
+  return d;
+}
+
+function getCatmullRomBounds(points: Point[]): BoundingBox | null {
+  if (points.length === 0) return null;
+  if (points.length === 1) return { x: points[0].x, y: points[0].y, width: 0, height: 0 };
+
+  let minX = Number.POSITIVE_INFINITY;
+  let minY = Number.POSITIVE_INFINITY;
+  let maxX = Number.NEGATIVE_INFINITY;
+  let maxY = Number.NEGATIVE_INFINITY;
+
+  const sampleSteps = 10;
+  for (let i = 0; i < points.length - 1; i++) {
+    const p0 = points[i - 1] ?? points[i];
+    const p1 = points[i];
+    const p2 = points[i + 1];
+    const p3 = points[i + 2] ?? p2;
+    const { c1, c2 } = getCatmullRomControlPoints(p0, p1, p2, p3);
+    for (let s = 0; s <= sampleSteps; s++) {
+      const t = s / sampleSteps;
+      const p = getCubicBezierPoint(p1, c1, c2, p2, t);
+      minX = Math.min(minX, p.x);
+      minY = Math.min(minY, p.y);
+      maxX = Math.max(maxX, p.x);
+      maxY = Math.max(maxY, p.y);
+    }
+  }
+
+  return { x: minX, y: minY, width: maxX - minX, height: maxY - minY };
+}
+
+function getElbowPolylineForVertices(points: Point[]): Point[] {
+  if (points.length < 2) return points;
+  const out: Point[] = [points[0]];
+  for (let i = 0; i < points.length - 1; i++) {
+    const a = out[out.length - 1];
+    const b = points[i + 1];
+    const dx = b.x - a.x;
+    const dy = b.y - a.y;
+    const vertical = Math.abs(dx) >= Math.abs(dy);
+    const mid = vertical ? { x: b.x, y: a.y } : { x: a.x, y: b.y };
+    if (mid.x !== a.x || mid.y !== a.y) out.push(mid);
+    out.push(b);
+  }
+  return out;
+}
+
 // Get bounding box for any element
 function getBoundingBox(element: BoardElement): BoundingBox | null {
   if (element.type === 'pen' || element.type === 'line' || element.type === 'arrow') {
@@ -484,27 +563,42 @@ function getBoundingBox(element: BoardElement): BoundingBox | null {
     let xs: number[];
     let ys: number[];
 
-    if ((element.type === 'line' || element.type === 'arrow') && hasCorner && control && style === 'curved') {
+    if ((element.type === 'line' || element.type === 'arrow') && hasCorner && control && style === 'curved' && element.points.length === 3) {
       const b = getQuadraticBezierBounds(start, control, end);
       xs = [b.x, b.x + b.width];
       ys = [b.y, b.y + b.height];
+    } else if ((element.type === 'line' || element.type === 'arrow') && style === 'curved' && element.points.length > 3) {
+      const b = getCatmullRomBounds(element.points);
+      if (b) {
+        xs = [b.x, b.x + b.width];
+        ys = [b.y, b.y + b.height];
+      } else {
+        xs = element.points.map((p) => p.x);
+        ys = element.points.map((p) => p.y);
+      }
     } else if ((element.type === 'line' || element.type === 'arrow') && hasCorner && control && style === 'elbow') {
-      const elbowPoints =
-        route === 'vertical'
-          ? [
-              start,
-              { x: control.x, y: start.y },
-              { x: control.x, y: end.y },
-              end,
-            ]
-          : [
-              start,
-              { x: start.x, y: control.y },
-              { x: end.x, y: control.y },
-              end,
-            ];
-      xs = elbowPoints.map((p) => p.x);
-      ys = elbowPoints.map((p) => p.y);
+      if (element.points.length === 3) {
+        const elbowPoints =
+          route === 'vertical'
+            ? [
+                start,
+                { x: control.x, y: start.y },
+                { x: control.x, y: end.y },
+                end,
+              ]
+            : [
+                start,
+                { x: start.x, y: control.y },
+                { x: end.x, y: control.y },
+                end,
+              ];
+        xs = elbowPoints.map((p) => p.x);
+        ys = elbowPoints.map((p) => p.y);
+      } else {
+        const elbowPoints = getElbowPolylineForVertices(element.points);
+        xs = elbowPoints.map((p) => p.x);
+        ys = elbowPoints.map((p) => p.y);
+      }
     } else {
       xs = element.points.map((p) => p.x);
       ys = element.points.map((p) => p.y);
@@ -2401,12 +2495,18 @@ export function Canvas({
 
         if (hasCorner && control) {
           if (style === 'curved') {
-            pathD = `M ${start.x} ${start.y} Q ${control.x} ${control.y} ${end.x} ${end.y}`;
+            if (element.points.length === 3) {
+              pathD = `M ${start.x} ${start.y} Q ${control.x} ${control.y} ${end.x} ${end.y}`;
+            } else {
+              pathD = getCatmullRomPath(element.points);
+            }
           } else if (style === 'elbow') {
             polyPoints =
-              route === 'vertical'
-                ? [start, { x: control.x, y: start.y }, { x: control.x, y: end.y }, end]
-                : [start, { x: start.x, y: control.y }, { x: end.x, y: control.y }, end];
+              element.points.length === 3
+                ? route === 'vertical'
+                  ? [start, { x: control.x, y: start.y }, { x: control.x, y: end.y }, end]
+                  : [start, { x: start.x, y: control.y }, { x: end.x, y: control.y }, end]
+                : getElbowPolylineForVertices(element.points);
           } else {
             polyPoints = element.points;
           }
@@ -3149,6 +3249,38 @@ export function Canvas({
     const handlePosCurved = { x: (start.x + 2 * control.x + end.x) / 4, y: (start.y + 2 * control.y + end.y) / 4 };
     const handlePosElbow = route === 'vertical' ? { x: control.x, y: midY } : { x: midX, y: control.y };
 
+    const getQuadraticPoint = (p0: Point, c: Point, p1: Point, t: number): Point => {
+      const mt = 1 - t;
+      return {
+        x: mt * mt * p0.x + 2 * mt * t * c.x + t * t * p1.x,
+        y: mt * mt * p0.y + 2 * mt * t * c.y + t * t * p1.y,
+      };
+    };
+
+    const approxQuadraticLength = (p0: Point, c: Point, p1: Point, t0: number, t1: number, steps = 12) => {
+      let len = 0;
+      let prev = getQuadraticPoint(p0, c, p1, t0);
+      for (let s = 1; s <= steps; s++) {
+        const t = t0 + ((t1 - t0) * s) / steps;
+        const next = getQuadraticPoint(p0, c, p1, t);
+        len += Math.hypot(next.x - prev.x, next.y - prev.y);
+        prev = next;
+      }
+      return len;
+    };
+
+    const approxCubicLength = (p0: Point, c1: Point, c2: Point, p1: Point, steps = 12) => {
+      let len = 0;
+      let prev = getCubicBezierPoint(p0, c1, c2, p1, 0);
+      for (let s = 1; s <= steps; s++) {
+        const t = s / steps;
+        const next = getCubicBezierPoint(p0, c1, c2, p1, t);
+        len += Math.hypot(next.x - prev.x, next.y - prev.y);
+        prev = next;
+      }
+      return len;
+    };
+
     const handles: Array<{ pos: Point; index: number; kind: ConnectorDragKind }> =
       element.points.length === 2
         ? [
@@ -3192,22 +3324,88 @@ export function Canvas({
       const pointerWorld = getMousePosition(e);
       const pointerLocal = toLocalPoint(pointerWorld);
 
-      // Convert the current visible 3-handle connector into a polyline in point space,
-      // then insert a new point between segment endpoints.
-      const basePoints = handles.map((h) => h.pos);
+      const basePoints =
+        style === 'curved' && element.points.length === 3
+          ? [start, handlePosCurved, end]
+          : style === 'elbow' && element.points.length === 3
+            ? [start, handlePosElbow, end]
+            : element.points;
+
       const insertIndex = Math.max(1, Math.min(basePoints.length - 1, segmentIndex + 1));
       const nextPoints = [...basePoints];
       nextPoints.splice(insertIndex, 0, pointerLocal);
 
       const updates: Partial<BoardElement> = {
         points: nextPoints,
-        connectorStyle: 'sharp',
-        elbowRoute: undefined,
+        connectorStyle: style,
+        elbowRoute: element.points.length === 3 ? element.elbowRoute : undefined,
       };
 
       setOriginalElements([{ ...element, ...updates, points: nextPoints }]);
       setDraggingConnectorPoint({ index: insertIndex, kind: 'normal' });
       onUpdateElement(element.id, updates);
+    };
+
+    const getInsertPointForSegment = (segmentIndex: number): Point => {
+      if (style === 'curved' && element.points.length === 3) {
+        return getQuadraticPoint(start, control, end, segmentIndex === 0 ? 0.25 : 0.75);
+      }
+
+      if (style === 'curved' && element.points.length > 3) {
+        const pts = element.points;
+        const p0 = pts[segmentIndex - 1] ?? pts[segmentIndex];
+        const p1 = pts[segmentIndex];
+        const p2 = pts[segmentIndex + 1];
+        const p3 = pts[segmentIndex + 2] ?? p2;
+        const { c1, c2 } = getCatmullRomControlPoints(p0, p1, p2, p3);
+        return getCubicBezierPoint(p1, c1, c2, p2, 0.5);
+      }
+
+      if (style === 'elbow') {
+        if (element.points.length === 3) {
+          const path =
+            route === 'vertical'
+              ? segmentIndex === 0
+                ? [start, { x: control.x, y: start.y }, handlePosElbow]
+                : [handlePosElbow, { x: control.x, y: end.y }, end]
+              : segmentIndex === 0
+                ? [start, { x: start.x, y: control.y }, handlePosElbow]
+                : [handlePosElbow, { x: end.x, y: control.y }, end];
+
+          const a = path[0];
+          const b = path[1];
+          const c = path[2];
+          const l1 = Math.hypot(b.x - a.x, b.y - a.y);
+          const l2 = Math.hypot(c.x - b.x, c.y - b.y);
+          const half = (l1 + l2) / 2;
+          if (half <= l1 || l2 === 0) {
+            const t = l1 === 0 ? 0 : half / l1;
+            return { x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t };
+          }
+          const t = (half - l1) / l2;
+          return { x: b.x + (c.x - b.x) * t, y: b.y + (c.y - b.y) * t };
+        }
+
+        const a = element.points[segmentIndex];
+        const b = element.points[segmentIndex + 1];
+        const dx = b.x - a.x;
+        const dy = b.y - a.y;
+        const vertical = Math.abs(dx) >= Math.abs(dy);
+        const mid = vertical ? { x: b.x, y: a.y } : { x: a.x, y: b.y };
+        const l1 = Math.hypot(mid.x - a.x, mid.y - a.y);
+        const l2 = Math.hypot(b.x - mid.x, b.y - mid.y);
+        const half = (l1 + l2) / 2;
+        if (half <= l1 || l2 === 0) {
+          const t = l1 === 0 ? 0 : half / l1;
+          return { x: a.x + (mid.x - a.x) * t, y: a.y + (mid.y - a.y) * t };
+        }
+        const t = (half - l1) / l2;
+        return { x: mid.x + (b.x - mid.x) * t, y: mid.y + (b.y - mid.y) * t };
+      }
+
+      const a = handles[segmentIndex].pos;
+      const b = handles[segmentIndex + 1].pos;
+      return { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
     };
 
     return (
@@ -3231,14 +3429,44 @@ export function Canvas({
           <g>
             {handles.slice(0, -1).map((h, i) => {
               const next = handles[i + 1];
-              const segLenPx = Math.hypot(next.pos.x - h.pos.x, next.pos.y - h.pos.y) * zoom;
+
+              // Use distance *along* the rendered connector, so elbow/curved behave correctly.
+              let segLenWorld = Math.hypot(next.pos.x - h.pos.x, next.pos.y - h.pos.y);
+              if (style === 'curved' && element.points.length === 3 && handles.length === 3) {
+                segLenWorld = approxQuadraticLength(start, control, end, i === 0 ? 0 : 0.5, i === 0 ? 0.5 : 1);
+              } else if (style === 'curved' && element.points.length > 3) {
+                const pts = element.points;
+                const p0 = pts[i - 1] ?? pts[i];
+                const p1 = pts[i];
+                const p2 = pts[i + 1];
+                const p3 = pts[i + 2] ?? p2;
+                const { c1, c2 } = getCatmullRomControlPoints(p0, p1, p2, p3);
+                segLenWorld = approxCubicLength(p1, c1, c2, p2);
+              } else if (style === 'elbow' && element.points.length === 3 && handles.length === 3) {
+                if (route === 'vertical') {
+                  segLenWorld =
+                    i === 0
+                      ? Math.abs(control.x - start.x) + Math.abs(handlePosElbow.y - start.y)
+                      : Math.abs(end.x - control.x) + Math.abs(end.y - handlePosElbow.y);
+                } else {
+                  segLenWorld =
+                    i === 0
+                      ? Math.abs(control.y - start.y) + Math.abs(handlePosElbow.x - start.x)
+                      : Math.abs(end.y - control.y) + Math.abs(end.x - handlePosElbow.x);
+                }
+              } else if (style === 'elbow' && element.points.length > 3) {
+                segLenWorld = Math.abs(next.pos.x - h.pos.x) + Math.abs(next.pos.y - h.pos.y);
+              }
+
+              const segLenPx = segLenWorld * zoom;
               const existingDiameterPx = existingRadius * 2 * zoom;
               const insertDiameterPx = baseRadius * 2 * zoom;
               const minGapPx = 6;
               const canShow = segLenPx >= existingDiameterPx + insertDiameterPx + minGapPx;
               if (!canShow) return null;
-              const cx = (h.pos.x + next.pos.x) / 2;
-              const cy = (h.pos.y + next.pos.y) / 2;
+              const pos = getInsertPointForSegment(i);
+              const cx = pos.x;
+              const cy = pos.y;
               return (
                 <circle
                   key={`${element.id}-ins-${i}`}
