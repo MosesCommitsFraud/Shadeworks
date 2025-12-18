@@ -50,6 +50,7 @@ interface ToolbarProps {
     }>;
     onFollowUser: (userId: string) => void;
     followedUserId: string | null;
+    spectatedUserIds: Set<string>;
     isToolLocked: boolean;
     onToggleToolLock: () => void;
 }
@@ -89,6 +90,7 @@ export function Toolbar({
     collaboratorUsers,
     onFollowUser,
     followedUserId,
+    spectatedUserIds,
     isToolLocked,
     onToggleToolLock,
 }: ToolbarProps) {
@@ -237,6 +239,7 @@ export function Toolbar({
                                 maxDisplay={5}
                                 onFollowUser={onFollowUser}
                                 followedUserId={followedUserId}
+                                spectatedUserIds={spectatedUserIds}
                             />
                         </div>
 

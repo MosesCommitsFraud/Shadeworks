@@ -19,6 +19,7 @@ export interface UserState {
     color: string;
     cursor?: { x: number; y: number } | null;
     viewport?: { pan: { x: number; y: number }; zoom: number };
+    followingUserId?: string | null;
 }
 
 // PartyKit host - set NEXT_PUBLIC_PARTYKIT_HOST in .env.local
@@ -368,6 +369,21 @@ export class CollaborationManager {
                 name: this.userName,
                 color: this.userColor,
                 viewport: { pan, zoom },
+            });
+        }
+    }
+
+    updateFollowingUser(userId: string | null): void {
+        if (this.provider) {
+            const currentState = this.provider.awareness.getLocalState() as {
+                user?: any;
+            } | null;
+            this.provider.awareness.setLocalStateField("user", {
+                ...(currentState?.user || {}),
+                id: this.userId,
+                name: this.userName,
+                color: this.userColor,
+                followingUserId: userId,
             });
         }
     }

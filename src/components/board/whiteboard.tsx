@@ -178,6 +178,9 @@ export function Whiteboard({ roomId }: WhiteboardProps) {
             viewport?: { pan: { x: number; y: number }; zoom: number };
         }>
     >([]);
+    const [spectatedUserIds, setSpectatedUserIds] = useState<Set<string>>(
+        new Set(),
+    );
     const [isReady, setIsReady] = useState(false);
     const [followedUserId, setFollowedUserId] = useState<string | null>(null);
     const [selectedElements, setSelectedElements] = useState<BoardElement[]>(
@@ -299,20 +302,29 @@ export function Whiteboard({ roomId }: WhiteboardProps) {
                     color: string;
                     viewport?: { pan: { x: number; y: number }; zoom: number };
                 }> = [];
+                // Track which users are being spectated
+                const spectated = new Set<string>();
+                const myId = collab!.getUserInfo().id;
+
                 states.forEach((state) => {
-                    if (
-                        state.user &&
-                        state.user.id !== collab!.getUserInfo().id
-                    ) {
-                        users.push({
-                            id: state.user.id,
-                            name: state.user.name,
-                            color: state.user.color,
-                            viewport: state.user.viewport,
-                        });
+                    if (state.user) {
+                        // Track who is being followed/spectated
+                        if (state.user.followingUserId) {
+                            spectated.add(state.user.followingUserId);
+                        }
+                        // Add to collaborator list (excluding self)
+                        if (state.user.id !== myId) {
+                            users.push({
+                                id: state.user.id,
+                                name: state.user.name,
+                                color: state.user.color,
+                                viewport: state.user.viewport,
+                            });
+                        }
                     }
                 });
                 setCollaboratorUsers(users);
+                setSpectatedUserIds(spectated);
             });
 
             // Subscribe to connection status changes
@@ -1210,6 +1222,13 @@ export function Whiteboard({ roomId }: WhiteboardProps) {
         }
     }, [followedUserId, collaboratorUsers]);
 
+    // Broadcast who we're following to other users
+    useEffect(() => {
+        if (collaboration) {
+            collaboration.updateFollowingUser(followedUserId);
+        }
+    }, [collaboration, followedUserId]);
+
     // Hide the logo bar in smaller windows (match ToolSidebar condensed thresholds).
     useEffect(() => {
         const update = () => {
@@ -1309,7 +1328,7 @@ export function Whiteboard({ roomId }: WhiteboardProps) {
                     }}
                 >
                     <div
-                        className="absolute top-4 left-20 px-3 py-1.5 rounded-lg bg-card/95 backdrop-blur-md border-2 shadow-lg flex items-center gap-2"
+                        className="absolute bottom-20 left-1/2 -translate-x-1/2 px-4 py-2 rounded-lg bg-card/95 backdrop-blur-md border-2 shadow-lg flex items-center gap-2 pointer-events-auto"
                         style={{ borderColor: followedUser.color }}
                     >
                         <div
@@ -1321,7 +1340,7 @@ export function Whiteboard({ roomId }: WhiteboardProps) {
                         </span>
                         <button
                             onClick={() => setFollowedUserId(null)}
-                            className="ml-2 text-muted-foreground hover:text-foreground transition-colors pointer-events-auto"
+                            className="ml-2 text-muted-foreground hover:text-foreground transition-colors"
                         >
                             ✕
                         </button>
@@ -1345,6 +1364,7 @@ export function Whiteboard({ roomId }: WhiteboardProps) {
                 collaboratorUsers={collaboratorUsers}
                 onFollowUser={handleFollowUser}
                 followedUserId={followedUserId}
+                spectatedUserIds={spectatedUserIds}
                 isToolLocked={isToolLocked}
                 onToggleToolLock={() => setIsToolLocked(!isToolLocked)}
             />
@@ -1431,6 +1451,7 @@ export function Whiteboard({ roomId }: WhiteboardProps) {
                 onSetViewport={(setter) => {
                     setViewportRef.current = setter;
                 }}
+                onManualViewportChange={() => setFollowedUserId(null)}
                 onSelectionChange={setSelectedElements}
                 onStrokeColorChange={handleStrokeColorChange}
                 onFillColorChange={handleFillColorChange}
