@@ -437,12 +437,77 @@ function getMarkerBasis(tip: Point, from: Point) {
   return { ux, uy, bx, by, px, py };
 }
 
+function getQuadraticBezierBounds(p0: Point, c: Point, p1: Point): BoundingBox {
+  const xs = [p0.x, p1.x];
+  const ys = [p0.y, p1.y];
+
+  const denomX = p0.x - 2 * c.x + p1.x;
+  if (denomX !== 0) {
+    const t = (p0.x - c.x) / denomX;
+    if (t > 0 && t < 1) {
+      const mt = 1 - t;
+      xs.push(mt * mt * p0.x + 2 * mt * t * c.x + t * t * p1.x);
+    }
+  }
+
+  const denomY = p0.y - 2 * c.y + p1.y;
+  if (denomY !== 0) {
+    const t = (p0.y - c.y) / denomY;
+    if (t > 0 && t < 1) {
+      const mt = 1 - t;
+      ys.push(mt * mt * p0.y + 2 * mt * t * c.y + t * t * p1.y);
+    }
+  }
+
+  const minX = Math.min(...xs);
+  const minY = Math.min(...ys);
+  const maxX = Math.max(...xs);
+  const maxY = Math.max(...ys);
+
+  return { x: minX, y: minY, width: maxX - minX, height: maxY - minY };
+}
+
 // Get bounding box for any element
 function getBoundingBox(element: BoardElement): BoundingBox | null {
   if (element.type === 'pen' || element.type === 'line' || element.type === 'arrow') {
     if (element.points.length === 0) return null;
-    const xs = element.points.map(p => p.x);
-    const ys = element.points.map(p => p.y);
+
+    const style = element.connectorStyle || 'sharp';
+    const start = element.points[0];
+    const end = element.points[element.points.length - 1] ?? start;
+    const hasCorner = element.points.length >= 3;
+    const control = hasCorner ? element.points[1] : null;
+    const route = element.elbowRoute || (Math.abs(end.x - start.x) >= Math.abs(end.y - start.y) ? 'vertical' : 'horizontal');
+
+    let xs: number[];
+    let ys: number[];
+
+    if ((element.type === 'line' || element.type === 'arrow') && hasCorner && control && style === 'curved') {
+      const b = getQuadraticBezierBounds(start, control, end);
+      xs = [b.x, b.x + b.width];
+      ys = [b.y, b.y + b.height];
+    } else if ((element.type === 'line' || element.type === 'arrow') && hasCorner && control && style === 'elbow') {
+      const elbowPoints =
+        route === 'vertical'
+          ? [
+              start,
+              { x: control.x, y: start.y },
+              { x: control.x, y: end.y },
+              end,
+            ]
+          : [
+              start,
+              { x: start.x, y: control.y },
+              { x: end.x, y: control.y },
+              end,
+            ];
+      xs = elbowPoints.map((p) => p.x);
+      ys = elbowPoints.map((p) => p.y);
+    } else {
+      xs = element.points.map((p) => p.x);
+      ys = element.points.map((p) => p.y);
+    }
+
     const minX = Math.min(...xs);
     const minY = Math.min(...ys);
     const maxX = Math.max(...xs);
@@ -1009,7 +1074,13 @@ export function Canvas({
       const edgeHandle = getResizeHandleFromSelectionEdge(point, visualBounds, rotationDeg, 10 / zoom);
       if (edgeHandle) {
         setHoverCursor(getRotatedResizeCursor(edgeHandle, rotationDeg));
-      } else if (selectedElement && selectedElement.type !== 'line' && selectedElement.type !== 'arrow' && selectedElement.type !== 'laser') {
+      } else if (
+        selectedElement &&
+        selectedElement.type !== 'laser' &&
+        (selectedElement.type !== 'line' && selectedElement.type !== 'arrow'
+          ? true
+          : selectedElement.points.length >= 3)
+      ) {
         const center = getBoundsCenter(visualBounds);
         const rotateHandleDistance = 28 / zoom;
         const rotateHandleRadius = 4 / zoom;
@@ -1054,11 +1125,21 @@ export function Canvas({
     if (isDraggingLineEndpoint && lineEndpointIndex !== null && originalElements.length === 1) {
       const originalElement = originalElements[0];
       if ((originalElement.type === 'line' || originalElement.type === 'arrow') && originalElement.points.length >= 2) {
+        const rotationDeg = originalElement.rotation ?? 0;
+        let nextPoint = point;
+        if (rotationDeg) {
+          const bounds = getBoundingBox(originalElement);
+          if (bounds) {
+            const center = getBoundsCenter(bounds);
+            nextPoint = rotatePoint(point, center, -rotationDeg);
+          }
+        }
+
         const newPoints = [...originalElement.points];
         if (lineEndpointIndex === 0) {
-          newPoints[0] = point;
+          newPoints[0] = nextPoint;
         } else {
-          newPoints[newPoints.length - 1] = point;
+          newPoints[newPoints.length - 1] = nextPoint;
         }
         onUpdateElement(originalElement.id, { points: newPoints });
       }
@@ -1072,16 +1153,42 @@ export function Canvas({
         const pStart = originalElement.points[0];
         const pEnd = originalElement.points[originalElement.points.length - 1];
         const style = originalElement.connectorStyle ?? connectorStyle;
+
+        const rotationDeg = originalElement.rotation ?? 0;
+        let cornerPoint = point;
+        if (rotationDeg) {
+          const bounds = getBoundingBox(originalElement);
+          if (bounds) {
+            const center = getBoundsCenter(bounds);
+            cornerPoint = rotatePoint(point, center, -rotationDeg);
+          }
+        }
+
         const elbowRoute =
           originalElement.elbowRoute ??
           (Math.abs(pEnd.x - pStart.x) >= Math.abs(pEnd.y - pStart.y) ? 'vertical' : 'horizontal');
 
         let newPoints: Point[];
-        if (originalElement.points.length === 2) {
-          newPoints = [pStart, point, pEnd];
+        if (style === 'curved') {
+          // Keep the handle *on* the curve at t=0.5 by storing the corresponding quadratic control point.
+          // Quadratic midpoint: P(0.5) = (P0 + 2*C + P1) / 4  =>  C = 2*P(0.5) - (P0 + P1)/2
+          const controlPoint = {
+            x: 2 * cornerPoint.x - (pStart.x + pEnd.x) / 2,
+            y: 2 * cornerPoint.y - (pStart.y + pEnd.y) / 2,
+          };
+          if (originalElement.points.length === 2) {
+            newPoints = [pStart, controlPoint, pEnd];
+          } else {
+            newPoints = [...originalElement.points];
+            newPoints[1] = controlPoint;
+          }
         } else {
-          newPoints = [...originalElement.points];
-          newPoints[1] = point;
+          if (originalElement.points.length === 2) {
+            newPoints = [pStart, cornerPoint, pEnd];
+          } else {
+            newPoints = [...originalElement.points];
+            newPoints[1] = cornerPoint;
+          }
         }
 
         const updates: Partial<BoardElement> = { points: newPoints, connectorStyle: style };
@@ -1595,10 +1702,16 @@ export function Canvas({
         const selectionPadding = 6 / zoom;
         const visualBounds = expandBounds(selectedBounds, selectionPadding);
 
-        // Rotate handle (single selection, non-connector)
+        // Rotate handle (single selection)
         if (selectedIds.length === 1) {
           const selectedElement = elements.find((el) => el.id === selectedIds[0]);
-          if (selectedElement && selectedElement.type !== 'line' && selectedElement.type !== 'arrow' && selectedElement.type !== 'laser') {
+          if (
+            selectedElement &&
+            selectedElement.type !== 'laser' &&
+            (selectedElement.type !== 'line' && selectedElement.type !== 'arrow'
+              ? true
+              : selectedElement.points.length >= 3)
+          ) {
             const rotationDeg = selectedElement.rotation ?? 0;
             const center = getBoundsCenter(visualBounds);
             const rotateHandleDistance = 28 / zoom;
@@ -3037,18 +3150,28 @@ export function Canvas({
     const midX = (start.x + end.x) / 2;
     const midY = (start.y + end.y) / 2;
 
+    const rotationDeg = element.rotation ?? 0;
+    const boundsForRotation = rotationDeg ? getBoundingBox(element) : null;
+    const rotationTransform =
+      boundsForRotation && rotationDeg
+        ? `rotate(${rotationDeg} ${boundsForRotation.x + boundsForRotation.width / 2} ${boundsForRotation.y + boundsForRotation.height / 2})`
+        : undefined;
+
     const style = element.connectorStyle ?? connectorStyle;
     const route = element.elbowRoute ?? (Math.abs(end.x - start.x) >= Math.abs(end.y - start.y) ? 'vertical' : 'horizontal');
     const control = element.points.length >= 3 ? element.points[1] : { x: midX, y: midY };
 
     const handlePos =
-      style === 'elbow'
-        ? route === 'vertical'
-          ? { x: control.x, y: midY }
-          : { x: midX, y: control.y }
-        : control;
+      style === 'curved'
+        ? { x: (start.x + 2 * control.x + end.x) / 4, y: (start.y + 2 * control.y + end.y) / 4 }
+        : style === 'elbow'
+          ? route === 'vertical'
+            ? { x: control.x, y: midY }
+            : { x: midX, y: control.y }
+          : control;
 
-    const dotSize = 8;
+    const dotSize = 8 / zoom;
+    const dotStrokeWidth = 2 / zoom;
 
     const handleEndpointMouseDown = (e: React.MouseEvent, endpointIndex: number) => {
       e.stopPropagation();
@@ -3065,76 +3188,16 @@ export function Canvas({
       setOriginalElements([{ ...element }]);
     };
 
-    const elbowPoints =
-      style === 'elbow' && element.points.length >= 3
-        ? route === 'vertical'
-          ? [
-              start,
-              { x: control.x, y: start.y },
-              { x: control.x, y: end.y },
-              end,
-            ]
-          : [
-              start,
-              { x: start.x, y: control.y },
-              { x: end.x, y: control.y },
-              end,
-            ]
-        : null;
-
     return (
-      <g>
-        {/* Dashed preview of the connector */}
-        {style === 'curved' && element.points.length >= 3 ? (
-          <path
-            d={`M ${start.x} ${start.y} Q ${control.x} ${control.y} ${end.x} ${end.y}`}
-            fill="none"
-            stroke="var(--accent)"
-            strokeWidth={2}
-            strokeDasharray="5,5"
-            pointerEvents="none"
-          />
-        ) : elbowPoints ? (
-          <polyline
-            points={elbowPoints.map(p => `${p.x},${p.y}`).join(' ')}
-            fill="none"
-            stroke="var(--accent)"
-            strokeWidth={2}
-            strokeDasharray="5,5"
-            strokeLinejoin="round"
-            pointerEvents="none"
-          />
-        ) : element.points.length >= 3 ? (
-          <polyline
-            points={[start, control, end].map(p => `${p.x},${p.y}`).join(' ')}
-            fill="none"
-            stroke="var(--accent)"
-            strokeWidth={2}
-            strokeDasharray="5,5"
-            strokeLinejoin="round"
-            pointerEvents="none"
-          />
-        ) : (
-          <line
-            x1={start.x}
-            y1={start.y}
-            x2={end.x}
-            y2={end.y}
-            stroke="var(--accent)"
-            strokeWidth={2}
-            strokeDasharray="5,5"
-            pointerEvents="none"
-          />
-        )}
-
+      <g transform={rotationTransform}>
         {/* Endpoint dots */}
         <circle
           cx={start.x}
           cy={start.y}
           r={dotSize / 2}
-          fill="var(--accent)"
-          stroke="var(--background)"
-          strokeWidth={2}
+          fill="var(--background)"
+          stroke="var(--accent)"
+          strokeWidth={dotStrokeWidth}
           style={{ cursor: 'move' }}
           onMouseDown={(e) => handleEndpointMouseDown(e, 0)}
         />
@@ -3142,29 +3205,27 @@ export function Canvas({
           cx={end.x}
           cy={end.y}
           r={dotSize / 2}
-          fill="var(--accent)"
-          stroke="var(--background)"
-          strokeWidth={2}
+          fill="var(--background)"
+          stroke="var(--accent)"
+          strokeWidth={dotStrokeWidth}
           style={{ cursor: 'move' }}
           onMouseDown={(e) => handleEndpointMouseDown(e, 1)}
         />
 
         {/* Middle control for corner */}
-        <rect
-          x={handlePos.x - dotSize / 2}
-          y={handlePos.y - dotSize / 2}
-          width={dotSize}
-          height={dotSize}
-          fill="var(--accent)"
-          stroke="var(--background)"
-          strokeWidth={2}
-          rx={2}
+        <circle
+          cx={handlePos.x}
+          cy={handlePos.y}
+          r={dotSize / 2}
+          fill="var(--background)"
+          stroke="var(--accent)"
+          strokeWidth={dotStrokeWidth}
           style={{ cursor: 'move' }}
           onMouseDown={handleCornerMouseDown}
         />
       </g>
     );
-  }, [onStartTransform, connectorStyle]);
+  }, [onStartTransform, connectorStyle, zoom]);
 
   // Render selection box with handles
   const renderSelectionBox = () => {
@@ -3174,7 +3235,8 @@ export function Canvas({
     if (selectedIds.length === 1) {
       const selectedElement = elements.find(el => el.id === selectedIds[0]);
       if (selectedElement && (selectedElement.type === 'line' || selectedElement.type === 'arrow')) {
-        return renderConnectorControls(selectedElement);
+        const hasCorner = selectedElement.points.length >= 3;
+        if (!hasCorner) return renderConnectorControls(selectedElement);
       }
     }
 
@@ -3270,7 +3332,11 @@ export function Canvas({
     const rotateHandleRadius = handleSize / 2;
 
     const hasRotateHandle =
-      selectedElement && selectedElement.type !== 'line' && selectedElement.type !== 'arrow' && selectedElement.type !== 'laser';
+      !!selectedElement &&
+      selectedElement.type !== 'laser' &&
+      (selectedElement.type !== 'line' && selectedElement.type !== 'arrow'
+        ? true
+        : selectedElement.points.length >= 3);
 
     const localRotateAnchor: Point | null = hasRotateHandle
       ? rotateHandleSide === 'n'
@@ -3333,6 +3399,11 @@ export function Canvas({
             />
           </g>
         )}
+
+        {/* Connector controls (line/arrow w/ corner) */}
+        {selectedElement && (selectedElement.type === 'line' || selectedElement.type === 'arrow') && selectedElement.points.length >= 3
+          ? renderConnectorControls(selectedElement)
+          : null}
 
         {/* Resize handles (only for single selection) */}
         {handles.map((handle) => (
