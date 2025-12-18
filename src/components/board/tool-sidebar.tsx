@@ -166,7 +166,7 @@ export function ToolSidebar({
   useEffect(() => {
     const update = () => {
       // Condense earlier so the sidebar stays usable in smaller windows.
-      setIsCondensed(window.innerHeight < 1200 || window.innerWidth < 1440);
+      setIsCondensed(window.innerHeight < 920 || window.innerWidth < 1100);
     };
     update();
     window.addEventListener('resize', update);

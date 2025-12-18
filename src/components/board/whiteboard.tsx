@@ -143,6 +143,7 @@ export function Whiteboard({ roomId }: WhiteboardProps) {
   const [showFindCanvas, setShowFindCanvas] = useState(false);
   const [showHotkeysDialog, setShowHotkeysDialog] = useState(false);
   const [highlightedElementIds, setHighlightedElementIds] = useState<string[]>([]);
+  const [hideLogoBar, setHideLogoBar] = useState(false);
 
   // Undo/Redo stacks - store snapshots
   const undoStackRef = useRef<BoardElement[][]>([]);
@@ -939,6 +940,16 @@ export function Whiteboard({ roomId }: WhiteboardProps) {
     }
   }, [followedUserId, collaboratorUsers]);
 
+  // Hide the logo bar in smaller windows (match ToolSidebar condensed thresholds).
+  useEffect(() => {
+    const update = () => {
+      setHideLogoBar(window.innerHeight < 920 || window.innerWidth < 1100);
+    };
+    update();
+    window.addEventListener('resize', update);
+    return () => window.removeEventListener('resize', update);
+  }, []);
+
   // Show loading while connecting
   if (!isReady) {
     return (
@@ -968,17 +979,18 @@ export function Whiteboard({ roomId }: WhiteboardProps) {
           onCanvasBackgroundChange={setCanvasBackground}
           roomId={roomId}
         />
-        {/* Shadeworks Logo */}
-        <a
-          href="/"
-          className="bg-card/95 backdrop-blur-md border border-border rounded-md px-3 py-2 shadow-2xl hover:bg-muted/60 transition-colors"
-        >
-          <img
-            src={(resolvedTheme || theme) === 'light' ? '/logo-text-sw-dark.svg' : '/logo-text-sw-white.svg'}
-            alt="Shadeworks"
-            className="h-6"
-          />
-        </a>
+        {!hideLogoBar && (
+          <a
+            href="/"
+            className="bg-card/95 backdrop-blur-md border border-border rounded-md px-3 py-2 shadow-2xl hover:bg-muted/60 transition-colors"
+          >
+            <img
+              src={(resolvedTheme || theme) === 'light' ? '/logo-text-sw-dark.svg' : '/logo-text-sw-white.svg'}
+              alt="Shadeworks"
+              className="h-6"
+            />
+          </a>
+        )}
       </div>
 
       {/* Hotkeys - Top Right */}
