@@ -1,7 +1,13 @@
-'use client';
+"use client";
 
-import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
-import { useTheme } from 'next-themes';
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type CSSProperties,
+} from "react";
+import { useTheme } from "next-themes";
 import {
   ChevronLeft,
   ChevronRight,
@@ -30,15 +36,34 @@ import {
   MoreHorizontal,
   SlidersHorizontal,
   Spline,
-} from 'lucide-react';
-import { Tool, COLORS, STROKE_WIDTHS, FONTS, FONT_SIZES, BoardElement } from '@/lib/board-types';
-import { cn } from '@/lib/utils';
-import { Slider } from '@/components/ui/slider';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
-import { Button } from '@/components/ui/button';
-import { ColorPicker } from '@/components/ui/color-picker';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+} from "lucide-react";
+import {
+  Tool,
+  COLORS,
+  STROKE_WIDTHS,
+  FONTS,
+  FONT_SIZES,
+  BoardElement,
+} from "@/lib/board-types";
+import { cn } from "@/lib/utils";
+import { Slider } from "@/components/ui/slider";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { Button } from "@/components/ui/button";
+import { ColorPicker } from "@/components/ui/color-picker";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 interface ToolSidebarProps {
   selectedTool: Tool;
@@ -50,30 +75,30 @@ interface ToolSidebarProps {
   onFillColorChange?: (color: string) => void;
   opacity: number;
   onOpacityChange: (opacity: number) => void;
-  strokeStyle: 'solid' | 'dashed' | 'dotted';
-  onStrokeStyleChange: (style: 'solid' | 'dashed' | 'dotted') => void;
+  strokeStyle: "solid" | "dashed" | "dotted";
+  onStrokeStyleChange: (style: "solid" | "dashed" | "dotted") => void;
   cornerRadius: number;
   onCornerRadiusChange: (radius: number) => void;
-  connectorStyle?: 'sharp' | 'curved' | 'elbow';
-  onConnectorStyleChange?: (style: 'sharp' | 'curved' | 'elbow') => void;
-  arrowStart?: NonNullable<BoardElement['arrowStart']>;
-  onArrowStartChange?: (end: NonNullable<BoardElement['arrowStart']>) => void;
-  arrowEnd?: NonNullable<BoardElement['arrowEnd']>;
-  onArrowEndChange?: (end: NonNullable<BoardElement['arrowEnd']>) => void;
+  connectorStyle?: "sharp" | "curved" | "elbow";
+  onConnectorStyleChange?: (style: "sharp" | "curved" | "elbow") => void;
+  arrowStart?: NonNullable<BoardElement["arrowStart"]>;
+  onArrowStartChange?: (end: NonNullable<BoardElement["arrowStart"]>) => void;
+  arrowEnd?: NonNullable<BoardElement["arrowEnd"]>;
+  onArrowEndChange?: (end: NonNullable<BoardElement["arrowEnd"]>) => void;
   fontFamily: string;
   onFontFamilyChange: (font: string) => void;
-  textAlign: 'left' | 'center' | 'right';
-  onTextAlignChange: (align: 'left' | 'center' | 'right') => void;
+  textAlign: "left" | "center" | "right";
+  onTextAlignChange: (align: "left" | "center" | "right") => void;
   fontSize: number;
   onFontSizeChange: (size: number) => void;
   letterSpacing: number;
   onLetterSpacingChange: (spacing: number) => void;
   lineHeight: number;
   onLineHeightChange: (height: number) => void;
-  fillPattern?: 'none' | 'solid' | 'criss-cross';
-  onFillPatternChange?: (pattern: 'none' | 'solid' | 'criss-cross') => void;
-  lineCap?: 'butt' | 'round';
-  onLineCapChange?: (cap: 'butt' | 'round') => void;
+  fillPattern?: "none" | "solid" | "criss-cross";
+  onFillPatternChange?: (pattern: "none" | "solid" | "criss-cross") => void;
+  lineCap?: "butt" | "round";
+  onLineCapChange?: (cap: "butt" | "round") => void;
   selectedElements?: BoardElement[];
   onBringToFront?: () => void;
   onSendToBack?: () => void;
@@ -93,15 +118,23 @@ interface ToolSidebarProps {
 }
 
 // Tools that have adjustable properties
-const ADJUSTABLE_TOOLS: Tool[] = ['pen', 'line', 'arrow', 'rectangle', 'ellipse', 'text'];
+const ADJUSTABLE_TOOLS: Tool[] = [
+  "pen",
+  "line",
+  "arrow",
+  "rectangle",
+  "diamond",
+  "ellipse",
+  "text",
+];
 
-const SIDEBAR_HIDDEN_COLORS = new Set(['#a78bfa', '#c084fc', '#e879f9']);
+const SIDEBAR_HIDDEN_COLORS = new Set(["#a78bfa", "#c084fc", "#e879f9"]);
 
 const CONTROL_BUTTON =
-  'rounded-md border border-input bg-background/50 shadow-xs transition-all duration-200 hover:bg-muted/60 hover:text-foreground active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 focus-visible:ring-offset-background';
-const CONTROL_BUTTON_SELECTED = 'bg-muted/70 border-foreground/20 shadow-sm';
+  "rounded-md border border-input bg-background/50 shadow-xs transition-all duration-200 hover:bg-muted/60 hover:text-foreground active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 focus-visible:ring-offset-background";
+const CONTROL_BUTTON_SELECTED = "bg-muted/70 border-foreground/20 shadow-sm";
 const SWATCH_BASE =
-  'w-7 h-7 rounded-md border border-input bg-background shadow-xs transition-all duration-200 hover:scale-110 hover:bg-muted/40 hover:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 focus-visible:ring-offset-background';
+  "w-7 h-7 rounded-md border border-input bg-background shadow-xs transition-all duration-200 hover:scale-110 hover:bg-muted/40 hover:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 focus-visible:ring-offset-background";
 
 export function ToolSidebar({
   selectedTool,
@@ -109,7 +142,7 @@ export function ToolSidebar({
   onStrokeColorChange,
   strokeWidth,
   onStrokeWidthChange,
-  fillColor = 'transparent',
+  fillColor = "transparent",
   onFillColorChange,
   opacity,
   onOpacityChange,
@@ -117,11 +150,11 @@ export function ToolSidebar({
   onStrokeStyleChange,
   cornerRadius,
   onCornerRadiusChange,
-  connectorStyle = 'sharp',
+  connectorStyle = "sharp",
   onConnectorStyleChange,
-  arrowStart = 'arrow',
+  arrowStart = "arrow",
   onArrowStartChange,
-  arrowEnd = 'arrow',
+  arrowEnd = "arrow",
   onArrowEndChange,
   fontFamily,
   onFontFamilyChange,
@@ -133,9 +166,9 @@ export function ToolSidebar({
   onLetterSpacingChange,
   lineHeight,
   onLineHeightChange,
-  fillPattern = 'none',
+  fillPattern = "none",
   onFillPatternChange,
-  lineCap = 'round',
+  lineCap = "round",
   onLineCapChange,
   selectedElements = [],
   onBringToFront,
@@ -159,8 +192,13 @@ export function ToolSidebar({
   const [isCondensed, setIsCondensed] = useState(false);
   const [showStrokeColorPicker, setShowStrokeColorPicker] = useState(false);
   const [showFillColorPicker, setShowFillColorPicker] = useState(false);
-  const [openArrowEndMenu, setOpenArrowEndMenu] = useState<'start' | 'end' | null>(null);
-  const [arrowEndMenuPos, setArrowEndMenuPos] = useState<{ left: number; top: number } | null>(null);
+  const [openArrowEndMenu, setOpenArrowEndMenu] = useState<
+    "start" | "end" | null
+  >(null);
+  const [arrowEndMenuPos, setArrowEndMenuPos] = useState<{
+    left: number;
+    top: number;
+  } | null>(null);
   const [openStrokeMenu, setOpenStrokeMenu] = useState(false);
   const [openFillMenu, setOpenFillMenu] = useState(false);
   const [openOptionsMenu, setOpenOptionsMenu] = useState(false);
@@ -174,100 +212,262 @@ export function ToolSidebar({
       setIsCondensed(window.innerHeight < 920 || window.innerWidth < 1100);
     };
     update();
-    window.addEventListener('resize', update);
-    return () => window.removeEventListener('resize', update);
+    window.addEventListener("resize", update);
+    return () => window.removeEventListener("resize", update);
   }, []);
 
   const arrowEndOptions = useMemo(
     () =>
       [
-        { id: 'arrow', label: 'Arrow' },
-        { id: 'triangle', label: 'Triangle' },
-        { id: 'triangle-outline', label: 'Triangle Outline' },
-        { id: 'diamond', label: 'Diamond' },
-        { id: 'diamond-outline', label: 'Diamond Outline' },
-        { id: 'circle', label: 'Circle' },
-        { id: 'circle-outline', label: 'Circle Outline' },
-        { id: 'bar', label: 'Bar' },
-      ] as Array<{ id: NonNullable<BoardElement['arrowEnd']>; label: string }>,
-    []
+        { id: "arrow", label: "Arrow" },
+        { id: "triangle", label: "Triangle" },
+        { id: "triangle-outline", label: "Triangle Outline" },
+        { id: "diamond", label: "Diamond" },
+        { id: "diamond-outline", label: "Diamond Outline" },
+        { id: "circle", label: "Circle" },
+        { id: "circle-outline", label: "Circle Outline" },
+        { id: "bar", label: "Bar" },
+      ] as Array<{ id: NonNullable<BoardElement["arrowEnd"]>; label: string }>,
+    [],
   );
 
-  const renderArrowEndPreview = (endType: NonNullable<BoardElement['arrowEnd']>) => {
-    const stroke = 'currentColor';
+  const renderArrowEndPreview = (
+    endType: NonNullable<BoardElement["arrowEnd"]>,
+  ) => {
+    const stroke = "currentColor";
     const sw = 1.8;
     const cx = 18;
     const cy = 10;
 
     switch (endType) {
-      case 'arrow':
+      case "arrow":
         return (
-          <svg width="28" height="20" viewBox="0 0 28 20" className="text-foreground">
-            <line x1="3" y1={cy} x2="20" y2={cy} stroke={stroke} strokeWidth={sw} strokeLinecap="round" />
-            <line x1="20" y1={cy} x2="14.5" y2="6.5" stroke={stroke} strokeWidth={sw} strokeLinecap="round" />
-            <line x1="20" y1={cy} x2="14.5" y2="13.5" stroke={stroke} strokeWidth={sw} strokeLinecap="round" />
+          <svg
+            width="28"
+            height="20"
+            viewBox="0 0 28 20"
+            className="text-foreground"
+          >
+            <line
+              x1="3"
+              y1={cy}
+              x2="20"
+              y2={cy}
+              stroke={stroke}
+              strokeWidth={sw}
+              strokeLinecap="round"
+            />
+            <line
+              x1="20"
+              y1={cy}
+              x2="14.5"
+              y2="6.5"
+              stroke={stroke}
+              strokeWidth={sw}
+              strokeLinecap="round"
+            />
+            <line
+              x1="20"
+              y1={cy}
+              x2="14.5"
+              y2="13.5"
+              stroke={stroke}
+              strokeWidth={sw}
+              strokeLinecap="round"
+            />
           </svg>
         );
-      case 'triangle':
+      case "triangle":
         return (
-          <svg width="28" height="20" viewBox="0 0 28 20" className="text-foreground">
-            <line x1="3" y1={cy} x2="13" y2={cy} stroke={stroke} strokeWidth={sw} strokeLinecap="round" />
+          <svg
+            width="28"
+            height="20"
+            viewBox="0 0 28 20"
+            className="text-foreground"
+          >
+            <line
+              x1="3"
+              y1={cy}
+              x2="13"
+              y2={cy}
+              stroke={stroke}
+              strokeWidth={sw}
+              strokeLinecap="round"
+            />
             <polygon points="13,5 23,10 13,15" fill={stroke} />
           </svg>
         );
-      case 'triangle-outline':
+      case "triangle-outline":
         return (
-          <svg width="28" height="20" viewBox="0 0 28 20" className="text-foreground">
-            <line x1="3" y1={cy} x2="13" y2={cy} stroke={stroke} strokeWidth={sw} strokeLinecap="round" />
-            <polygon points="13,5 23,10 13,15" fill="none" stroke={stroke} strokeWidth={sw} strokeLinejoin="round" />
+          <svg
+            width="28"
+            height="20"
+            viewBox="0 0 28 20"
+            className="text-foreground"
+          >
+            <line
+              x1="3"
+              y1={cy}
+              x2="13"
+              y2={cy}
+              stroke={stroke}
+              strokeWidth={sw}
+              strokeLinecap="round"
+            />
+            <polygon
+              points="13,5 23,10 13,15"
+              fill="none"
+              stroke={stroke}
+              strokeWidth={sw}
+              strokeLinejoin="round"
+            />
           </svg>
         );
-      case 'diamond':
+      case "diamond":
         return (
-          <svg width="28" height="20" viewBox="0 0 28 20" className="text-foreground">
-            <line x1="3" y1={cy} x2="12.5" y2={cy} stroke={stroke} strokeWidth={sw} strokeLinecap="round" />
+          <svg
+            width="28"
+            height="20"
+            viewBox="0 0 28 20"
+            className="text-foreground"
+          >
+            <line
+              x1="3"
+              y1={cy}
+              x2="12.5"
+              y2={cy}
+              stroke={stroke}
+              strokeWidth={sw}
+              strokeLinecap="round"
+            />
             <polygon points="12.5,10 17.5,5 22.5,10 17.5,15" fill={stroke} />
           </svg>
         );
-      case 'diamond-outline':
+      case "diamond-outline":
         return (
-          <svg width="28" height="20" viewBox="0 0 28 20" className="text-foreground">
-            <line x1="3" y1={cy} x2="12.5" y2={cy} stroke={stroke} strokeWidth={sw} strokeLinecap="round" />
-            <polygon points="12.5,10 17.5,5 22.5,10 17.5,15" fill="none" stroke={stroke} strokeWidth={sw} strokeLinejoin="round" />
+          <svg
+            width="28"
+            height="20"
+            viewBox="0 0 28 20"
+            className="text-foreground"
+          >
+            <line
+              x1="3"
+              y1={cy}
+              x2="12.5"
+              y2={cy}
+              stroke={stroke}
+              strokeWidth={sw}
+              strokeLinecap="round"
+            />
+            <polygon
+              points="12.5,10 17.5,5 22.5,10 17.5,15"
+              fill="none"
+              stroke={stroke}
+              strokeWidth={sw}
+              strokeLinejoin="round"
+            />
           </svg>
         );
-      case 'circle':
+      case "circle":
         return (
-          <svg width="28" height="20" viewBox="0 0 28 20" className="text-foreground">
-            <line x1="3" y1={cy} x2="13" y2={cy} stroke={stroke} strokeWidth={sw} strokeLinecap="round" />
+          <svg
+            width="28"
+            height="20"
+            viewBox="0 0 28 20"
+            className="text-foreground"
+          >
+            <line
+              x1="3"
+              y1={cy}
+              x2="13"
+              y2={cy}
+              stroke={stroke}
+              strokeWidth={sw}
+              strokeLinecap="round"
+            />
             <circle cx={cx} cy={cy} r="4.2" fill={stroke} />
           </svg>
         );
-      case 'circle-outline':
+      case "circle-outline":
         return (
-          <svg width="28" height="20" viewBox="0 0 28 20" className="text-foreground">
-            <line x1="3" y1={cy} x2="13" y2={cy} stroke={stroke} strokeWidth={sw} strokeLinecap="round" />
-            <circle cx={cx} cy={cy} r="4.2" fill="none" stroke={stroke} strokeWidth={sw} />
+          <svg
+            width="28"
+            height="20"
+            viewBox="0 0 28 20"
+            className="text-foreground"
+          >
+            <line
+              x1="3"
+              y1={cy}
+              x2="13"
+              y2={cy}
+              stroke={stroke}
+              strokeWidth={sw}
+              strokeLinecap="round"
+            />
+            <circle
+              cx={cx}
+              cy={cy}
+              r="4.2"
+              fill="none"
+              stroke={stroke}
+              strokeWidth={sw}
+            />
           </svg>
         );
-      case 'bar':
+      case "bar":
         return (
-          <svg width="28" height="20" viewBox="0 0 28 20" className="text-foreground">
-            <line x1="3" y1={cy} x2="16" y2={cy} stroke={stroke} strokeWidth={sw} strokeLinecap="round" />
-            <line x1={cx} y1="4.5" x2={cx} y2="15.5" stroke={stroke} strokeWidth={sw} strokeLinecap="round" />
+          <svg
+            width="28"
+            height="20"
+            viewBox="0 0 28 20"
+            className="text-foreground"
+          >
+            <line
+              x1="3"
+              y1={cy}
+              x2="16"
+              y2={cy}
+              stroke={stroke}
+              strokeWidth={sw}
+              strokeLinecap="round"
+            />
+            <line
+              x1={cx}
+              y1="4.5"
+              x2={cx}
+              y2="15.5"
+              stroke={stroke}
+              strokeWidth={sw}
+              strokeLinecap="round"
+            />
           </svg>
         );
       default:
         return (
-          <svg width="28" height="20" viewBox="0 0 28 20" className="text-foreground">
-            <line x1="3" y1={cy} x2="23" y2={cy} stroke={stroke} strokeWidth={sw} strokeLinecap="round" />
+          <svg
+            width="28"
+            height="20"
+            viewBox="0 0 28 20"
+            className="text-foreground"
+          >
+            <line
+              x1="3"
+              y1={cy}
+              x2="23"
+              y2={cy}
+              stroke={stroke}
+              strokeWidth={sw}
+              strokeLinecap="round"
+            />
           </svg>
         );
     }
   };
 
-  const openArrowMenu = (which: 'start' | 'end') => {
-    const ref = which === 'start' ? arrowStartButtonRef : arrowEndButtonRef;
+  const openArrowMenu = (which: "start" | "end") => {
+    const ref = which === "start" ? arrowStartButtonRef : arrowEndButtonRef;
     const rect = ref.current?.getBoundingClientRect();
     if (!rect) {
       setOpenArrowEndMenu(which);
@@ -278,23 +478,30 @@ export function ToolSidebar({
     const padding = 8;
     const left = Math.min(
       Math.max(padding, rect.right - menuWidth),
-      window.innerWidth - menuWidth - padding
+      window.innerWidth - menuWidth - padding,
     );
-    const top = Math.min(Math.max(padding, rect.bottom + 8), window.innerHeight - padding);
+    const top = Math.min(
+      Math.max(padding, rect.bottom + 8),
+      window.innerHeight - padding,
+    );
 
     setArrowEndMenuPos({ left, top });
     setOpenArrowEndMenu(which);
   };
 
   // Don't show sidebar for non-adjustable tools
-  if (!ADJUSTABLE_TOOLS.includes(selectedTool) && selectedElements.length === 0) {
+  if (
+    !ADJUSTABLE_TOOLS.includes(selectedTool) &&
+    selectedElements.length === 0
+  ) {
     return null;
   }
 
   const hasSelectedElements = selectedElements.length > 0;
   const selectionGroupId = selectedElements[0]?.groupId;
   const isSelectionSingleGroup =
-    !!selectionGroupId && selectedElements.every((el) => el.groupId === selectionGroupId);
+    !!selectionGroupId &&
+    selectedElements.every((el) => el.groupId === selectionGroupId);
   const showAlign =
     hasSelectedElements &&
     selectedElements.length > 1 &&
@@ -304,61 +511,77 @@ export function ToolSidebar({
     !!onAlignTop &&
     !!onAlignCenterVertical &&
     !!onAlignBottom;
-  const showActions = hasSelectedElements && (!!onCopySelected || !!onDeleteSelected || !!onToggleGroupSelection);
+  const showActions =
+    hasSelectedElements &&
+    (!!onCopySelected || !!onDeleteSelected || !!onToggleGroupSelection);
   const canEditArrow =
     selectedElements.length === 1 &&
-    (selectedElements[0].type === 'line' || selectedElements[0].type === 'arrow') &&
+    (selectedElements[0].type === "line" ||
+      selectedElements[0].type === "arrow") &&
     (selectedElements[0].points?.length ?? 0) >= 3 &&
     !!onToggleEditArrowMode;
-  const showGroupAction = hasSelectedElements && !!onToggleGroupSelection && (selectedElements.length > 1 || isSelectionSingleGroup);
+  const showGroupAction =
+    hasSelectedElements &&
+    !!onToggleGroupSelection &&
+    (selectedElements.length > 1 || isSelectionSingleGroup);
   const showLayerOrderActions =
-    hasSelectedElements && !!onBringToFront && !!onSendToBack && !!onMoveForward && !!onMoveBackward;
+    hasSelectedElements &&
+    !!onBringToFront &&
+    !!onSendToBack &&
+    !!onMoveForward &&
+    !!onMoveBackward;
   const showMoreMenu = showLayerOrderActions || showAlign || showGroupAction;
 
   // Reorder colors based on theme: black first in light mode, white first in dark mode
   const currentTheme = resolvedTheme || theme;
-  const orderedColors = currentTheme === 'light'
-    ? COLORS
-    : [COLORS[1], COLORS[0], ...COLORS.slice(2)];
-  const sidebarColors = orderedColors.filter((color) => !SIDEBAR_HIDDEN_COLORS.has(color));
+  const orderedColors =
+    currentTheme === "light"
+      ? COLORS
+      : [COLORS[1], COLORS[0], ...COLORS.slice(2)];
+  const sidebarColors = orderedColors.filter(
+    (color) => !SIDEBAR_HIDDEN_COLORS.has(color),
+  );
 
   // Determine what controls to show based on selected elements or current tool
   const showFill = hasSelectedElements
-    ? selectedElements.some(el =>
-        el.type === 'rectangle' ||
-        el.type === 'ellipse' ||
-        el.type === 'frame' ||
-        (el.type === 'pen' && el.isClosed && fillPattern !== 'none')
+    ? selectedElements.some(
+        (el) =>
+          el.type === "rectangle" ||
+          el.type === "ellipse" ||
+          el.type === "frame" ||
+          (el.type === "pen" && el.isClosed && fillPattern !== "none"),
       )
-    : selectedTool === 'rectangle' ||
-      selectedTool === 'ellipse' ||
-      (selectedTool === 'pen' && fillPattern !== 'none');
+    : selectedTool === "rectangle" ||
+      selectedTool === "ellipse" ||
+      (selectedTool === "pen" && fillPattern !== "none");
 
   const showCornerRadius = hasSelectedElements
-    ? selectedElements.some(el => el.type === 'rectangle' || el.type === 'frame')
-    : selectedTool === 'rectangle';
+    ? selectedElements.some(
+        (el) => el.type === "rectangle" || el.type === "frame",
+      )
+    : selectedTool === "rectangle";
 
   const isTextTool = hasSelectedElements
-    ? selectedElements.some(el => el.type === 'text')
-    : selectedTool === 'text';
+    ? selectedElements.some((el) => el.type === "text")
+    : selectedTool === "text";
 
   const showStrokeWidthAndStyle = !isTextTool;
 
   const showConnectorControls = hasSelectedElements
-    ? selectedElements.some(el => el.type === 'line' || el.type === 'arrow')
-    : selectedTool === 'line' || selectedTool === 'arrow';
+    ? selectedElements.some((el) => el.type === "line" || el.type === "arrow")
+    : selectedTool === "line" || selectedTool === "arrow";
 
   const showArrowControls = hasSelectedElements
-    ? selectedElements.some(el => el.type === 'arrow')
-    : selectedTool === 'arrow';
+    ? selectedElements.some((el) => el.type === "arrow")
+    : selectedTool === "arrow";
 
   const swatchStyle = (color: string): CSSProperties => {
-    if (color === 'transparent') {
+    if (color === "transparent") {
       return {
         backgroundImage:
-          'linear-gradient(45deg, hsl(var(--muted)) 25%, transparent 25%, transparent 75%, hsl(var(--muted)) 75%, hsl(var(--muted))), linear-gradient(45deg, hsl(var(--muted)) 25%, transparent 25%, transparent 75%, hsl(var(--muted)) 75%, hsl(var(--muted)))',
-        backgroundSize: '10px 10px',
-        backgroundPosition: '0 0, 5px 5px',
+          "linear-gradient(45deg, hsl(var(--muted)) 25%, transparent 25%, transparent 75%, hsl(var(--muted)) 75%, hsl(var(--muted))), linear-gradient(45deg, hsl(var(--muted)) 25%, transparent 25%, transparent 75%, hsl(var(--muted)) 75%, hsl(var(--muted)))",
+        backgroundSize: "10px 10px",
+        backgroundPosition: "0 0, 5px 5px",
       };
     }
     return { backgroundColor: color };
@@ -367,7 +590,7 @@ export function ToolSidebar({
   const iconButton = cn(
     CONTROL_BUTTON,
     // Match toolbar tool button corners/sizing.
-    'h-10 w-10 p-0 flex items-center justify-center rounded-sm bg-background/70 hover:bg-muted/60'
+    "h-10 w-10 p-0 flex items-center justify-center rounded-sm bg-background/70 hover:bg-muted/60",
   );
 
   const optionsControls = (
@@ -383,9 +606,11 @@ export function ToolSidebar({
                 key={font.value}
                 onClick={() => onFontFamilyChange(font.value)}
                 className={cn(
-                  'h-8 w-full justify-center px-2 text-xs',
+                  "h-8 w-full justify-center px-2 text-xs",
                   CONTROL_BUTTON,
-                  fontFamily === font.value ? CONTROL_BUTTON_SELECTED : undefined
+                  fontFamily === font.value
+                    ? CONTROL_BUTTON_SELECTED
+                    : undefined,
                 )}
                 variant="outline"
                 size="sm"
@@ -404,7 +629,10 @@ export function ToolSidebar({
             Size &amp; Align
           </label>
           <div className="flex gap-1">
-            <Select value={fontSize.toString()} onValueChange={(value) => onFontSizeChange(Number(value))}>
+            <Select
+              value={fontSize.toString()}
+              onValueChange={(value) => onFontSizeChange(Number(value))}
+            >
               <SelectTrigger className="flex-1 h-8 text-xs">
                 <SelectValue />
               </SelectTrigger>
@@ -421,7 +649,7 @@ export function ToolSidebar({
               value={textAlign}
               onValueChange={(value) => {
                 if (!value) return;
-                onTextAlignChange(value as 'left' | 'center' | 'right');
+                onTextAlignChange(value as "left" | "center" | "right");
               }}
               variant="outline"
               size="sm"
@@ -432,7 +660,7 @@ export function ToolSidebar({
                 aria-label="Align left"
                 className={cn(
                   CONTROL_BUTTON,
-                  'h-8 w-8 p-0 data-[state=on]:bg-muted/70 data-[state=on]:border-foreground/20 data-[state=on]:shadow-sm'
+                  "h-8 w-8 p-0 data-[state=on]:bg-muted/70 data-[state=on]:border-foreground/20 data-[state=on]:shadow-sm",
                 )}
               >
                 <AlignLeft className="w-3.5 h-3.5" />
@@ -442,7 +670,7 @@ export function ToolSidebar({
                 aria-label="Align center"
                 className={cn(
                   CONTROL_BUTTON,
-                  'h-8 w-8 p-0 data-[state=on]:bg-muted/70 data-[state=on]:border-foreground/20 data-[state=on]:shadow-sm'
+                  "h-8 w-8 p-0 data-[state=on]:bg-muted/70 data-[state=on]:border-foreground/20 data-[state=on]:shadow-sm",
                 )}
               >
                 <AlignCenter className="w-3.5 h-3.5" />
@@ -452,7 +680,7 @@ export function ToolSidebar({
                 aria-label="Align right"
                 className={cn(
                   CONTROL_BUTTON,
-                  'h-8 w-8 p-0 data-[state=on]:bg-muted/70 data-[state=on]:border-foreground/20 data-[state=on]:shadow-sm'
+                  "h-8 w-8 p-0 data-[state=on]:bg-muted/70 data-[state=on]:border-foreground/20 data-[state=on]:shadow-sm",
                 )}
               >
                 <AlignRight className="w-3.5 h-3.5" />
@@ -497,7 +725,9 @@ export function ToolSidebar({
             <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
               Stroke Width
             </label>
-            <span className="text-xs text-muted-foreground tabular-nums">{strokeWidth}px</span>
+            <span className="text-xs text-muted-foreground tabular-nums">
+              {strokeWidth}px
+            </span>
           </div>
           <ToggleGroup
             type="single"
@@ -516,13 +746,16 @@ export function ToolSidebar({
                 value={width.toString()}
                 aria-label={`Stroke width ${width}px`}
                 className={cn(
-                  'flex-1 h-10 min-w-0 px-0',
+                  "flex-1 h-10 min-w-0 px-0",
                   CONTROL_BUTTON,
-                  'data-[state=on]:bg-muted/70 data-[state=on]:border-foreground/20 data-[state=on]:shadow-sm'
+                  "data-[state=on]:bg-muted/70 data-[state=on]:border-foreground/20 data-[state=on]:shadow-sm",
                 )}
               >
                 <div className="flex flex-col items-center justify-center gap-1 w-full">
-                  <div className="w-[calc(100%-1.25rem)] bg-foreground/90 rounded-full" style={{ height: width }} />
+                  <div
+                    className="w-[calc(100%-1.25rem)] bg-foreground/90 rounded-full"
+                    style={{ height: width }}
+                  />
                 </div>
               </ToggleGroupItem>
             ))}
@@ -536,14 +769,16 @@ export function ToolSidebar({
             <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
               Stroke Style
             </label>
-            <span className="text-xs text-muted-foreground capitalize">{strokeStyle}</span>
+            <span className="text-xs text-muted-foreground capitalize">
+              {strokeStyle}
+            </span>
           </div>
           <ToggleGroup
             type="single"
             value={strokeStyle}
             onValueChange={(value) => {
               if (!value) return;
-              onStrokeStyleChange(value as 'solid' | 'dashed' | 'dotted');
+              onStrokeStyleChange(value as "solid" | "dashed" | "dotted");
             }}
             variant="outline"
             size="sm"
@@ -553,9 +788,9 @@ export function ToolSidebar({
               value="solid"
               aria-label="Solid stroke"
               className={cn(
-                'flex-1 h-10 min-w-0 px-0',
+                "flex-1 h-10 min-w-0 px-0",
                 CONTROL_BUTTON,
-                'data-[state=on]:bg-muted/70 data-[state=on]:border-foreground/20 data-[state=on]:shadow-sm'
+                "data-[state=on]:bg-muted/70 data-[state=on]:border-foreground/20 data-[state=on]:shadow-sm",
               )}
             >
               <div className="w-full h-0.5 bg-foreground mx-2" />
@@ -564,9 +799,9 @@ export function ToolSidebar({
               value="dashed"
               aria-label="Dashed stroke"
               className={cn(
-                'flex-1 h-10 min-w-0 px-0',
+                "flex-1 h-10 min-w-0 px-0",
                 CONTROL_BUTTON,
-                'data-[state=on]:bg-muted/70 data-[state=on]:border-foreground/20 data-[state=on]:shadow-sm'
+                "data-[state=on]:bg-muted/70 data-[state=on]:border-foreground/20 data-[state=on]:shadow-sm",
               )}
             >
               <div className="w-full h-0.5 border-t-2 border-dashed border-foreground mx-2" />
@@ -575,9 +810,9 @@ export function ToolSidebar({
               value="dotted"
               aria-label="Dotted stroke"
               className={cn(
-                'flex-1 h-10 min-w-0 px-0',
+                "flex-1 h-10 min-w-0 px-0",
                 CONTROL_BUTTON,
-                'data-[state=on]:bg-muted/70 data-[state=on]:border-foreground/20 data-[state=on]:shadow-sm'
+                "data-[state=on]:bg-muted/70 data-[state=on]:border-foreground/20 data-[state=on]:shadow-sm",
               )}
             >
               <div className="w-full h-0.5 border-t-2 border-dotted border-foreground mx-2" />
@@ -592,14 +827,16 @@ export function ToolSidebar({
             <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
               Line Cap
             </label>
-            <span className="text-xs text-muted-foreground capitalize">{lineCap}</span>
+            <span className="text-xs text-muted-foreground capitalize">
+              {lineCap}
+            </span>
           </div>
           <ToggleGroup
             type="single"
             value={lineCap}
             onValueChange={(value) => {
               if (!value) return;
-              onLineCapChange(value as 'butt' | 'round');
+              onLineCapChange(value as "butt" | "round");
             }}
             variant="outline"
             size="sm"
@@ -609,28 +846,54 @@ export function ToolSidebar({
               value="butt"
               aria-label="Butt line cap"
               className={cn(
-                'flex-1 h-9 min-w-0 px-0',
+                "flex-1 h-9 min-w-0 px-0",
                 CONTROL_BUTTON,
-                'data-[state=on]:bg-muted/70 data-[state=on]:border-foreground/20 data-[state=on]:shadow-sm'
+                "data-[state=on]:bg-muted/70 data-[state=on]:border-foreground/20 data-[state=on]:shadow-sm",
               )}
               title="Butt (flat)"
             >
-              <svg width="28" height="20" viewBox="0 0 28 20" className="text-foreground">
-                <line x1="4" y1="10" x2="24" y2="10" stroke="currentColor" strokeWidth="6" strokeLinecap="butt" />
+              <svg
+                width="28"
+                height="20"
+                viewBox="0 0 28 20"
+                className="text-foreground"
+              >
+                <line
+                  x1="4"
+                  y1="10"
+                  x2="24"
+                  y2="10"
+                  stroke="currentColor"
+                  strokeWidth="6"
+                  strokeLinecap="butt"
+                />
               </svg>
             </ToggleGroupItem>
             <ToggleGroupItem
               value="round"
               aria-label="Round line cap"
               className={cn(
-                'flex-1 h-9 min-w-0 px-0',
+                "flex-1 h-9 min-w-0 px-0",
                 CONTROL_BUTTON,
-                'data-[state=on]:bg-muted/70 data-[state=on]:border-foreground/20 data-[state=on]:shadow-sm'
+                "data-[state=on]:bg-muted/70 data-[state=on]:border-foreground/20 data-[state=on]:shadow-sm",
               )}
               title="Round"
             >
-              <svg width="28" height="20" viewBox="0 0 28 20" className="text-foreground">
-                <line x1="4" y1="10" x2="24" y2="10" stroke="currentColor" strokeWidth="6" strokeLinecap="round" />
+              <svg
+                width="28"
+                height="20"
+                viewBox="0 0 28 20"
+                className="text-foreground"
+              >
+                <line
+                  x1="4"
+                  y1="10"
+                  x2="24"
+                  y2="10"
+                  stroke="currentColor"
+                  strokeWidth="6"
+                  strokeLinecap="round"
+                />
               </svg>
             </ToggleGroupItem>
           </ToggleGroup>
@@ -643,14 +906,16 @@ export function ToolSidebar({
             <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
               Corner
             </label>
-            <span className="text-xs text-muted-foreground capitalize">{connectorStyle}</span>
+            <span className="text-xs text-muted-foreground capitalize">
+              {connectorStyle}
+            </span>
           </div>
           <ToggleGroup
             type="single"
             value={connectorStyle}
             onValueChange={(value) => {
               if (!value) return;
-              onConnectorStyleChange(value as 'sharp' | 'curved' | 'elbow');
+              onConnectorStyleChange(value as "sharp" | "curved" | "elbow");
             }}
             variant="outline"
             size="sm"
@@ -660,13 +925,18 @@ export function ToolSidebar({
               value="sharp"
               aria-label="Sharp corner"
               className={cn(
-                'flex-1 h-10 min-w-0 px-0',
+                "flex-1 h-10 min-w-0 px-0",
                 CONTROL_BUTTON,
-                'data-[state=on]:bg-muted/70 data-[state=on]:border-foreground/20 data-[state=on]:shadow-sm'
+                "data-[state=on]:bg-muted/70 data-[state=on]:border-foreground/20 data-[state=on]:shadow-sm",
               )}
               title="Sharp corner"
             >
-              <svg width="24" height="16" viewBox="0 0 24 16" className="text-foreground">
+              <svg
+                width="24"
+                height="16"
+                viewBox="0 0 24 16"
+                className="text-foreground"
+              >
                 <polyline
                   points="2,14 10,6 22,2"
                   fill="none"
@@ -681,27 +951,43 @@ export function ToolSidebar({
               value="curved"
               aria-label="Curved"
               className={cn(
-                'flex-1 h-10 min-w-0 px-0',
+                "flex-1 h-10 min-w-0 px-0",
                 CONTROL_BUTTON,
-                'data-[state=on]:bg-muted/70 data-[state=on]:border-foreground/20 data-[state=on]:shadow-sm'
+                "data-[state=on]:bg-muted/70 data-[state=on]:border-foreground/20 data-[state=on]:shadow-sm",
               )}
               title="Curved"
             >
-              <svg width="24" height="16" viewBox="0 0 24 16" className="text-foreground">
-                <path d="M 2 14 Q 10 4 22 2" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+              <svg
+                width="24"
+                height="16"
+                viewBox="0 0 24 16"
+                className="text-foreground"
+              >
+                <path
+                  d="M 2 14 Q 10 4 22 2"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                />
               </svg>
             </ToggleGroupItem>
             <ToggleGroupItem
               value="elbow"
               aria-label="Elbow"
               className={cn(
-                'flex-1 h-10 min-w-0 px-0',
+                "flex-1 h-10 min-w-0 px-0",
                 CONTROL_BUTTON,
-                'data-[state=on]:bg-muted/70 data-[state=on]:border-foreground/20 data-[state=on]:shadow-sm'
+                "data-[state=on]:bg-muted/70 data-[state=on]:border-foreground/20 data-[state=on]:shadow-sm",
               )}
               title="Elbow"
             >
-              <svg width="24" height="16" viewBox="0 0 24 16" className="text-foreground">
+              <svg
+                width="24"
+                height="16"
+                viewBox="0 0 24 16"
+                className="text-foreground"
+              >
                 <polyline
                   points="2,14 14,14 14,2 22,2"
                   fill="none"
@@ -723,21 +1009,25 @@ export function ToolSidebar({
           </label>
           <div className="grid grid-cols-2 gap-2">
             <div className="space-y-1 relative">
-              <div className="text-[10px] text-muted-foreground uppercase tracking-wider">Start</div>
+              <div className="text-[10px] text-muted-foreground uppercase tracking-wider">
+                Start
+              </div>
               <button
                 type="button"
                 ref={arrowStartButtonRef}
                 onClick={() => {
-                  if (openArrowEndMenu === 'start') {
+                  if (openArrowEndMenu === "start") {
                     setOpenArrowEndMenu(null);
                     return;
                   }
-                  openArrowMenu('start');
+                  openArrowMenu("start");
                 }}
                 className={cn(
                   CONTROL_BUTTON,
-                  'h-10 w-full flex items-center justify-center',
-                  openArrowEndMenu === 'start' ? CONTROL_BUTTON_SELECTED : undefined
+                  "h-10 w-full flex items-center justify-center",
+                  openArrowEndMenu === "start"
+                    ? CONTROL_BUTTON_SELECTED
+                    : undefined,
                 )}
                 title="Start marker"
               >
@@ -746,21 +1036,25 @@ export function ToolSidebar({
             </div>
 
             <div className="space-y-1 relative">
-              <div className="text-[10px] text-muted-foreground uppercase tracking-wider">End</div>
+              <div className="text-[10px] text-muted-foreground uppercase tracking-wider">
+                End
+              </div>
               <button
                 type="button"
                 ref={arrowEndButtonRef}
                 onClick={() => {
-                  if (openArrowEndMenu === 'end') {
+                  if (openArrowEndMenu === "end") {
                     setOpenArrowEndMenu(null);
                     return;
                   }
-                  openArrowMenu('end');
+                  openArrowMenu("end");
                 }}
                 className={cn(
                   CONTROL_BUTTON,
-                  'h-10 w-full flex items-center justify-center',
-                  openArrowEndMenu === 'end' ? CONTROL_BUTTON_SELECTED : undefined
+                  "h-10 w-full flex items-center justify-center",
+                  openArrowEndMenu === "end"
+                    ? CONTROL_BUTTON_SELECTED
+                    : undefined,
                 )}
                 title="End marker"
               >
@@ -771,20 +1065,23 @@ export function ToolSidebar({
         </div>
       )}
 
-      {(selectedTool === 'pen' || selectedElements.some((el) => el.type === 'pen')) && (
+      {(selectedTool === "pen" ||
+        selectedElements.some((el) => el.type === "pen")) && (
         <div className="space-y-2">
           <div className="flex items-center justify-between">
             <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
               Fill Pattern
             </label>
-            <span className="text-xs text-muted-foreground capitalize">{fillPattern}</span>
+            <span className="text-xs text-muted-foreground capitalize">
+              {fillPattern}
+            </span>
           </div>
           <ToggleGroup
             type="single"
             value={fillPattern}
             onValueChange={(value) => {
               if (!value) return;
-              onFillPatternChange?.(value as 'none' | 'solid' | 'criss-cross');
+              onFillPatternChange?.(value as "none" | "solid" | "criss-cross");
             }}
             variant="outline"
             size="sm"
@@ -794,9 +1091,9 @@ export function ToolSidebar({
               value="none"
               aria-label="No fill pattern"
               className={cn(
-                'flex-1 h-9 min-w-0 px-0',
+                "flex-1 h-9 min-w-0 px-0",
                 CONTROL_BUTTON,
-                'data-[state=on]:bg-muted/70 data-[state=on]:border-foreground/20 data-[state=on]:shadow-sm'
+                "data-[state=on]:bg-muted/70 data-[state=on]:border-foreground/20 data-[state=on]:shadow-sm",
               )}
             >
               <span className="text-xs">None</span>
@@ -805,9 +1102,9 @@ export function ToolSidebar({
               value="solid"
               aria-label="Solid fill pattern"
               className={cn(
-                'flex-1 h-9 min-w-0 px-0',
+                "flex-1 h-9 min-w-0 px-0",
                 CONTROL_BUTTON,
-                'data-[state=on]:bg-muted/70 data-[state=on]:border-foreground/20 data-[state=on]:shadow-sm'
+                "data-[state=on]:bg-muted/70 data-[state=on]:border-foreground/20 data-[state=on]:shadow-sm",
               )}
             >
               <div className="w-6 h-6 rounded-sm bg-foreground/30" />
@@ -816,13 +1113,23 @@ export function ToolSidebar({
               value="criss-cross"
               aria-label="Criss-cross fill pattern"
               className={cn(
-                'flex-1 h-9 min-w-0 px-0',
+                "flex-1 h-9 min-w-0 px-0",
                 CONTROL_BUTTON,
-                'data-[state=on]:bg-muted/70 data-[state=on]:border-foreground/20 data-[state=on]:shadow-sm'
+                "data-[state=on]:bg-muted/70 data-[state=on]:border-foreground/20 data-[state=on]:shadow-sm",
               )}
             >
-              <svg width="20" height="20" viewBox="0 0 20 20" className="text-foreground">
-                <pattern id="criss-cross-preview" width="10" height="10" patternUnits="userSpaceOnUse">
+              <svg
+                width="20"
+                height="20"
+                viewBox="0 0 20 20"
+                className="text-foreground"
+              >
+                <pattern
+                  id="criss-cross-preview"
+                  width="10"
+                  height="10"
+                  patternUnits="userSpaceOnUse"
+                >
                   <line
                     x1="0"
                     y1="0"
@@ -886,7 +1193,12 @@ export function ToolSidebar({
       <div className="bg-card/95 backdrop-blur-md border border-border rounded-md shadow-2xl py-3 px-2 flex flex-col items-center gap-3">
         <DropdownMenu open={openStrokeMenu} onOpenChange={setOpenStrokeMenu}>
           <DropdownMenuTrigger asChild>
-            <button type="button" className={iconButton} title="Stroke color" style={swatchStyle(strokeColor)} />
+            <button
+              type="button"
+              className={iconButton}
+              title="Stroke color"
+              style={swatchStyle(strokeColor)}
+            />
           </DropdownMenuTrigger>
           <DropdownMenuContent side="left" align="center" className="w-56 p-3">
             <DropdownMenuLabel>Stroke</DropdownMenuLabel>
@@ -900,8 +1212,8 @@ export function ToolSidebar({
                     setOpenStrokeMenu(false);
                   }}
                   className={cn(
-                    'h-7 w-7 rounded-sm border border-input transition-transform hover:scale-110',
-                    strokeColor === color ? 'scale-105' : undefined
+                    "h-7 w-7 rounded-sm border border-input transition-transform hover:scale-110",
+                    strokeColor === color ? "scale-105" : undefined,
                   )}
                   style={{ backgroundColor: color }}
                   title={color}
@@ -920,7 +1232,7 @@ export function ToolSidebar({
                   className="w-full h-full"
                   style={{
                     background:
-                      'linear-gradient(135deg, #ff0000 0%, #ff7f00 14%, #ffff00 28%, #00ff00 42%, #0000ff 57%, #4b0082 71%, #9400d3 85%, #ff0000 100%)',
+                      "linear-gradient(135deg, #ff0000 0%, #ff7f00 14%, #ffff00 28%, #00ff00 42%, #0000ff 57%, #4b0082 71%, #9400d3 85%, #ff0000 100%)",
                   }}
                 />
               </button>
@@ -931,22 +1243,33 @@ export function ToolSidebar({
         {showFill && onFillColorChange && (
           <DropdownMenu open={openFillMenu} onOpenChange={setOpenFillMenu}>
             <DropdownMenuTrigger asChild>
-              <button type="button" className={iconButton} title="Fill color" style={swatchStyle(fillColor)} />
+              <button
+                type="button"
+                className={iconButton}
+                title="Fill color"
+                style={swatchStyle(fillColor)}
+              />
             </DropdownMenuTrigger>
-            <DropdownMenuContent side="left" align="center" className="w-56 p-3">
+            <DropdownMenuContent
+              side="left"
+              align="center"
+              className="w-56 p-3"
+            >
               <div className="flex items-center justify-between">
                 <DropdownMenuLabel>Fill</DropdownMenuLabel>
                 <button
                   type="button"
                   onClick={() => {
-                    onFillColorChange('transparent');
+                    onFillColorChange("transparent");
                     setOpenFillMenu(false);
                   }}
                   className={cn(
-                    'text-[10px] uppercase tracking-wider transition-colors',
-                    fillColor === 'transparent' ? 'text-muted-foreground/70 cursor-default' : 'text-muted-foreground hover:text-foreground'
+                    "text-[10px] uppercase tracking-wider transition-colors",
+                    fillColor === "transparent"
+                      ? "text-muted-foreground/70 cursor-default"
+                      : "text-muted-foreground hover:text-foreground",
                   )}
-                  disabled={fillColor === 'transparent'}
+                  disabled={fillColor === "transparent"}
                   title="Clear fill"
                 >
                   Clear
@@ -962,8 +1285,8 @@ export function ToolSidebar({
                       setOpenFillMenu(false);
                     }}
                     className={cn(
-                      'h-7 w-7 rounded-sm border border-input transition-transform hover:scale-110',
-                      fillColor === color ? 'scale-105' : undefined
+                      "h-7 w-7 rounded-sm border border-input transition-transform hover:scale-110",
+                      fillColor === color ? "scale-105" : undefined,
                     )}
                     style={{ backgroundColor: color }}
                     title={color}
@@ -976,8 +1299,11 @@ export function ToolSidebar({
                     setOpenFillMenu(false);
                   }}
                   className={cn(
-                    'h-7 w-7 rounded-sm border border-input overflow-hidden',
-                    fillColor !== 'transparent' && !sidebarColors.includes(fillColor) ? 'ring-2 ring-ring ring-offset-2 ring-offset-background' : undefined
+                    "h-7 w-7 rounded-sm border border-input overflow-hidden",
+                    fillColor !== "transparent" &&
+                      !sidebarColors.includes(fillColor)
+                      ? "ring-2 ring-ring ring-offset-2 ring-offset-background"
+                      : undefined,
                   )}
                   title="Custom fill color"
                 >
@@ -985,7 +1311,7 @@ export function ToolSidebar({
                     className="w-full h-full"
                     style={{
                       background:
-                        'linear-gradient(135deg, #ff0000 0%, #ff7f00 14%, #ffff00 28%, #00ff00 42%, #0000ff 57%, #4b0082 71%, #9400d3 85%, #ff0000 100%)',
+                        "linear-gradient(135deg, #ff0000 0%, #ff7f00 14%, #ffff00 28%, #00ff00 42%, #0000ff 57%, #4b0082 71%, #9400d3 85%, #ff0000 100%)",
                     }}
                   />
                 </button>
@@ -996,18 +1322,33 @@ export function ToolSidebar({
 
         <DropdownMenu open={openOptionsMenu} onOpenChange={setOpenOptionsMenu}>
           <DropdownMenuTrigger asChild>
-            <button type="button" className={iconButton} title="Options" aria-label="Options">
+            <button
+              type="button"
+              className={iconButton}
+              title="Options"
+              aria-label="Options"
+            >
               <SlidersHorizontal className="w-5 h-5" />
             </button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent side="left" align="center" className="w-[320px] p-3">
+          <DropdownMenuContent
+            side="left"
+            align="center"
+            className="w-[320px] p-3"
+          >
             <DropdownMenuLabel>Options</DropdownMenuLabel>
             <div className="mt-3 space-y-4">{optionsControls}</div>
           </DropdownMenuContent>
         </DropdownMenu>
 
         {hasSelectedElements && onCopySelected && (
-          <button type="button" onClick={onCopySelected} className={iconButton} title="Copy" aria-label="Copy">
+          <button
+            type="button"
+            onClick={onCopySelected}
+            className={iconButton}
+            title="Copy"
+            aria-label="Copy"
+          >
             <Copy className="w-5 h-5" />
           </button>
         )}
@@ -1016,7 +1357,7 @@ export function ToolSidebar({
           <button
             type="button"
             onClick={onDeleteSelected}
-            className={cn(iconButton, 'hover:text-destructive')}
+            className={cn(iconButton, "hover:text-destructive")}
             title="Delete"
             aria-label="Delete"
           >
@@ -1027,11 +1368,20 @@ export function ToolSidebar({
         {showMoreMenu && (
           <DropdownMenu open={openMoreMenu} onOpenChange={setOpenMoreMenu}>
             <DropdownMenuTrigger asChild>
-              <button type="button" className={iconButton} title="More" aria-label="More">
+              <button
+                type="button"
+                className={iconButton}
+                title="More"
+                aria-label="More"
+              >
                 <MoreHorizontal className="w-5 h-5" />
               </button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent side="left" align="center" className="w-72 p-3">
+            <DropdownMenuContent
+              side="left"
+              align="center"
+              className="w-72 p-3"
+            >
               {showLayerOrderActions && (
                 <>
                   <DropdownMenuLabel>Layers</DropdownMenuLabel>
@@ -1042,7 +1392,10 @@ export function ToolSidebar({
                         onBringToFront?.();
                         setOpenMoreMenu(false);
                       }}
-                      className={cn(CONTROL_BUTTON, 'h-9 flex items-center justify-center')}
+                      className={cn(
+                        CONTROL_BUTTON,
+                        "h-9 flex items-center justify-center",
+                      )}
                       title="Bring to Front"
                     >
                       <ArrowUpToLine className="w-3.5 h-3.5" />
@@ -1053,7 +1406,10 @@ export function ToolSidebar({
                         onMoveForward?.();
                         setOpenMoreMenu(false);
                       }}
-                      className={cn(CONTROL_BUTTON, 'h-9 flex items-center justify-center')}
+                      className={cn(
+                        CONTROL_BUTTON,
+                        "h-9 flex items-center justify-center",
+                      )}
                       title="Move Forward"
                     >
                       <ChevronLeft className="w-3.5 h-3.5 -rotate-90" />
@@ -1064,7 +1420,10 @@ export function ToolSidebar({
                         onMoveBackward?.();
                         setOpenMoreMenu(false);
                       }}
-                      className={cn(CONTROL_BUTTON, 'h-9 flex items-center justify-center')}
+                      className={cn(
+                        CONTROL_BUTTON,
+                        "h-9 flex items-center justify-center",
+                      )}
                       title="Move Backward"
                     >
                       <ChevronLeft className="w-3.5 h-3.5 rotate-90" />
@@ -1075,7 +1434,10 @@ export function ToolSidebar({
                         onSendToBack?.();
                         setOpenMoreMenu(false);
                       }}
-                      className={cn(CONTROL_BUTTON, 'h-9 flex items-center justify-center')}
+                      className={cn(
+                        CONTROL_BUTTON,
+                        "h-9 flex items-center justify-center",
+                      )}
                       title="Send to Back"
                     >
                       <ArrowDownToLine className="w-3.5 h-3.5" />
@@ -1095,7 +1457,10 @@ export function ToolSidebar({
                         onAlignLeft?.();
                         setOpenMoreMenu(false);
                       }}
-                      className={cn(CONTROL_BUTTON, 'h-9 flex items-center justify-center')}
+                      className={cn(
+                        CONTROL_BUTTON,
+                        "h-9 flex items-center justify-center",
+                      )}
                       title="Align left"
                       aria-label="Align left"
                     >
@@ -1107,7 +1472,10 @@ export function ToolSidebar({
                         onAlignCenterHorizontal?.();
                         setOpenMoreMenu(false);
                       }}
-                      className={cn(CONTROL_BUTTON, 'h-9 flex items-center justify-center')}
+                      className={cn(
+                        CONTROL_BUTTON,
+                        "h-9 flex items-center justify-center",
+                      )}
                       title="Align center (horizontal)"
                       aria-label="Align center (horizontal)"
                     >
@@ -1119,7 +1487,10 @@ export function ToolSidebar({
                         onAlignRight?.();
                         setOpenMoreMenu(false);
                       }}
-                      className={cn(CONTROL_BUTTON, 'h-9 flex items-center justify-center')}
+                      className={cn(
+                        CONTROL_BUTTON,
+                        "h-9 flex items-center justify-center",
+                      )}
                       title="Align right"
                       aria-label="Align right"
                     >
@@ -1133,7 +1504,10 @@ export function ToolSidebar({
                         onAlignTop?.();
                         setOpenMoreMenu(false);
                       }}
-                      className={cn(CONTROL_BUTTON, 'h-9 flex items-center justify-center')}
+                      className={cn(
+                        CONTROL_BUTTON,
+                        "h-9 flex items-center justify-center",
+                      )}
                       title="Align top"
                       aria-label="Align top"
                     >
@@ -1145,7 +1519,10 @@ export function ToolSidebar({
                         onAlignCenterVertical?.();
                         setOpenMoreMenu(false);
                       }}
-                      className={cn(CONTROL_BUTTON, 'h-9 flex items-center justify-center')}
+                      className={cn(
+                        CONTROL_BUTTON,
+                        "h-9 flex items-center justify-center",
+                      )}
                       title="Align center (vertical)"
                       aria-label="Align center (vertical)"
                     >
@@ -1157,7 +1534,10 @@ export function ToolSidebar({
                         onAlignBottom?.();
                         setOpenMoreMenu(false);
                       }}
-                      className={cn(CONTROL_BUTTON, 'h-9 flex items-center justify-center')}
+                      className={cn(
+                        CONTROL_BUTTON,
+                        "h-9 flex items-center justify-center",
+                      )}
                       title="Align bottom"
                       aria-label="Align bottom"
                     >
@@ -1179,13 +1559,17 @@ export function ToolSidebar({
                     }}
                     className={cn(
                       CONTROL_BUTTON,
-                      'mt-2 h-9 w-full flex items-center justify-center gap-2 text-sm'
+                      "mt-2 h-9 w-full flex items-center justify-center gap-2 text-sm",
                     )}
-                    title={isSelectionSingleGroup ? 'Ungroup' : 'Group'}
-                    aria-label={isSelectionSingleGroup ? 'Ungroup' : 'Group'}
+                    title={isSelectionSingleGroup ? "Ungroup" : "Group"}
+                    aria-label={isSelectionSingleGroup ? "Ungroup" : "Group"}
                   >
-                    {isSelectionSingleGroup ? <Ungroup className="w-4 h-4" /> : <Group className="w-4 h-4" />}
-                    <span>{isSelectionSingleGroup ? 'Ungroup' : 'Group'}</span>
+                    {isSelectionSingleGroup ? (
+                      <Ungroup className="w-4 h-4" />
+                    ) : (
+                      <Group className="w-4 h-4" />
+                    )}
+                    <span>{isSelectionSingleGroup ? "Ungroup" : "Group"}</span>
                   </button>
                 </>
               )}
@@ -1199,8 +1583,8 @@ export function ToolSidebar({
   const fullSidebar = (
     <div
       className={cn(
-        'fixed right-4 top-1/2 -translate-y-1/2 z-40 transition-all duration-300 ease-out',
-        isCollapsed ? 'translate-x-[calc(100%-3rem)]' : 'translate-x-0'
+        "fixed right-4 top-1/2 -translate-y-1/2 z-40 transition-all duration-300 ease-out",
+        isCollapsed ? "translate-x-[calc(100%-3rem)]" : "translate-x-0",
       )}
     >
       <div className="relative bg-card/95 backdrop-blur-md border border-border rounded-md shadow-2xl overflow-hidden">
@@ -1208,8 +1592,8 @@ export function ToolSidebar({
         <button
           onClick={() => setIsCollapsed(!isCollapsed)}
           className={cn(
-            'absolute -left-10 top-1/2 -translate-y-1/2 w-8 h-16 bg-card/95 backdrop-blur-md border border-border rounded-l-md',
-            'transition-all duration-200 hover:bg-muted/60 hover:shadow-md active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 focus-visible:ring-offset-background'
+            "absolute -left-10 top-1/2 -translate-y-1/2 w-8 h-16 bg-card/95 backdrop-blur-md border border-border rounded-l-md",
+            "transition-all duration-200 hover:bg-muted/60 hover:shadow-md active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 focus-visible:ring-offset-background",
           )}
         >
           {isCollapsed ? (
@@ -1222,20 +1606,34 @@ export function ToolSidebar({
         {/* Sidebar Content */}
         <div
           className={cn(
-            'w-64 p-4 space-y-4 max-h-[calc(100vh-2rem)] overflow-y-auto overscroll-contain',
-            isCollapsed && 'opacity-0 pointer-events-none'
+            "w-64 p-4 space-y-4 max-h-[calc(100vh-2rem)] overflow-y-auto overscroll-contain",
+            isCollapsed && "opacity-0 pointer-events-none",
           )}
         >
           {/* Header */}
           <div className="flex items-center gap-2 pb-2 border-b border-border">
-            {selectedTool === 'pen' && <Pencil className="w-4 h-4 text-foreground" />}
-            {selectedTool === 'line' && <Minus className="w-4 h-4 text-foreground" />}
-            {selectedTool === 'arrow' && <ArrowRight className="w-4 h-4 text-foreground" />}
-            {selectedTool === 'rectangle' && <Square className="w-4 h-4 text-foreground" />}
-            {selectedTool === 'ellipse' && <Circle className="w-4 h-4 text-foreground" />}
-            {selectedTool === 'text' && <Type className="w-4 h-4 text-foreground" />}
+            {selectedTool === "pen" && (
+              <Pencil className="w-4 h-4 text-foreground" />
+            )}
+            {selectedTool === "line" && (
+              <Minus className="w-4 h-4 text-foreground" />
+            )}
+            {selectedTool === "arrow" && (
+              <ArrowRight className="w-4 h-4 text-foreground" />
+            )}
+            {selectedTool === "rectangle" && (
+              <Square className="w-4 h-4 text-foreground" />
+            )}
+            {selectedTool === "ellipse" && (
+              <Circle className="w-4 h-4 text-foreground" />
+            )}
+            {selectedTool === "text" && (
+              <Type className="w-4 h-4 text-foreground" />
+            )}
             <span className="text-sm font-semibold text-foreground capitalize">
-              {hasSelectedElements ? `${selectedElements.length} Selected` : `${selectedTool} Properties`}
+              {hasSelectedElements
+                ? `${selectedElements.length} Selected`
+                : `${selectedTool} Properties`}
             </span>
           </div>
 
@@ -1249,7 +1647,10 @@ export function ToolSidebar({
                 <button
                   key={color}
                   onClick={() => onStrokeColorChange(color)}
-                  className={cn(SWATCH_BASE, strokeColor === color ? 'scale-105' : undefined)}
+                  className={cn(
+                    SWATCH_BASE,
+                    strokeColor === color ? "scale-105" : undefined,
+                  )}
                   style={{
                     backgroundColor: color,
                     boxShadow:
@@ -1263,14 +1664,14 @@ export function ToolSidebar({
               {/* Custom color picker */}
               <button
                 onClick={() => setShowStrokeColorPicker(true)}
-                className={cn(SWATCH_BASE, 'cursor-pointer overflow-hidden')}
+                className={cn(SWATCH_BASE, "cursor-pointer overflow-hidden")}
                 title="Custom color"
               >
                 <div
                   className="w-full h-full"
                   style={{
                     background:
-                      'linear-gradient(135deg, #ff0000 0%, #ff7f00 14%, #ffff00 28%, #00ff00 42%, #0000ff 57%, #4b0082 71%, #9400d3 85%, #ff0000 100%)',
+                      "linear-gradient(135deg, #ff0000 0%, #ff7f00 14%, #ffff00 28%, #00ff00 42%, #0000ff 57%, #4b0082 71%, #9400d3 85%, #ff0000 100%)",
                   }}
                 />
               </button>
@@ -1287,14 +1688,14 @@ export function ToolSidebar({
                   </label>
                   <button
                     type="button"
-                    onClick={() => onFillColorChange('transparent')}
+                    onClick={() => onFillColorChange("transparent")}
                     className={cn(
-                      'text-[10px] uppercase tracking-wider transition-colors',
-                      fillColor === 'transparent'
-                        ? 'text-muted-foreground/70 cursor-default'
-                        : 'text-muted-foreground hover:text-foreground'
+                      "text-[10px] uppercase tracking-wider transition-colors",
+                      fillColor === "transparent"
+                        ? "text-muted-foreground/70 cursor-default"
+                        : "text-muted-foreground hover:text-foreground",
                     )}
-                    disabled={fillColor === 'transparent'}
+                    disabled={fillColor === "transparent"}
                     title="Clear fill"
                   >
                     Clear
@@ -1304,8 +1705,15 @@ export function ToolSidebar({
                   {sidebarColors.map((color) => (
                     <button
                       key={`fill-${color}`}
-                      onClick={() => onFillColorChange(fillColor === color ? 'transparent' : color)}
-                      className={cn(SWATCH_BASE, fillColor === color ? 'scale-105' : undefined)}
+                      onClick={() =>
+                        onFillColorChange(
+                          fillColor === color ? "transparent" : color,
+                        )
+                      }
+                      className={cn(
+                        SWATCH_BASE,
+                        fillColor === color ? "scale-105" : undefined,
+                      )}
                       style={{
                         backgroundColor: color,
                         boxShadow:
@@ -1321,8 +1729,11 @@ export function ToolSidebar({
                     onClick={() => setShowFillColorPicker(true)}
                     className={cn(
                       SWATCH_BASE,
-                      'cursor-pointer overflow-hidden',
-                      fillColor !== 'transparent' && !sidebarColors.includes(fillColor) ? 'scale-105' : undefined
+                      "cursor-pointer overflow-hidden",
+                      fillColor !== "transparent" &&
+                        !sidebarColors.includes(fillColor)
+                        ? "scale-105"
+                        : undefined,
                     )}
                     title="Custom fill color"
                   >
@@ -1330,7 +1741,7 @@ export function ToolSidebar({
                       className="w-full h-full"
                       style={{
                         background:
-                          'linear-gradient(135deg, #ff0000 0%, #ff7f00 14%, #ffff00 28%, #00ff00 42%, #0000ff 57%, #4b0082 71%, #9400d3 85%, #ff0000 100%)',
+                          "linear-gradient(135deg, #ff0000 0%, #ff7f00 14%, #ffff00 28%, #00ff00 42%, #0000ff 57%, #4b0082 71%, #9400d3 85%, #ff0000 100%)",
                       }}
                     />
                   </button>
@@ -1342,43 +1753,59 @@ export function ToolSidebar({
           {optionsControls}
 
           {/* Layer Order (when elements are selected) */}
-          {hasSelectedElements && onBringToFront && onSendToBack && onMoveForward && onMoveBackward && (
-            <div className="space-y-2 pt-2 border-t border-border">
-              <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                Layer Order
-              </label>
-              <div className="grid grid-cols-4 gap-1">
-                <button
-                  onClick={onBringToFront}
-                  className={cn(CONTROL_BUTTON, 'h-9 flex items-center justify-center')}
-                  title="Bring to Front"
-                >
-                  <ArrowUpToLine className="w-3.5 h-3.5" />
-                </button>
-                <button
-                  onClick={onMoveForward}
-                  className={cn(CONTROL_BUTTON, 'h-9 flex items-center justify-center')}
-                  title="Move Forward"
-                >
-                  <ChevronLeft className="w-3.5 h-3.5 -rotate-90" />
-                </button>
-                <button
-                  onClick={onMoveBackward}
-                  className={cn(CONTROL_BUTTON, 'h-9 flex items-center justify-center')}
-                  title="Move Backward"
-                >
-                  <ChevronLeft className="w-3.5 h-3.5 rotate-90" />
-                </button>
-                <button
-                  onClick={onSendToBack}
-                  className={cn(CONTROL_BUTTON, 'h-9 flex items-center justify-center')}
-                  title="Send to Back"
-                >
-                  <ArrowDownToLine className="w-3.5 h-3.5" />
-                </button>
+          {hasSelectedElements &&
+            onBringToFront &&
+            onSendToBack &&
+            onMoveForward &&
+            onMoveBackward && (
+              <div className="space-y-2 pt-2 border-t border-border">
+                <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                  Layer Order
+                </label>
+                <div className="grid grid-cols-4 gap-1">
+                  <button
+                    onClick={onBringToFront}
+                    className={cn(
+                      CONTROL_BUTTON,
+                      "h-9 flex items-center justify-center",
+                    )}
+                    title="Bring to Front"
+                  >
+                    <ArrowUpToLine className="w-3.5 h-3.5" />
+                  </button>
+                  <button
+                    onClick={onMoveForward}
+                    className={cn(
+                      CONTROL_BUTTON,
+                      "h-9 flex items-center justify-center",
+                    )}
+                    title="Move Forward"
+                  >
+                    <ChevronLeft className="w-3.5 h-3.5 -rotate-90" />
+                  </button>
+                  <button
+                    onClick={onMoveBackward}
+                    className={cn(
+                      CONTROL_BUTTON,
+                      "h-9 flex items-center justify-center",
+                    )}
+                    title="Move Backward"
+                  >
+                    <ChevronLeft className="w-3.5 h-3.5 rotate-90" />
+                  </button>
+                  <button
+                    onClick={onSendToBack}
+                    className={cn(
+                      CONTROL_BUTTON,
+                      "h-9 flex items-center justify-center",
+                    )}
+                    title="Send to Back"
+                  >
+                    <ArrowDownToLine className="w-3.5 h-3.5" />
+                  </button>
+                </div>
               </div>
-            </div>
-          )}
+            )}
 
           {/* Align (multi selection) */}
           {showAlign && (
@@ -1389,7 +1816,10 @@ export function ToolSidebar({
               <div className="grid grid-cols-3 gap-1">
                 <button
                   onClick={onAlignLeft}
-                  className={cn(CONTROL_BUTTON, 'h-9 flex items-center justify-center')}
+                  className={cn(
+                    CONTROL_BUTTON,
+                    "h-9 flex items-center justify-center",
+                  )}
                   title="Align left"
                   aria-label="Align left"
                 >
@@ -1397,7 +1827,10 @@ export function ToolSidebar({
                 </button>
                 <button
                   onClick={onAlignCenterHorizontal}
-                  className={cn(CONTROL_BUTTON, 'h-9 flex items-center justify-center')}
+                  className={cn(
+                    CONTROL_BUTTON,
+                    "h-9 flex items-center justify-center",
+                  )}
                   title="Align center (horizontal)"
                   aria-label="Align center (horizontal)"
                 >
@@ -1405,7 +1838,10 @@ export function ToolSidebar({
                 </button>
                 <button
                   onClick={onAlignRight}
-                  className={cn(CONTROL_BUTTON, 'h-9 flex items-center justify-center')}
+                  className={cn(
+                    CONTROL_BUTTON,
+                    "h-9 flex items-center justify-center",
+                  )}
                   title="Align right"
                   aria-label="Align right"
                 >
@@ -1415,7 +1851,10 @@ export function ToolSidebar({
               <div className="grid grid-cols-3 gap-1">
                 <button
                   onClick={onAlignTop}
-                  className={cn(CONTROL_BUTTON, 'h-9 flex items-center justify-center')}
+                  className={cn(
+                    CONTROL_BUTTON,
+                    "h-9 flex items-center justify-center",
+                  )}
                   title="Align top"
                   aria-label="Align top"
                 >
@@ -1423,7 +1862,10 @@ export function ToolSidebar({
                 </button>
                 <button
                   onClick={onAlignCenterVertical}
-                  className={cn(CONTROL_BUTTON, 'h-9 flex items-center justify-center')}
+                  className={cn(
+                    CONTROL_BUTTON,
+                    "h-9 flex items-center justify-center",
+                  )}
                   title="Align center (vertical)"
                   aria-label="Align center (vertical)"
                 >
@@ -1431,7 +1873,10 @@ export function ToolSidebar({
                 </button>
                 <button
                   onClick={onAlignBottom}
-                  className={cn(CONTROL_BUTTON, 'h-9 flex items-center justify-center')}
+                  className={cn(
+                    CONTROL_BUTTON,
+                    "h-9 flex items-center justify-center",
+                  )}
                   title="Align bottom"
                   aria-label="Align bottom"
                 >
@@ -1447,11 +1892,19 @@ export function ToolSidebar({
               <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
                 Actions
               </label>
-              <div className={cn("grid gap-1", canEditArrow ? "grid-cols-4" : "grid-cols-3")}>
+              <div
+                className={cn(
+                  "grid gap-1",
+                  canEditArrow ? "grid-cols-4" : "grid-cols-3",
+                )}
+              >
                 {onCopySelected && (
                   <button
                     onClick={onCopySelected}
-                    className={cn(CONTROL_BUTTON, 'h-9 flex items-center justify-center')}
+                    className={cn(
+                      CONTROL_BUTTON,
+                      "h-9 flex items-center justify-center",
+                    )}
                     title="Copy"
                     aria-label="Copy"
                   >
@@ -1461,34 +1914,41 @@ export function ToolSidebar({
                 {onDeleteSelected && (
                   <button
                     onClick={onDeleteSelected}
-                    className={cn(CONTROL_BUTTON, 'h-9 flex items-center justify-center')}
+                    className={cn(
+                      CONTROL_BUTTON,
+                      "h-9 flex items-center justify-center",
+                    )}
                     title="Delete"
                     aria-label="Delete"
                   >
                     <Trash2 className="w-3.5 h-3.5" />
                   </button>
                 )}
-                {onToggleGroupSelection && (selectedElements.length > 1 || isSelectionSingleGroup) && (
-                  <button
-                    onClick={onToggleGroupSelection}
-                    className={cn(CONTROL_BUTTON, 'h-9 flex items-center justify-center')}
-                    title={isSelectionSingleGroup ? 'Ungroup' : 'Group'}
-                    aria-label={isSelectionSingleGroup ? 'Ungroup' : 'Group'}
-                  >
-                    {isSelectionSingleGroup ? (
-                      <Ungroup className="w-3.5 h-3.5" />
-                    ) : (
-                      <Group className="w-3.5 h-3.5" />
-                    )}
-                  </button>
-                )}
+                {onToggleGroupSelection &&
+                  (selectedElements.length > 1 || isSelectionSingleGroup) && (
+                    <button
+                      onClick={onToggleGroupSelection}
+                      className={cn(
+                        CONTROL_BUTTON,
+                        "h-9 flex items-center justify-center",
+                      )}
+                      title={isSelectionSingleGroup ? "Ungroup" : "Group"}
+                      aria-label={isSelectionSingleGroup ? "Ungroup" : "Group"}
+                    >
+                      {isSelectionSingleGroup ? (
+                        <Ungroup className="w-3.5 h-3.5" />
+                      ) : (
+                        <Group className="w-3.5 h-3.5" />
+                      )}
+                    </button>
+                  )}
                 {canEditArrow && (
                   <button
                     onClick={onToggleEditArrowMode}
                     className={cn(
                       CONTROL_BUTTON,
-                      'h-9 flex items-center justify-center',
-                      isEditArrowMode && CONTROL_BUTTON_SELECTED
+                      "h-9 flex items-center justify-center",
+                      isEditArrowMode && CONTROL_BUTTON_SELECTED,
                     )}
                     title="Edit arrow"
                     aria-label="Edit arrow"
@@ -1537,7 +1997,10 @@ export function ToolSidebar({
       {/* Arrow End Picker Menu - Outside overflow container */}
       {openArrowEndMenu && arrowEndMenuPos && (
         <>
-          <div className="fixed inset-0 z-[9998]" onClick={() => setOpenArrowEndMenu(null)} />
+          <div
+            className="fixed inset-0 z-[9998]"
+            onClick={() => setOpenArrowEndMenu(null)}
+          />
           <div
             className="fixed z-[9999] w-[260px] bg-card/95 backdrop-blur-md border border-border rounded-md shadow-2xl p-2"
             style={{ left: arrowEndMenuPos.left, top: arrowEndMenuPos.top }}
@@ -1545,20 +2008,24 @@ export function ToolSidebar({
           >
             <div className="grid grid-cols-2 gap-1">
               {arrowEndOptions.map((opt) => {
-                const isSelected = openArrowEndMenu === 'start' ? arrowStart === opt.id : arrowEnd === opt.id;
+                const isSelected =
+                  openArrowEndMenu === "start"
+                    ? arrowStart === opt.id
+                    : arrowEnd === opt.id;
                 return (
                   <button
                     key={`${openArrowEndMenu}-${opt.id}`}
                     type="button"
                     onClick={() => {
-                      if (openArrowEndMenu === 'start') onArrowStartChange?.(opt.id);
+                      if (openArrowEndMenu === "start")
+                        onArrowStartChange?.(opt.id);
                       else onArrowEndChange?.(opt.id);
                       setOpenArrowEndMenu(null);
                     }}
                     className={cn(
                       CONTROL_BUTTON,
-                      'h-10 flex items-center justify-center hover:bg-muted/60',
-                      isSelected ? CONTROL_BUTTON_SELECTED : undefined
+                      "h-10 flex items-center justify-center hover:bg-muted/60",
+                      isSelected ? CONTROL_BUTTON_SELECTED : undefined,
                     )}
                     title={opt.label}
                   >

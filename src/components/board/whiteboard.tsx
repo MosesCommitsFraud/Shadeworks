@@ -1,19 +1,22 @@
-'use client';
+"use client";
 
-import { useState, useEffect, useCallback, useRef } from 'react';
-import { useTheme } from 'next-themes';
-import { v4 as uuid } from 'uuid';
-import { Canvas } from './canvas';
-import { Toolbar } from './toolbar';
-import { ToolSidebar } from './tool-sidebar';
-import { BurgerMenu } from './burger-menu';
-import { ExportImageModal } from './export-image-modal';
-import { FindCanvas } from './find-canvas';
-import { HotkeysDialog } from './hotkeys-dialog';
-import { CollaborationManager, type ConnectionStatus } from '@/lib/collaboration';
-import { generateFunnyName } from '@/lib/funny-names';
-import type { Tool, BoardElement, ShadeworksFile } from '@/lib/board-types';
-import { isClosedShape } from '@/lib/board-types';
+import { useState, useEffect, useCallback, useRef } from "react";
+import { useTheme } from "next-themes";
+import { v4 as uuid } from "uuid";
+import { Canvas } from "./canvas";
+import { Toolbar } from "./toolbar";
+import { ToolSidebar } from "./tool-sidebar";
+import { BurgerMenu } from "./burger-menu";
+import { ExportImageModal } from "./export-image-modal";
+import { FindCanvas } from "./find-canvas";
+import { HotkeysDialog } from "./hotkeys-dialog";
+import {
+  CollaborationManager,
+  type ConnectionStatus,
+} from "@/lib/collaboration";
+import { generateFunnyName } from "@/lib/funny-names";
+import type { Tool, BoardElement, ShadeworksFile } from "@/lib/board-types";
+import { isClosedShape } from "@/lib/board-types";
 
 interface WhiteboardProps {
   roomId: string;
@@ -29,7 +32,11 @@ interface BoundingBox {
 }
 
 function getBoundingBox(element: BoardElement): BoundingBox | null {
-  if (element.type === 'pen' || element.type === 'line' || element.type === 'arrow') {
+  if (
+    element.type === "pen" ||
+    element.type === "line" ||
+    element.type === "arrow"
+  ) {
     if (element.points.length === 0) return null;
     const xs = element.points.map((p) => p.x);
     const ys = element.points.map((p) => p.y);
@@ -46,7 +53,13 @@ function getBoundingBox(element: BoardElement): BoundingBox | null {
     };
   }
 
-  if (element.type === 'rectangle' || element.type === 'ellipse' || element.type === 'frame' || element.type === 'web-embed') {
+  if (
+    element.type === "rectangle" ||
+    element.type === "diamond" ||
+    element.type === "ellipse" ||
+    element.type === "frame" ||
+    element.type === "web-embed"
+  ) {
     return {
       x: element.x ?? 0,
       y: element.y ?? 0,
@@ -55,7 +68,7 @@ function getBoundingBox(element: BoardElement): BoundingBox | null {
     };
   }
 
-  if (element.type === 'text') {
+  if (element.type === "text") {
     if (element.width !== undefined && element.height !== undefined) {
       return {
         x: element.x ?? 0,
@@ -86,8 +99,16 @@ function getBoundingBox(element: BoardElement): BoundingBox | null {
   return null;
 }
 
-function translateElement(element: BoardElement, dx: number, dy: number): Partial<BoardElement> {
-  if (element.type === 'pen' || element.type === 'line' || element.type === 'arrow') {
+function translateElement(
+  element: BoardElement,
+  dx: number,
+  dy: number,
+): Partial<BoardElement> {
+  if (
+    element.type === "pen" ||
+    element.type === "line" ||
+    element.type === "arrow"
+  ) {
     return {
       points: element.points.map((p) => ({ x: p.x + dx, y: p.y + dy })),
     };
@@ -101,49 +122,72 @@ function translateElement(element: BoardElement, dx: number, dy: number): Partia
 
 export function Whiteboard({ roomId }: WhiteboardProps) {
   const { theme, resolvedTheme } = useTheme();
-  const [tool, setTool] = useState<Tool>('select');
+  const [tool, setTool] = useState<Tool>("select");
   const [isToolLocked, setIsToolLocked] = useState(false);
 
   // Default color based on theme: black in light mode, white in dark mode
   const getDefaultStrokeColor = () => {
     const currentTheme = resolvedTheme || theme;
-    return currentTheme === 'light' ? '#000000' : '#ffffff';
+    return currentTheme === "light" ? "#000000" : "#ffffff";
   };
 
   const [strokeColor, setStrokeColor] = useState(getDefaultStrokeColor());
   const [strokeWidth, setStrokeWidth] = useState(4);
-  const [fillColor, setFillColor] = useState('transparent');
+  const [fillColor, setFillColor] = useState("transparent");
   const [opacity, setOpacity] = useState(100);
-  const [strokeStyle, setStrokeStyle] = useState<'solid' | 'dashed' | 'dotted'>('solid');
-  const [lineCap, setLineCap] = useState<'butt' | 'round'>('round');
-  const [connectorStyle, setConnectorStyle] = useState<'sharp' | 'curved' | 'elbow'>('sharp');
-  const [arrowStart, setArrowStart] = useState<NonNullable<BoardElement['arrowStart']>>('arrow');
-  const [arrowEnd, setArrowEnd] = useState<NonNullable<BoardElement['arrowEnd']>>('arrow');
+  const [strokeStyle, setStrokeStyle] = useState<"solid" | "dashed" | "dotted">(
+    "solid",
+  );
+  const [lineCap, setLineCap] = useState<"butt" | "round">("round");
+  const [connectorStyle, setConnectorStyle] = useState<
+    "sharp" | "curved" | "elbow"
+  >("sharp");
+  const [arrowStart, setArrowStart] =
+    useState<NonNullable<BoardElement["arrowStart"]>>("arrow");
+  const [arrowEnd, setArrowEnd] =
+    useState<NonNullable<BoardElement["arrowEnd"]>>("arrow");
   const [cornerRadius, setCornerRadius] = useState(0);
-  const [fontFamily, setFontFamily] = useState('var(--font-inter)');
-  const [textAlign, setTextAlign] = useState<'left' | 'center' | 'right'>('left');
+  const [fontFamily, setFontFamily] = useState("var(--font-inter)");
+  const [textAlign, setTextAlign] = useState<"left" | "center" | "right">(
+    "left",
+  );
   const [fontSize, setFontSize] = useState(24);
   const [letterSpacing, setLetterSpacing] = useState(0);
   const [lineHeight, setLineHeight] = useState(1.5);
-  const [fillPattern, setFillPattern] = useState<'none' | 'solid' | 'criss-cross'>('none');
+  const [fillPattern, setFillPattern] = useState<
+    "none" | "solid" | "criss-cross"
+  >("none");
   const [elements, setElements] = useState<BoardElement[]>([]);
-  const [collaboration, setCollaboration] = useState<CollaborationManager | null>(null);
+  const [collaboration, setCollaboration] =
+    useState<CollaborationManager | null>(null);
   const [connectedUsers, setConnectedUsers] = useState(1);
   const [peerCount, setPeerCount] = useState(0);
-  const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>('connecting');
+  const [connectionStatus, setConnectionStatus] =
+    useState<ConnectionStatus>("connecting");
   const [myName, setMyName] = useState<string | null>(null);
-  const [collaboratorUsers, setCollaboratorUsers] = useState<Array<{ id: string; name: string; color: string; viewport?: { pan: { x: number; y: number }; zoom: number } }>>([]);
+  const [collaboratorUsers, setCollaboratorUsers] = useState<
+    Array<{
+      id: string;
+      name: string;
+      color: string;
+      viewport?: { pan: { x: number; y: number }; zoom: number };
+    }>
+  >([]);
   const [isReady, setIsReady] = useState(false);
   const [followedUserId, setFollowedUserId] = useState<string | null>(null);
   const [selectedElements, setSelectedElements] = useState<BoardElement[]>([]);
   const [isEditArrowMode, setIsEditArrowMode] = useState(false);
-  const [canvasBackground, setCanvasBackground] = useState<'none' | 'dots' | 'lines' | 'grid'>('none');
+  const [canvasBackground, setCanvasBackground] = useState<
+    "none" | "dots" | "lines" | "grid"
+  >("none");
   const [showSaveDialog, setShowSaveDialog] = useState(false);
-  const [saveFileName, setSaveFileName] = useState('');
+  const [saveFileName, setSaveFileName] = useState("");
   const [showExportDialog, setShowExportDialog] = useState(false);
   const [showFindCanvas, setShowFindCanvas] = useState(false);
   const [showHotkeysDialog, setShowHotkeysDialog] = useState(false);
-  const [highlightedElementIds, setHighlightedElementIds] = useState<string[]>([]);
+  const [highlightedElementIds, setHighlightedElementIds] = useState<string[]>(
+    [],
+  );
   const [hideLogoBar, setHideLogoBar] = useState(false);
 
   // Undo/Redo stacks - store snapshots
@@ -152,16 +196,18 @@ export function Whiteboard({ roomId }: WhiteboardProps) {
   const isUndoingRef = useRef(false);
 
   // Ref to store the setViewport function from Canvas
-  const setViewportRef = useRef<((pan: { x: number; y: number }, zoom: number) => void) | null>(null);
+  const setViewportRef = useRef<
+    ((pan: { x: number; y: number }, zoom: number) => void) | null
+  >(null);
 
   // Update default stroke color when theme changes
   useEffect(() => {
     const currentTheme = resolvedTheme || theme;
-    const defaultColor = currentTheme === 'light' ? '#000000' : '#ffffff';
-    const oldDefaultColor = currentTheme === 'light' ? '#ffffff' : '#000000';
+    const defaultColor = currentTheme === "light" ? "#000000" : "#ffffff";
+    const oldDefaultColor = currentTheme === "light" ? "#ffffff" : "#000000";
 
     // Update current stroke color if it's a default color
-    if (strokeColor === '#ffffff' || strokeColor === '#000000') {
+    if (strokeColor === "#ffffff" || strokeColor === "#000000") {
       setStrokeColor(defaultColor);
     }
 
@@ -169,7 +215,9 @@ export function Whiteboard({ roomId }: WhiteboardProps) {
     if (collaboration) {
       elements.forEach((element) => {
         if (element.strokeColor === oldDefaultColor) {
-          collaboration.updateElement(element.id, { strokeColor: defaultColor });
+          collaboration.updateElement(element.id, {
+            strokeColor: defaultColor,
+          });
         }
       });
     }
@@ -178,10 +226,10 @@ export function Whiteboard({ roomId }: WhiteboardProps) {
   // Initialize collaboration with a random funny name
   useEffect(() => {
     // Get or generate a funny name for this session
-    let name = sessionStorage.getItem('shadeworks-name');
+    let name = sessionStorage.getItem("shadeworks-name");
     if (!name) {
       name = generateFunnyName();
-      sessionStorage.setItem('shadeworks-name', name);
+      sessionStorage.setItem("shadeworks-name", name);
     }
     setMyName(name);
 
@@ -201,7 +249,12 @@ export function Whiteboard({ roomId }: WhiteboardProps) {
       setConnectedUsers(states.size);
 
       // Extract collaborator user info (excluding current user)
-      const users: Array<{ id: string; name: string; color: string; viewport?: { pan: { x: number; y: number }; zoom: number } }> = [];
+      const users: Array<{
+        id: string;
+        name: string;
+        color: string;
+        viewport?: { pan: { x: number; y: number }; zoom: number };
+      }> = [];
       states.forEach((state) => {
         if (state.user && state.user.id !== collab.getUserInfo().id) {
           users.push({
@@ -234,38 +287,43 @@ export function Whiteboard({ roomId }: WhiteboardProps) {
   // Save state to undo stack
   const saveToUndoStack = useCallback(() => {
     if (isUndoingRef.current) return;
-    
+
     const snapshot = JSON.parse(JSON.stringify(elements));
-    undoStackRef.current = [...undoStackRef.current, snapshot].slice(-MAX_UNDO_STACK);
+    undoStackRef.current = [...undoStackRef.current, snapshot].slice(
+      -MAX_UNDO_STACK,
+    );
     redoStackRef.current = []; // Clear redo on new action
   }, [elements]);
 
   // Apply state to collaboration
-  const applyState = useCallback((newElements: BoardElement[]) => {
-    if (collaboration) {
-      collaboration.clearAll();
-      newElements.forEach(el => collaboration.addElement(el));
-    } else {
-      setElements(newElements);
-    }
-  }, [collaboration]);
+  const applyState = useCallback(
+    (newElements: BoardElement[]) => {
+      if (collaboration) {
+        collaboration.clearAll();
+        newElements.forEach((el) => collaboration.addElement(el));
+      } else {
+        setElements(newElements);
+      }
+    },
+    [collaboration],
+  );
 
   // Undo function - instant
   const handleUndo = useCallback(() => {
     if (undoStackRef.current.length === 0) return;
-    
+
     isUndoingRef.current = true;
-    
+
     // Save current to redo
     const currentSnapshot = JSON.parse(JSON.stringify(elements));
     redoStackRef.current = [...redoStackRef.current, currentSnapshot];
-    
+
     // Pop from undo
     const previousState = undoStackRef.current.pop()!;
-    
+
     // Apply
     applyState(previousState);
-    
+
     // Reset flag immediately
     requestAnimationFrame(() => {
       isUndoingRef.current = false;
@@ -275,19 +333,19 @@ export function Whiteboard({ roomId }: WhiteboardProps) {
   // Redo function - instant
   const handleRedo = useCallback(() => {
     if (redoStackRef.current.length === 0) return;
-    
+
     isUndoingRef.current = true;
-    
+
     // Save current to undo
     const currentSnapshot = JSON.parse(JSON.stringify(elements));
     undoStackRef.current = [...undoStackRef.current, currentSnapshot];
-    
+
     // Pop from redo
     const nextState = redoStackRef.current.pop()!;
-    
+
     // Apply
     applyState(nextState);
-    
+
     // Reset flag immediately
     requestAnimationFrame(() => {
       isUndoingRef.current = false;
@@ -298,11 +356,14 @@ export function Whiteboard({ roomId }: WhiteboardProps) {
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       // Don't trigger if typing in input
-      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
+      if (
+        e.target instanceof HTMLInputElement ||
+        e.target instanceof HTMLTextAreaElement
+      ) {
         return;
       }
-      
-      if ((e.ctrlKey || e.metaKey) && e.key === 'z') {
+
+      if ((e.ctrlKey || e.metaKey) && e.key === "z") {
         e.preventDefault();
         if (e.shiftKey) {
           handleRedo();
@@ -310,49 +371,58 @@ export function Whiteboard({ roomId }: WhiteboardProps) {
           handleUndo();
         }
       }
-      if ((e.ctrlKey || e.metaKey) && e.key === 'y') {
+      if ((e.ctrlKey || e.metaKey) && e.key === "y") {
         e.preventDefault();
         handleRedo();
       }
     };
 
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
   }, [handleUndo, handleRedo]);
 
-  const handleAddElement = useCallback((element: BoardElement) => {
-    saveToUndoStack();
-    
-    if (collaboration) {
-      collaboration.addElement(element);
-    } else {
-      setElements((prev) => [...prev, element]);
-    }
-  }, [collaboration, saveToUndoStack]);
+  const handleAddElement = useCallback(
+    (element: BoardElement) => {
+      saveToUndoStack();
 
-  const handleUpdateElement = useCallback((id: string, updates: Partial<BoardElement>) => {
-    if (collaboration) {
-      collaboration.updateElement(id, updates);
-    } else {
-      setElements((prev) =>
-        prev.map((el) => (el.id === id ? { ...el, ...updates } : el))
-      );
-    }
-  }, [collaboration]);
+      if (collaboration) {
+        collaboration.addElement(element);
+      } else {
+        setElements((prev) => [...prev, element]);
+      }
+    },
+    [collaboration, saveToUndoStack],
+  );
+
+  const handleUpdateElement = useCallback(
+    (id: string, updates: Partial<BoardElement>) => {
+      if (collaboration) {
+        collaboration.updateElement(id, updates);
+      } else {
+        setElements((prev) =>
+          prev.map((el) => (el.id === id ? { ...el, ...updates } : el)),
+        );
+      }
+    },
+    [collaboration],
+  );
 
   const handleStartTransform = useCallback(() => {
     saveToUndoStack();
   }, [saveToUndoStack]);
 
-  const handleDeleteElement = useCallback((id: string) => {
-    saveToUndoStack();
-    
-    if (collaboration) {
-      collaboration.deleteElement(id);
-    } else {
-      setElements((prev) => prev.filter((el) => el.id !== id));
-    }
-  }, [collaboration, saveToUndoStack]);
+  const handleDeleteElement = useCallback(
+    (id: string) => {
+      saveToUndoStack();
+
+      if (collaboration) {
+        collaboration.deleteElement(id);
+      } else {
+        setElements((prev) => prev.filter((el) => el.id !== id));
+      }
+    },
+    [collaboration, saveToUndoStack],
+  );
 
   const handleClear = useCallback(() => {
     saveToUndoStack();
@@ -366,13 +436,13 @@ export function Whiteboard({ roomId }: WhiteboardProps) {
 
   const handleSave = useCallback(() => {
     // Set default filename with current date
-    setSaveFileName(`shadeworks-${new Date().toISOString().split('T')[0]}`);
+    setSaveFileName(`shadeworks-${new Date().toISOString().split("T")[0]}`);
     setShowSaveDialog(true);
   }, []);
 
   const handleConfirmSave = useCallback(() => {
     const shadeworksFile: ShadeworksFile = {
-      type: 'shadeworks',
+      type: "shadeworks",
       version: 1,
       elements: elements,
       appState: {
@@ -381,13 +451,13 @@ export function Whiteboard({ roomId }: WhiteboardProps) {
     };
 
     const jsonString = JSON.stringify(shadeworksFile, null, 2);
-    const blob = new Blob([jsonString], { type: 'application/json' });
+    const blob = new Blob([jsonString], { type: "application/json" });
     const url = URL.createObjectURL(blob);
 
-    const link = document.createElement('a');
+    const link = document.createElement("a");
     link.href = url;
     // Ensure .shadeworks extension
-    const fileName = saveFileName.endsWith('.shadeworks')
+    const fileName = saveFileName.endsWith(".shadeworks")
       ? saveFileName
       : `${saveFileName}.shadeworks`;
     link.download = fileName;
@@ -397,13 +467,13 @@ export function Whiteboard({ roomId }: WhiteboardProps) {
     URL.revokeObjectURL(url);
 
     setShowSaveDialog(false);
-    setSaveFileName('');
+    setSaveFileName("");
   }, [elements, canvasBackground, saveFileName]);
 
   const handleOpen = useCallback(() => {
-    const input = document.createElement('input');
-    input.type = 'file';
-    input.accept = '.shadeworks,application/json';
+    const input = document.createElement("input");
+    input.type = "file";
+    input.accept = ".shadeworks,application/json";
 
     input.onchange = (e: Event) => {
       const file = (e.target as HTMLInputElement).files?.[0];
@@ -416,8 +486,8 @@ export function Whiteboard({ roomId }: WhiteboardProps) {
           const data: ShadeworksFile = JSON.parse(content);
 
           // Validate file format
-          if (data.type !== 'shadeworks') {
-            alert('Invalid file format. Please select a .shadeworks file.');
+          if (data.type !== "shadeworks") {
+            alert("Invalid file format. Please select a .shadeworks file.");
             return;
           }
 
@@ -427,7 +497,7 @@ export function Whiteboard({ roomId }: WhiteboardProps) {
           // Load elements
           if (collaboration) {
             collaboration.clearAll();
-            data.elements.forEach(el => collaboration.addElement(el));
+            data.elements.forEach((el) => collaboration.addElement(el));
           } else {
             setElements(data.elements);
           }
@@ -437,8 +507,10 @@ export function Whiteboard({ roomId }: WhiteboardProps) {
             setCanvasBackground(data.appState.canvasBackground);
           }
         } catch (error) {
-          console.error('Error loading file:', error);
-          alert('Failed to load file. Please ensure it is a valid .shadeworks file.');
+          console.error("Error loading file:", error);
+          alert(
+            "Failed to load file. Please ensure it is a valid .shadeworks file.",
+          );
         }
       };
 
@@ -462,12 +534,21 @@ export function Whiteboard({ roomId }: WhiteboardProps) {
       let centerX = 0;
       let centerY = 0;
 
-      if (element.type === 'text' || element.type === 'rectangle' || element.type === 'ellipse' || element.type === 'frame') {
+      if (
+        element.type === "text" ||
+        element.type === "rectangle" ||
+        element.type === "ellipse" ||
+        element.type === "frame"
+      ) {
         centerX = (element.x ?? 0) + (element.width ?? 0) / 2;
         centerY = (element.y ?? 0) + (element.height ?? 0) / 2;
-      } else if (element.type === 'pen' || element.type === 'line' || element.type === 'arrow') {
-        const xs = element.points.map(p => p.x);
-        const ys = element.points.map(p => p.y);
+      } else if (
+        element.type === "pen" ||
+        element.type === "line" ||
+        element.type === "arrow"
+      ) {
+        const xs = element.points.map((p) => p.x);
+        const ys = element.points.map((p) => p.y);
         centerX = (Math.min(...xs) + Math.max(...xs)) / 2;
         centerY = (Math.min(...ys) + Math.max(...ys)) / 2;
       }
@@ -489,14 +570,14 @@ export function Whiteboard({ roomId }: WhiteboardProps) {
 
   const handleFollowUser = useCallback((userId: string) => {
     // Toggle follow mode - if clicking the same user, unfollow
-    setFollowedUserId(prev => prev === userId ? null : userId);
+    setFollowedUserId((prev) => (prev === userId ? null : userId));
   }, []);
 
   const handleBringToFront = useCallback(() => {
     if (selectedElements.length === 0) return;
     saveToUndoStack();
 
-    const maxZIndex = Math.max(...elements.map(el => el.zIndex || 0), 0);
+    const maxZIndex = Math.max(...elements.map((el) => el.zIndex || 0), 0);
     selectedElements.forEach((selectedEl) => {
       handleUpdateElement(selectedEl.id, { zIndex: maxZIndex + 1 });
     });
@@ -506,206 +587,254 @@ export function Whiteboard({ roomId }: WhiteboardProps) {
     if (selectedElements.length === 0) return;
     saveToUndoStack();
 
-    const minZIndex = Math.min(...elements.map(el => el.zIndex || 0), 0);
+    const minZIndex = Math.min(...elements.map((el) => el.zIndex || 0), 0);
     selectedElements.forEach((selectedEl) => {
       handleUpdateElement(selectedEl.id, { zIndex: minZIndex - 1 });
     });
   }, [selectedElements, elements, saveToUndoStack, handleUpdateElement]);
 
   // Handle property changes - apply to selected elements if any, otherwise update defaults
-  const handleStrokeColorChange = useCallback((color: string) => {
-    if (selectedElements.length > 0) {
-      saveToUndoStack();
-      selectedElements.forEach((el) => {
-        handleUpdateElement(el.id, { strokeColor: color });
-      });
-    }
-    setStrokeColor(color);
-  }, [selectedElements, saveToUndoStack, handleUpdateElement]);
+  const handleStrokeColorChange = useCallback(
+    (color: string) => {
+      if (selectedElements.length > 0) {
+        saveToUndoStack();
+        selectedElements.forEach((el) => {
+          handleUpdateElement(el.id, { strokeColor: color });
+        });
+      }
+      setStrokeColor(color);
+    },
+    [selectedElements, saveToUndoStack, handleUpdateElement],
+  );
 
-  const handleStrokeWidthChange = useCallback((width: number) => {
-    if (selectedElements.length > 0) {
-      saveToUndoStack();
-      selectedElements.forEach((el) => {
-        handleUpdateElement(el.id, { strokeWidth: width });
-      });
-    }
-    setStrokeWidth(width);
-  }, [selectedElements, saveToUndoStack, handleUpdateElement]);
+  const handleStrokeWidthChange = useCallback(
+    (width: number) => {
+      if (selectedElements.length > 0) {
+        saveToUndoStack();
+        selectedElements.forEach((el) => {
+          handleUpdateElement(el.id, { strokeWidth: width });
+        });
+      }
+      setStrokeWidth(width);
+    },
+    [selectedElements, saveToUndoStack, handleUpdateElement],
+  );
 
-  const handleFillColorChange = useCallback((color: string) => {
-    if (selectedElements.length > 0) {
-      saveToUndoStack();
-      selectedElements.forEach((el) => {
-        if (
-          el.type === 'rectangle' ||
-          el.type === 'ellipse' ||
-          el.type === 'frame' ||
-          (el.type === 'pen' && el.isClosed && el.fillPattern !== 'none')
-        ) {
-          handleUpdateElement(el.id, { fillColor: color });
-        }
-      });
-    }
-    setFillColor(color);
-  }, [selectedElements, saveToUndoStack, handleUpdateElement]);
-
-  const handleOpacityChange = useCallback((newOpacity: number) => {
-    if (selectedElements.length > 0) {
-      saveToUndoStack();
-      selectedElements.forEach((el) => {
-        handleUpdateElement(el.id, { opacity: newOpacity });
-      });
-    }
-    setOpacity(newOpacity);
-  }, [selectedElements, saveToUndoStack, handleUpdateElement]);
-
-  const handleStrokeStyleChange = useCallback((style: 'solid' | 'dashed' | 'dotted') => {
-    if (selectedElements.length > 0) {
-      saveToUndoStack();
-      selectedElements.forEach((el) => {
-        handleUpdateElement(el.id, { strokeStyle: style });
-      });
-    }
-    setStrokeStyle(style);
-  }, [selectedElements, saveToUndoStack, handleUpdateElement]);
-
-  const handleCornerRadiusChange = useCallback((radius: number) => {
-    if (selectedElements.length > 0) {
-      saveToUndoStack();
-      selectedElements.forEach((el) => {
-        if (el.type === 'rectangle' || el.type === 'frame') {
-          handleUpdateElement(el.id, { cornerRadius: radius });
-        }
-      });
-    }
-    setCornerRadius(radius);
-  }, [selectedElements, saveToUndoStack, handleUpdateElement]);
-
-  const handleFontFamilyChange = useCallback((font: string) => {
-    if (selectedElements.length > 0) {
-      saveToUndoStack();
-      selectedElements.forEach((el) => {
-        if (el.type === 'text') {
-          handleUpdateElement(el.id, { fontFamily: font });
-        }
-      });
-    }
-    setFontFamily(font);
-  }, [selectedElements, saveToUndoStack, handleUpdateElement]);
-
-  const handleTextAlignChange = useCallback((align: 'left' | 'center' | 'right') => {
-    if (selectedElements.length > 0) {
-      saveToUndoStack();
-      selectedElements.forEach((el) => {
-        if (el.type === 'text') {
-          handleUpdateElement(el.id, { textAlign: align });
-        }
-      });
-    }
-    setTextAlign(align);
-  }, [selectedElements, saveToUndoStack, handleUpdateElement]);
-
-  const handleFontSizeChange = useCallback((size: number) => {
-    if (selectedElements.length > 0) {
-      saveToUndoStack();
-      selectedElements.forEach((el) => {
-        if (el.type === 'text') {
-          handleUpdateElement(el.id, { fontSize: size });
-        }
-      });
-    }
-    setFontSize(size);
-  }, [selectedElements, saveToUndoStack, handleUpdateElement]);
-
-  const handleLetterSpacingChange = useCallback((spacing: number) => {
-    if (selectedElements.length > 0) {
-      saveToUndoStack();
-      selectedElements.forEach((el) => {
-        if (el.type === 'text') {
-          handleUpdateElement(el.id, { letterSpacing: spacing });
-        }
-      });
-    }
-    setLetterSpacing(spacing);
-  }, [selectedElements, saveToUndoStack, handleUpdateElement]);
-
-  const handleLineHeightChange = useCallback((height: number) => {
-    if (selectedElements.length > 0) {
-      saveToUndoStack();
-      selectedElements.forEach((el) => {
-        if (el.type === 'text') {
-          handleUpdateElement(el.id, { lineHeight: height });
-        }
-      });
-    }
-    setLineHeight(height);
-  }, [selectedElements, saveToUndoStack, handleUpdateElement]);
-
-  const handleFillPatternChange = useCallback((pattern: 'none' | 'solid' | 'criss-cross') => {
-    if (selectedElements.length > 0) {
-      saveToUndoStack();
-      selectedElements.forEach((el) => {
-        if (el.type === 'pen') {
-          // Check if the stroke is closed (in case it wasn't detected before)
-          const isClosed = el.isClosed ?? isClosedShape(el.points);
-          if (isClosed) {
-            handleUpdateElement(el.id, {
-              fillPattern: pattern,
-              isClosed: true, // Make sure isClosed is set
-            });
+  const handleFillColorChange = useCallback(
+    (color: string) => {
+      if (selectedElements.length > 0) {
+        saveToUndoStack();
+        selectedElements.forEach((el) => {
+          if (
+            el.type === "rectangle" ||
+            el.type === "ellipse" ||
+            el.type === "frame" ||
+            (el.type === "pen" && el.isClosed && el.fillPattern !== "none")
+          ) {
+            handleUpdateElement(el.id, { fillColor: color });
           }
-        }
-      });
-    }
-    setFillPattern(pattern);
-  }, [selectedElements, saveToUndoStack, handleUpdateElement]);
+        });
+      }
+      setFillColor(color);
+    },
+    [selectedElements, saveToUndoStack, handleUpdateElement],
+  );
 
-  const handleLineCapChange = useCallback((cap: 'butt' | 'round') => {
-    if (selectedElements.length > 0) {
-      saveToUndoStack();
-      selectedElements.forEach((el) => {
-        handleUpdateElement(el.id, { lineCap: cap });
-      });
-    }
-    setLineCap(cap);
-  }, [selectedElements, saveToUndoStack, handleUpdateElement]);
+  const handleOpacityChange = useCallback(
+    (newOpacity: number) => {
+      if (selectedElements.length > 0) {
+        saveToUndoStack();
+        selectedElements.forEach((el) => {
+          handleUpdateElement(el.id, { opacity: newOpacity });
+        });
+      }
+      setOpacity(newOpacity);
+    },
+    [selectedElements, saveToUndoStack, handleUpdateElement],
+  );
 
-  const handleConnectorStyleChange = useCallback((style: 'sharp' | 'curved' | 'elbow') => {
-    if (selectedElements.length > 0) {
-      saveToUndoStack();
-      selectedElements.forEach((el) => {
-        if (el.type === 'line' || el.type === 'arrow') {
-          handleUpdateElement(el.id, { connectorStyle: style });
-        }
-      });
-    }
-    setConnectorStyle(style);
-  }, [selectedElements, saveToUndoStack, handleUpdateElement]);
+  const handleStrokeStyleChange = useCallback(
+    (style: "solid" | "dashed" | "dotted") => {
+      if (selectedElements.length > 0) {
+        saveToUndoStack();
+        selectedElements.forEach((el) => {
+          handleUpdateElement(el.id, { strokeStyle: style });
+        });
+      }
+      setStrokeStyle(style);
+    },
+    [selectedElements, saveToUndoStack, handleUpdateElement],
+  );
 
-  const handleArrowStartChange = useCallback((end: NonNullable<BoardElement['arrowStart']>) => {
-    if (selectedElements.length > 0) {
-      saveToUndoStack();
-      selectedElements.forEach((el) => {
-        if (el.type === 'arrow') {
-          handleUpdateElement(el.id, { arrowStart: end });
-        }
-      });
-    }
-    setArrowStart(end);
-  }, [selectedElements, saveToUndoStack, handleUpdateElement]);
+  const handleCornerRadiusChange = useCallback(
+    (radius: number) => {
+      if (selectedElements.length > 0) {
+        saveToUndoStack();
+        selectedElements.forEach((el) => {
+          if (el.type === "rectangle" || el.type === "frame") {
+            handleUpdateElement(el.id, { cornerRadius: radius });
+          }
+        });
+      }
+      setCornerRadius(radius);
+    },
+    [selectedElements, saveToUndoStack, handleUpdateElement],
+  );
 
-  const handleArrowEndChange = useCallback((end: NonNullable<BoardElement['arrowEnd']>) => {
-    if (selectedElements.length > 0) {
-      saveToUndoStack();
-      selectedElements.forEach((el) => {
-        if (el.type === 'arrow') {
-          handleUpdateElement(el.id, { arrowEnd: end });
-        }
-      });
-    }
-    setArrowEnd(end);
-  }, [selectedElements, saveToUndoStack, handleUpdateElement]);
+  const handleFontFamilyChange = useCallback(
+    (font: string) => {
+      if (selectedElements.length > 0) {
+        saveToUndoStack();
+        selectedElements.forEach((el) => {
+          if (el.type === "text") {
+            handleUpdateElement(el.id, { fontFamily: font });
+          }
+        });
+      }
+      setFontFamily(font);
+    },
+    [selectedElements, saveToUndoStack, handleUpdateElement],
+  );
+
+  const handleTextAlignChange = useCallback(
+    (align: "left" | "center" | "right") => {
+      if (selectedElements.length > 0) {
+        saveToUndoStack();
+        selectedElements.forEach((el) => {
+          if (el.type === "text") {
+            handleUpdateElement(el.id, { textAlign: align });
+          }
+        });
+      }
+      setTextAlign(align);
+    },
+    [selectedElements, saveToUndoStack, handleUpdateElement],
+  );
+
+  const handleFontSizeChange = useCallback(
+    (size: number) => {
+      if (selectedElements.length > 0) {
+        saveToUndoStack();
+        selectedElements.forEach((el) => {
+          if (el.type === "text") {
+            handleUpdateElement(el.id, { fontSize: size });
+          }
+        });
+      }
+      setFontSize(size);
+    },
+    [selectedElements, saveToUndoStack, handleUpdateElement],
+  );
+
+  const handleLetterSpacingChange = useCallback(
+    (spacing: number) => {
+      if (selectedElements.length > 0) {
+        saveToUndoStack();
+        selectedElements.forEach((el) => {
+          if (el.type === "text") {
+            handleUpdateElement(el.id, { letterSpacing: spacing });
+          }
+        });
+      }
+      setLetterSpacing(spacing);
+    },
+    [selectedElements, saveToUndoStack, handleUpdateElement],
+  );
+
+  const handleLineHeightChange = useCallback(
+    (height: number) => {
+      if (selectedElements.length > 0) {
+        saveToUndoStack();
+        selectedElements.forEach((el) => {
+          if (el.type === "text") {
+            handleUpdateElement(el.id, { lineHeight: height });
+          }
+        });
+      }
+      setLineHeight(height);
+    },
+    [selectedElements, saveToUndoStack, handleUpdateElement],
+  );
+
+  const handleFillPatternChange = useCallback(
+    (pattern: "none" | "solid" | "criss-cross") => {
+      if (selectedElements.length > 0) {
+        saveToUndoStack();
+        selectedElements.forEach((el) => {
+          if (el.type === "pen") {
+            // Check if the stroke is closed (in case it wasn't detected before)
+            const isClosed = el.isClosed ?? isClosedShape(el.points);
+            if (isClosed) {
+              handleUpdateElement(el.id, {
+                fillPattern: pattern,
+                isClosed: true, // Make sure isClosed is set
+              });
+            }
+          }
+        });
+      }
+      setFillPattern(pattern);
+    },
+    [selectedElements, saveToUndoStack, handleUpdateElement],
+  );
+
+  const handleLineCapChange = useCallback(
+    (cap: "butt" | "round") => {
+      if (selectedElements.length > 0) {
+        saveToUndoStack();
+        selectedElements.forEach((el) => {
+          handleUpdateElement(el.id, { lineCap: cap });
+        });
+      }
+      setLineCap(cap);
+    },
+    [selectedElements, saveToUndoStack, handleUpdateElement],
+  );
+
+  const handleConnectorStyleChange = useCallback(
+    (style: "sharp" | "curved" | "elbow") => {
+      if (selectedElements.length > 0) {
+        saveToUndoStack();
+        selectedElements.forEach((el) => {
+          if (el.type === "line" || el.type === "arrow") {
+            handleUpdateElement(el.id, { connectorStyle: style });
+          }
+        });
+      }
+      setConnectorStyle(style);
+    },
+    [selectedElements, saveToUndoStack, handleUpdateElement],
+  );
+
+  const handleArrowStartChange = useCallback(
+    (end: NonNullable<BoardElement["arrowStart"]>) => {
+      if (selectedElements.length > 0) {
+        saveToUndoStack();
+        selectedElements.forEach((el) => {
+          if (el.type === "arrow") {
+            handleUpdateElement(el.id, { arrowStart: end });
+          }
+        });
+      }
+      setArrowStart(end);
+    },
+    [selectedElements, saveToUndoStack, handleUpdateElement],
+  );
+
+  const handleArrowEndChange = useCallback(
+    (end: NonNullable<BoardElement["arrowEnd"]>) => {
+      if (selectedElements.length > 0) {
+        saveToUndoStack();
+        selectedElements.forEach((el) => {
+          if (el.type === "arrow") {
+            handleUpdateElement(el.id, { arrowEnd: end });
+          }
+        });
+      }
+      setArrowEnd(end);
+    },
+    [selectedElements, saveToUndoStack, handleUpdateElement],
+  );
 
   const handleMoveForward = useCallback(() => {
     if (selectedElements.length === 0) return;
@@ -730,19 +859,25 @@ export function Whiteboard({ roomId }: WhiteboardProps) {
   const handleAlignLeft = useCallback(() => {
     if (selectedElements.length < 2) return;
     saveToUndoStack();
-    const bounds = selectedElements.map((el) => ({ el, b: getBoundingBox(el) })).filter((x) => x.b) as Array<{
+    const bounds = selectedElements
+      .map((el) => ({ el, b: getBoundingBox(el) }))
+      .filter((x) => x.b) as Array<{
       el: BoardElement;
       b: BoundingBox;
     }>;
     if (bounds.length < 2) return;
     const target = Math.min(...bounds.map(({ b }) => b.x));
-    bounds.forEach(({ el, b }) => handleUpdateElement(el.id, translateElement(el, target - b.x, 0)));
+    bounds.forEach(({ el, b }) =>
+      handleUpdateElement(el.id, translateElement(el, target - b.x, 0)),
+    );
   }, [selectedElements, saveToUndoStack, handleUpdateElement]);
 
   const handleAlignCenterHorizontal = useCallback(() => {
     if (selectedElements.length < 2) return;
     saveToUndoStack();
-    const bounds = selectedElements.map((el) => ({ el, b: getBoundingBox(el) })).filter((x) => x.b) as Array<{
+    const bounds = selectedElements
+      .map((el) => ({ el, b: getBoundingBox(el) }))
+      .filter((x) => x.b) as Array<{
       el: BoardElement;
       b: BoundingBox;
     }>;
@@ -751,38 +886,54 @@ export function Whiteboard({ roomId }: WhiteboardProps) {
     const maxX = Math.max(...bounds.map(({ b }) => b.x + b.width));
     const target = (minX + maxX) / 2;
     bounds.forEach(({ el, b }) =>
-      handleUpdateElement(el.id, translateElement(el, target - (b.x + b.width / 2), 0))
+      handleUpdateElement(
+        el.id,
+        translateElement(el, target - (b.x + b.width / 2), 0),
+      ),
     );
   }, [selectedElements, saveToUndoStack, handleUpdateElement]);
 
   const handleAlignRight = useCallback(() => {
     if (selectedElements.length < 2) return;
     saveToUndoStack();
-    const bounds = selectedElements.map((el) => ({ el, b: getBoundingBox(el) })).filter((x) => x.b) as Array<{
+    const bounds = selectedElements
+      .map((el) => ({ el, b: getBoundingBox(el) }))
+      .filter((x) => x.b) as Array<{
       el: BoardElement;
       b: BoundingBox;
     }>;
     if (bounds.length < 2) return;
     const target = Math.max(...bounds.map(({ b }) => b.x + b.width));
-    bounds.forEach(({ el, b }) => handleUpdateElement(el.id, translateElement(el, target - (b.x + b.width), 0)));
+    bounds.forEach(({ el, b }) =>
+      handleUpdateElement(
+        el.id,
+        translateElement(el, target - (b.x + b.width), 0),
+      ),
+    );
   }, [selectedElements, saveToUndoStack, handleUpdateElement]);
 
   const handleAlignTop = useCallback(() => {
     if (selectedElements.length < 2) return;
     saveToUndoStack();
-    const bounds = selectedElements.map((el) => ({ el, b: getBoundingBox(el) })).filter((x) => x.b) as Array<{
+    const bounds = selectedElements
+      .map((el) => ({ el, b: getBoundingBox(el) }))
+      .filter((x) => x.b) as Array<{
       el: BoardElement;
       b: BoundingBox;
     }>;
     if (bounds.length < 2) return;
     const target = Math.min(...bounds.map(({ b }) => b.y));
-    bounds.forEach(({ el, b }) => handleUpdateElement(el.id, translateElement(el, 0, target - b.y)));
+    bounds.forEach(({ el, b }) =>
+      handleUpdateElement(el.id, translateElement(el, 0, target - b.y)),
+    );
   }, [selectedElements, saveToUndoStack, handleUpdateElement]);
 
   const handleAlignCenterVertical = useCallback(() => {
     if (selectedElements.length < 2) return;
     saveToUndoStack();
-    const bounds = selectedElements.map((el) => ({ el, b: getBoundingBox(el) })).filter((x) => x.b) as Array<{
+    const bounds = selectedElements
+      .map((el) => ({ el, b: getBoundingBox(el) }))
+      .filter((x) => x.b) as Array<{
       el: BoardElement;
       b: BoundingBox;
     }>;
@@ -791,20 +942,30 @@ export function Whiteboard({ roomId }: WhiteboardProps) {
     const maxY = Math.max(...bounds.map(({ b }) => b.y + b.height));
     const target = (minY + maxY) / 2;
     bounds.forEach(({ el, b }) =>
-      handleUpdateElement(el.id, translateElement(el, 0, target - (b.y + b.height / 2)))
+      handleUpdateElement(
+        el.id,
+        translateElement(el, 0, target - (b.y + b.height / 2)),
+      ),
     );
   }, [selectedElements, saveToUndoStack, handleUpdateElement]);
 
   const handleAlignBottom = useCallback(() => {
     if (selectedElements.length < 2) return;
     saveToUndoStack();
-    const bounds = selectedElements.map((el) => ({ el, b: getBoundingBox(el) })).filter((x) => x.b) as Array<{
+    const bounds = selectedElements
+      .map((el) => ({ el, b: getBoundingBox(el) }))
+      .filter((x) => x.b) as Array<{
       el: BoardElement;
       b: BoundingBox;
     }>;
     if (bounds.length < 2) return;
     const target = Math.max(...bounds.map(({ b }) => b.y + b.height));
-    bounds.forEach(({ el, b }) => handleUpdateElement(el.id, translateElement(el, 0, target - (b.y + b.height))));
+    bounds.forEach(({ el, b }) =>
+      handleUpdateElement(
+        el.id,
+        translateElement(el, 0, target - (b.y + b.height)),
+      ),
+    );
   }, [selectedElements, saveToUndoStack, handleUpdateElement]);
 
   const handleCopySelected = useCallback(() => {
@@ -813,12 +974,13 @@ export function Whiteboard({ roomId }: WhiteboardProps) {
 
     const selectionGroupId = selectedElements[0]?.groupId;
     const isSelectionSingleGroup =
-      !!selectionGroupId && selectedElements.every((el) => el.groupId === selectionGroupId);
+      !!selectionGroupId &&
+      selectedElements.every((el) => el.groupId === selectionGroupId);
     const newGroupId = isSelectionSingleGroup ? uuid() : undefined;
     const offset = 12;
 
     const copies = selectedElements
-      .filter((el) => el.type !== 'laser')
+      .filter((el) => el.type !== "laser")
       .map((el) => {
         const next: BoardElement = {
           ...el,
@@ -826,8 +988,11 @@ export function Whiteboard({ roomId }: WhiteboardProps) {
           groupId: newGroupId,
         };
 
-        if (el.type === 'pen' || el.type === 'line' || el.type === 'arrow') {
-          next.points = el.points.map((p) => ({ x: p.x + offset, y: p.y + offset }));
+        if (el.type === "pen" || el.type === "line" || el.type === "arrow") {
+          next.points = el.points.map((p) => ({
+            x: p.x + offset,
+            y: p.y + offset,
+          }));
         } else {
           next.x = (el.x ?? 0) + offset;
           next.y = (el.y ?? 0) + offset;
@@ -859,7 +1024,8 @@ export function Whiteboard({ roomId }: WhiteboardProps) {
 
   const canEditArrow =
     selectedElements.length === 1 &&
-    (selectedElements[0].type === 'line' || selectedElements[0].type === 'arrow') &&
+    (selectedElements[0].type === "line" ||
+      selectedElements[0].type === "arrow") &&
     (selectedElements[0].points?.length ?? 0) >= 3;
 
   useEffect(() => {
@@ -867,7 +1033,7 @@ export function Whiteboard({ roomId }: WhiteboardProps) {
   }, [canEditArrow]);
 
   useEffect(() => {
-    if (tool !== 'select') setIsEditArrowMode(false);
+    if (tool !== "select") setIsEditArrowMode(false);
   }, [tool]);
 
   const handleToggleEditArrowMode = useCallback(() => {
@@ -881,7 +1047,8 @@ export function Whiteboard({ roomId }: WhiteboardProps) {
 
     const selectionGroupId = selectedElements[0]?.groupId;
     const isSelectionSingleGroup =
-      !!selectionGroupId && selectedElements.every((el) => el.groupId === selectionGroupId);
+      !!selectionGroupId &&
+      selectedElements.every((el) => el.groupId === selectionGroupId);
 
     if (isSelectionSingleGroup && selectionGroupId) {
       elements
@@ -893,7 +1060,9 @@ export function Whiteboard({ roomId }: WhiteboardProps) {
     if (selectedElements.length < 2) return;
 
     const newGroupId = uuid();
-    selectedElements.forEach((el) => handleUpdateElement(el.id, { groupId: newGroupId }));
+    selectedElements.forEach((el) =>
+      handleUpdateElement(el.id, { groupId: newGroupId }),
+    );
   }, [selectedElements, elements, saveToUndoStack, handleUpdateElement]);
 
   // Sync sidebar properties with selected elements
@@ -924,7 +1093,9 @@ export function Whiteboard({ roomId }: WhiteboardProps) {
       if (firstElement.arrowEnd !== undefined) {
         setArrowEnd(firstElement.arrowEnd);
       }
-      const cornerRadiusElements = selectedElements.filter((el) => el.type === 'rectangle' || el.type === 'frame');
+      const cornerRadiusElements = selectedElements.filter(
+        (el) => el.type === "rectangle" || el.type === "frame",
+      );
       if (cornerRadiusElements.length > 0) {
         setCornerRadius(cornerRadiusElements[0].cornerRadius ?? 0);
       }
@@ -953,9 +1124,12 @@ export function Whiteboard({ roomId }: WhiteboardProps) {
   useEffect(() => {
     if (!followedUserId || !setViewportRef.current) return;
 
-    const followedUser = collaboratorUsers.find(u => u.id === followedUserId);
+    const followedUser = collaboratorUsers.find((u) => u.id === followedUserId);
     if (followedUser && followedUser.viewport) {
-      setViewportRef.current(followedUser.viewport.pan, followedUser.viewport.zoom);
+      setViewportRef.current(
+        followedUser.viewport.pan,
+        followedUser.viewport.zoom,
+      );
     }
   }, [followedUserId, collaboratorUsers]);
 
@@ -965,8 +1139,8 @@ export function Whiteboard({ roomId }: WhiteboardProps) {
       setHideLogoBar(window.innerHeight < 920 || window.innerWidth < 1100);
     };
     update();
-    window.addEventListener('resize', update);
-    return () => window.removeEventListener('resize', update);
+    window.addEventListener("resize", update);
+    return () => window.removeEventListener("resize", update);
   }, []);
 
   // Show loading while connecting
@@ -981,7 +1155,9 @@ export function Whiteboard({ roomId }: WhiteboardProps) {
     );
   }
 
-  const followedUser = followedUserId ? collaboratorUsers.find(u => u.id === followedUserId) : null;
+  const followedUser = followedUserId
+    ? collaboratorUsers.find((u) => u.id === followedUserId)
+    : null;
 
   return (
     <div className="relative w-screen h-screen overflow-hidden">
@@ -1004,7 +1180,11 @@ export function Whiteboard({ roomId }: WhiteboardProps) {
             className="bg-card/95 backdrop-blur-md border border-border rounded-md px-3 py-2 shadow-2xl hover:bg-muted/60 transition-colors"
           >
             <img
-              src={(resolvedTheme || theme) === 'light' ? '/logo-text-sw-dark.svg' : '/logo-text-sw-white.svg'}
+              src={
+                (resolvedTheme || theme) === "light"
+                  ? "/logo-text-sw-dark.svg"
+                  : "/logo-text-sw-white.svg"
+              }
               alt="Shadeworks"
               className="h-6"
             />
@@ -1019,11 +1199,16 @@ export function Whiteboard({ roomId }: WhiteboardProps) {
           className="p-2.5 rounded-md transition-all duration-200 bg-card/95 backdrop-blur-md border border-border hover:bg-muted/60 text-muted-foreground hover:text-foreground shadow-2xl"
           aria-label="Keyboard shortcuts"
         >
-          <span className="w-5 h-5 flex items-center justify-center font-semibold">?</span>
+          <span className="w-5 h-5 flex items-center justify-center font-semibold">
+            ?
+          </span>
         </button>
       </div>
 
-      <HotkeysDialog open={showHotkeysDialog} onOpenChange={setShowHotkeysDialog} />
+      <HotkeysDialog
+        open={showHotkeysDialog}
+        onOpenChange={setShowHotkeysDialog}
+      />
 
       {/* Find Canvas */}
       <FindCanvas
@@ -1042,11 +1227,17 @@ export function Whiteboard({ roomId }: WhiteboardProps) {
             boxShadow: `inset 0 0 0 4px ${followedUser.color}`,
           }}
         >
-          <div className="absolute top-4 left-20 px-3 py-1.5 rounded-lg bg-card/95 backdrop-blur-md border-2 shadow-lg flex items-center gap-2"
+          <div
+            className="absolute top-4 left-20 px-3 py-1.5 rounded-lg bg-card/95 backdrop-blur-md border-2 shadow-lg flex items-center gap-2"
             style={{ borderColor: followedUser.color }}
           >
-            <div className="w-2 h-2 rounded-full" style={{ backgroundColor: followedUser.color }} />
-            <span className="text-sm font-medium">Following {followedUser.name}</span>
+            <div
+              className="w-2 h-2 rounded-full"
+              style={{ backgroundColor: followedUser.color }}
+            />
+            <span className="text-sm font-medium">
+              Following {followedUser.name}
+            </span>
             <button
               onClick={() => setFollowedUserId(null)}
               className="ml-2 text-muted-foreground hover:text-foreground transition-colors pointer-events-auto"
@@ -1069,7 +1260,7 @@ export function Whiteboard({ roomId }: WhiteboardProps) {
         connectedUsers={connectedUsers}
         peerCount={peerCount}
         connectionStatus={connectionStatus}
-        myName={myName || 'Connecting...'}
+        myName={myName || "Connecting..."}
         collaboratorUsers={collaboratorUsers}
         onFollowUser={handleFollowUser}
         followedUserId={followedUserId}
@@ -1174,7 +1365,10 @@ export function Whiteboard({ roomId }: WhiteboardProps) {
           <div className="bg-card/95 backdrop-blur-md border border-border rounded-xl shadow-2xl p-6 w-96 max-w-[90vw]">
             <h2 className="text-lg font-semibold mb-4">Save Shadeworks File</h2>
             <div className="mb-4">
-              <label htmlFor="filename" className="block text-sm font-medium mb-2 text-muted-foreground">
+              <label
+                htmlFor="filename"
+                className="block text-sm font-medium mb-2 text-muted-foreground"
+              >
                 File name
               </label>
               <input
@@ -1184,9 +1378,9 @@ export function Whiteboard({ roomId }: WhiteboardProps) {
                 value={saveFileName}
                 onChange={(e) => setSaveFileName(e.target.value)}
                 onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
+                  if (e.key === "Enter") {
                     handleConfirmSave();
-                  } else if (e.key === 'Escape') {
+                  } else if (e.key === "Escape") {
                     setShowSaveDialog(false);
                   }
                 }}
@@ -1194,7 +1388,7 @@ export function Whiteboard({ roomId }: WhiteboardProps) {
                 placeholder="Enter file name"
               />
               <p className="text-xs text-muted-foreground mt-1">
-                {saveFileName && !saveFileName.endsWith('.shadeworks')}
+                {saveFileName && !saveFileName.endsWith(".shadeworks")}
               </p>
             </div>
             <div className="flex gap-2 justify-end">

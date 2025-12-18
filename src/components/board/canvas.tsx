@@ -1232,7 +1232,11 @@ export function Canvas({
               ) < eraseRadius;
           }
           if (isNear) toErase.push(el.id);
-        } else if (el.type === "rectangle" || el.type === "ellipse") {
+        } else if (
+          el.type === "rectangle" ||
+          el.type === "diamond" ||
+          el.type === "ellipse"
+        ) {
           if (
             el.x !== undefined &&
             el.y !== undefined &&
@@ -2215,7 +2219,8 @@ export function Canvas({
           }
           break;
         }
-        case "rectangle": {
+        case "rectangle":
+        case "diamond": {
           const width = point.x - startPoint.x;
           const height = point.y - startPoint.y;
           let finalWidth = Math.abs(width);
@@ -2682,7 +2687,13 @@ export function Canvas({
       const elementType: BoardElement["type"] =
         tool === "arrow"
           ? "arrow"
-          : (tool as "pen" | "line" | "rectangle" | "ellipse" | "text");
+          : (tool as
+              | "pen"
+              | "line"
+              | "rectangle"
+              | "diamond"
+              | "ellipse"
+              | "text");
 
       const newElement: BoardElement = {
         id: uuid(),
@@ -2704,7 +2715,7 @@ export function Canvas({
         newElement.fillPattern = fillPattern;
       }
 
-      if (tool === "rectangle" || tool === "ellipse") {
+      if (tool === "rectangle" || tool === "diamond" || tool === "ellipse") {
         newElement.x = point.x;
         newElement.y = point.y;
         newElement.width = 0;
@@ -2937,6 +2948,7 @@ export function Canvas({
         // Don't switch tool for laser
       } else if (
         (currentElement.type === "rectangle" ||
+          currentElement.type === "diamond" ||
           currentElement.type === "ellipse") &&
         currentElement.width &&
         currentElement.height &&
@@ -4012,6 +4024,81 @@ export function Canvas({
                 height={element.height}
                 fill="rgba(0, 0, 0, 0.7)"
                 rx={elCornerRadius}
+                pointerEvents="none"
+              />
+            )}
+          </g>
+        );
+      }
+      case "diamond": {
+        const elOpacity = (element.opacity ?? 100) / 100;
+        const elStrokeStyle = element.strokeStyle || "solid";
+        const strokeDasharray =
+          elStrokeStyle === "dashed"
+            ? "10,10"
+            : elStrokeStyle === "dotted"
+              ? "2,6"
+              : "none";
+        const elFillColor = element.fillColor || "none";
+        const hasVisibleFill =
+          elFillColor !== "none" && elFillColor !== "transparent";
+        const fillValue = elFillColor === "transparent" ? "none" : elFillColor;
+        const pointerEventsValue =
+          hasVisibleFill && element.strokeWidth > 0
+            ? "visible"
+            : hasVisibleFill
+              ? "fill"
+              : element.strokeWidth > 0
+                ? "stroke"
+                : "none";
+        const hitboxStrokeWidth = Math.max(element.strokeWidth * 6, 16);
+
+        // Diamond points: top, right, bottom, left
+        const x = element.x ?? 0;
+        const y = element.y ?? 0;
+        const w = element.width ?? 0;
+        const h = element.height ?? 0;
+        const cx = x + w / 2;
+        const cy = y + h / 2;
+        const diamondPoints = `${cx},${y} ${x + w},${cy} ${cx},${y + h} ${x},${cy}`;
+
+        return (
+          <g key={element.id} transform={rotationTransform}>
+            {/* Invisible wider hitbox for easier clicking (stroke-only shapes) */}
+            {!hasVisibleFill && element.strokeWidth > 0 && (
+              <polygon
+                data-element-id={element.id}
+                points={diamondPoints}
+                stroke="transparent"
+                strokeWidth={hitboxStrokeWidth}
+                fill="none"
+                pointerEvents="stroke"
+              />
+            )}
+            {/* Visible diamond */}
+            <polygon
+              data-element-id={
+                !hasVisibleFill && element.strokeWidth > 0
+                  ? undefined
+                  : element.id
+              }
+              points={diamondPoints}
+              stroke={element.strokeColor}
+              strokeWidth={element.strokeWidth}
+              strokeDasharray={strokeDasharray}
+              fill={fillValue}
+              strokeLinejoin="round"
+              opacity={isMarkedForDeletion ? elOpacity * 0.3 : elOpacity}
+              pointerEvents={
+                !hasVisibleFill && element.strokeWidth > 0
+                  ? "none"
+                  : pointerEventsValue
+              }
+            />
+            {isMarkedForDeletion && (
+              <polygon
+                points={diamondPoints}
+                fill="rgba(0, 0, 0, 0.7)"
                 pointerEvents="none"
               />
             )}
@@ -5559,6 +5646,7 @@ export function Canvas({
       case "line":
       case "arrow":
       case "rectangle":
+      case "diamond":
       case "ellipse":
         return "crosshair";
       case "eraser":

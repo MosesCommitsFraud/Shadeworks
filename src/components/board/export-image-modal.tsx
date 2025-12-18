@@ -1,24 +1,31 @@
-'use client';
+"use client";
 
-import { useState, useRef, useEffect } from 'react';
-import { X, Download, Copy, HelpCircle } from 'lucide-react';
-import type { BoardElement, Point } from '@/lib/board-types';
+import { useState, useRef, useEffect } from "react";
+import { X, Download, Copy, HelpCircle } from "lucide-react";
+import type { BoardElement, Point } from "@/lib/board-types";
 
 interface ExportImageModalProps {
   isOpen: boolean;
   onClose: () => void;
   elements: BoardElement[];
-  canvasBackground: 'none' | 'dots' | 'lines' | 'grid';
+  canvasBackground: "none" | "dots" | "lines" | "grid";
 }
 
 // Get bounding box for any element
-function getBoundingBox(element: BoardElement): { x: number; y: number; width: number; height: number } | null {
+function getBoundingBox(
+  element: BoardElement,
+): { x: number; y: number; width: number; height: number } | null {
   const rotationDeg = element.rotation ?? 0;
 
-  if (element.type === 'pen' || element.type === 'line' || element.type === 'arrow' || element.type === 'laser') {
+  if (
+    element.type === "pen" ||
+    element.type === "line" ||
+    element.type === "arrow" ||
+    element.type === "laser"
+  ) {
     if (element.points.length === 0) return null;
-    const xs = element.points.map(p => p.x);
-    const ys = element.points.map(p => p.y);
+    const xs = element.points.map((p) => p.x);
+    const ys = element.points.map((p) => p.y);
     const minX = Math.min(...xs);
     const minY = Math.min(...ys);
     const maxX = Math.max(...xs);
@@ -56,7 +63,13 @@ function getBoundingBox(element: BoardElement): { x: number; y: number; width: n
     return { x: minRX, y: minRY, width: maxRX - minRX, height: maxRY - minRY };
   }
 
-  if (element.type === 'rectangle' || element.type === 'ellipse' || element.type === 'frame' || element.type === 'web-embed') {
+  if (
+    element.type === "rectangle" ||
+    element.type === "diamond" ||
+    element.type === "ellipse" ||
+    element.type === "frame" ||
+    element.type === "web-embed"
+  ) {
     const base = {
       x: element.x ?? 0,
       y: element.y ?? 0,
@@ -89,7 +102,7 @@ function getBoundingBox(element: BoardElement): { x: number; y: number; width: n
     return { x: minRX, y: minRY, width: maxRX - minRX, height: maxRY - minRY };
   }
 
-  if (element.type === 'text') {
+  if (element.type === "text") {
     const fontSize = (element.strokeWidth || 1) * 4 + 12;
     if (element.width !== undefined && element.height !== undefined) {
       const base = {
@@ -121,7 +134,12 @@ function getBoundingBox(element: BoardElement): { x: number; y: number; width: n
       const minRY = Math.min(...corners.map((p) => p.y));
       const maxRX = Math.max(...corners.map((p) => p.x));
       const maxRY = Math.max(...corners.map((p) => p.y));
-      return { x: minRX, y: minRY, width: maxRX - minRX, height: maxRY - minRY };
+      return {
+        x: minRX,
+        y: minRY,
+        width: maxRX - minRX,
+        height: maxRY - minRY,
+      };
     }
     const textWidth = (element.text?.length ?? 0) * fontSize * 0.55;
     const textHeight = fontSize * 1.2;
@@ -161,17 +179,27 @@ function getBoundingBox(element: BoardElement): { x: number; y: number; width: n
 }
 
 // Get combined bounding box for all elements
-function getSceneBounds(elements: BoardElement[]): { x: number; y: number; width: number; height: number } {
-  const boxes = elements.map(el => getBoundingBox(el)).filter(Boolean) as { x: number; y: number; width: number; height: number }[];
+function getSceneBounds(elements: BoardElement[]): {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+} {
+  const boxes = elements.map((el) => getBoundingBox(el)).filter(Boolean) as {
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+  }[];
 
   if (boxes.length === 0) {
     return { x: 0, y: 0, width: 800, height: 600 };
   }
 
-  const minX = Math.min(...boxes.map(b => b.x));
-  const minY = Math.min(...boxes.map(b => b.y));
-  const maxX = Math.max(...boxes.map(b => b.x + b.width));
-  const maxY = Math.max(...boxes.map(b => b.y + b.height));
+  const minX = Math.min(...boxes.map((b) => b.x));
+  const minY = Math.min(...boxes.map((b) => b.y));
+  const maxX = Math.max(...boxes.map((b) => b.x + b.width));
+  const maxY = Math.max(...boxes.map((b) => b.y + b.height));
 
   const padding = 40;
 
@@ -196,14 +224,19 @@ function getRotationTransform(el: BoardElement) {
 }
 
 function getStrokeDash(el: BoardElement) {
-  const style = el.strokeStyle || 'solid';
-  if (style === 'dashed') return [10, 10];
-  if (style === 'dotted') return [2, 6];
+  const style = el.strokeStyle || "solid";
+  if (style === "dashed") return [10, 10];
+  if (style === "dotted") return [2, 6];
   return [];
 }
 
 function getConnectorRoute(el: BoardElement, start: Point, end: Point) {
-  return el.elbowRoute ?? (Math.abs(end.x - start.x) >= Math.abs(end.y - start.y) ? 'vertical' : 'horizontal');
+  return (
+    el.elbowRoute ??
+    (Math.abs(end.x - start.x) >= Math.abs(end.y - start.y)
+      ? "vertical"
+      : "horizontal")
+  );
 }
 
 function getArrowHeadPoints(tip: Point, from: Point, size: number) {
@@ -232,15 +265,15 @@ function getMarkerBasis(tip: Point, from: Point) {
 
 function drawMarker(
   ctx: CanvasRenderingContext2D,
-  marker: NonNullable<BoardElement['arrowEnd']>,
+  marker: NonNullable<BoardElement["arrowEnd"]>,
   tip: Point,
   from: Point,
   strokeColor: string,
   strokeWidth: number,
   opacity: number,
-  lineCap: CanvasLineCap
+  lineCap: CanvasLineCap,
 ) {
-  if (marker === 'none') return;
+  if (marker === "none") return;
 
   const size = Math.max(6, strokeWidth * 3);
   const { bx, by, px, py } = getMarkerBasis(tip, from);
@@ -251,12 +284,12 @@ function drawMarker(
   ctx.fillStyle = strokeColor;
   ctx.lineWidth = Math.max(1.5, strokeWidth);
   ctx.lineCap = lineCap;
-  ctx.lineJoin = 'round';
+  ctx.lineJoin = "round";
   ctx.setLineDash([]);
 
   const outlineWidth = Math.min(ctx.lineWidth, 6);
 
-  if (marker === 'arrow') {
+  if (marker === "arrow") {
     const [a, b] = getArrowHeadPoints(tip, from, size);
     ctx.beginPath();
     ctx.moveTo(tip.x, tip.y);
@@ -268,7 +301,7 @@ function drawMarker(
     return;
   }
 
-  if (marker === 'triangle' || marker === 'triangle-outline') {
+  if (marker === "triangle" || marker === "triangle-outline") {
     const back = size * 1.1;
     const spread = size * 0.85;
     const baseX = tip.x + bx * back;
@@ -280,7 +313,7 @@ function drawMarker(
     ctx.lineTo(p1.x, p1.y);
     ctx.lineTo(p2.x, p2.y);
     ctx.closePath();
-    if (marker === 'triangle') ctx.fill();
+    if (marker === "triangle") ctx.fill();
     else {
       ctx.lineWidth = outlineWidth;
       ctx.stroke();
@@ -289,7 +322,7 @@ function drawMarker(
     return;
   }
 
-  if (marker === 'diamond' || marker === 'diamond-outline') {
+  if (marker === "diamond" || marker === "diamond-outline") {
     const back1 = size * 0.9;
     const back2 = size * 1.8;
     const spread = size * 0.75;
@@ -305,7 +338,7 @@ function drawMarker(
     ctx.lineTo(rearX, rearY);
     ctx.lineTo(right.x, right.y);
     ctx.closePath();
-    if (marker === 'diamond') ctx.fill();
+    if (marker === "diamond") ctx.fill();
     else {
       ctx.lineWidth = outlineWidth;
       ctx.stroke();
@@ -314,14 +347,14 @@ function drawMarker(
     return;
   }
 
-  if (marker === 'circle' || marker === 'circle-outline') {
+  if (marker === "circle" || marker === "circle-outline") {
     const back = size * 0.9;
     const r = Math.max(3, size * 0.55);
     const cx = tip.x + bx * back;
     const cy = tip.y + by * back;
     ctx.beginPath();
     ctx.arc(cx, cy, r, 0, Math.PI * 2);
-    if (marker === 'circle') ctx.fill();
+    if (marker === "circle") ctx.fill();
     else {
       ctx.lineWidth = outlineWidth;
       ctx.stroke();
@@ -330,7 +363,7 @@ function drawMarker(
     return;
   }
 
-  if (marker === 'bar') {
+  if (marker === "bar") {
     const half = size * 0.65;
     ctx.beginPath();
     ctx.moveTo(tip.x + px * half, tip.y + py * half);
@@ -356,17 +389,17 @@ function drawMarker(
     ctx.stroke();
   };
 
-  if (marker === 'crowfoot-one') {
+  if (marker === "crowfoot-one") {
     crowfoot(false);
     ctx.restore();
     return;
   }
-  if (marker === 'crowfoot-many') {
+  if (marker === "crowfoot-many") {
     crowfoot(true);
     ctx.restore();
     return;
   }
-  if (marker === 'crowfoot-one-many') {
+  if (marker === "crowfoot-one-many") {
     const barOffset = size * 0.45;
     const movedTip = { x: tip.x + bx * barOffset, y: tip.y + by * barOffset };
     const half = size * 0.65;
@@ -383,30 +416,31 @@ function drawMarker(
 }
 
 function drawConnector(ctx: CanvasRenderingContext2D, el: BoardElement) {
-  if ((el.type !== 'line' && el.type !== 'arrow') || el.points.length < 2) return;
+  if ((el.type !== "line" && el.type !== "arrow") || el.points.length < 2)
+    return;
 
   const start = el.points[0];
   const end = el.points[el.points.length - 1];
   const hasCorner = el.points.length >= 3;
   const control = hasCorner ? el.points[1] : null;
-  const style = el.connectorStyle || 'sharp';
+  const style = el.connectorStyle || "sharp";
   const route = getConnectorRoute(el, start, end);
-  const cap = el.lineCap || 'round';
+  const cap = el.lineCap || "round";
 
   ctx.strokeStyle = el.strokeColor;
   ctx.lineWidth = el.strokeWidth;
   ctx.lineCap = cap as CanvasLineCap;
-  ctx.lineJoin = 'round';
+  ctx.lineJoin = "round";
   ctx.setLineDash(getStrokeDash(el));
 
   ctx.beginPath();
   ctx.moveTo(start.x, start.y);
   if (!hasCorner || !control) {
     ctx.lineTo(end.x, end.y);
-  } else if (style === 'curved') {
+  } else if (style === "curved") {
     ctx.quadraticCurveTo(control.x, control.y, end.x, end.y);
-  } else if (style === 'elbow') {
-    if (route === 'vertical') {
+  } else if (style === "elbow") {
+    if (route === "vertical") {
       ctx.lineTo(control.x, start.y);
       ctx.lineTo(control.x, end.y);
       ctx.lineTo(end.x, end.y);
@@ -423,17 +457,18 @@ function drawConnector(ctx: CanvasRenderingContext2D, el: BoardElement) {
 
   ctx.setLineDash([]);
 
-  if (el.type !== 'arrow') return;
+  if (el.type !== "arrow") return;
 
-  const markerStart = el.arrowStart || 'none';
-  const markerEnd = el.arrowEnd || 'arrow';
+  const markerStart = el.arrowStart || "none";
+  const markerEnd = el.arrowEnd || "arrow";
   const markerOpacity = 1;
 
   const tangentForStart = () => {
     if (!control) return { tip: start, from: end };
-    if (style === 'curved') return { tip: start, from: control };
-    if (style === 'elbow') {
-      if (route === 'vertical') return { tip: start, from: { x: control.x, y: start.y } };
+    if (style === "curved") return { tip: start, from: control };
+    if (style === "elbow") {
+      if (route === "vertical")
+        return { tip: start, from: { x: control.x, y: start.y } };
       return { tip: start, from: { x: start.x, y: control.y } };
     }
     return { tip: start, from: control };
@@ -441,9 +476,10 @@ function drawConnector(ctx: CanvasRenderingContext2D, el: BoardElement) {
 
   const tangentForEnd = () => {
     if (!control) return { tip: end, from: start };
-    if (style === 'curved') return { tip: end, from: control };
-    if (style === 'elbow') {
-      if (route === 'vertical') return { tip: end, from: { x: control.x, y: end.y } };
+    if (style === "curved") return { tip: end, from: control };
+    if (style === "elbow") {
+      if (route === "vertical")
+        return { tip: end, from: { x: control.x, y: end.y } };
       return { tip: end, from: { x: end.x, y: control.y } };
     }
     return { tip: end, from: control };
@@ -451,43 +487,72 @@ function drawConnector(ctx: CanvasRenderingContext2D, el: BoardElement) {
 
   const { tip: sTip, from: sFrom } = tangentForStart();
   const { tip: eTip, from: eFrom } = tangentForEnd();
-  drawMarker(ctx, markerStart, sTip, sFrom, el.strokeColor, el.strokeWidth, markerOpacity, cap as CanvasLineCap);
-  drawMarker(ctx, markerEnd, eTip, eFrom, el.strokeColor, el.strokeWidth, markerOpacity, cap as CanvasLineCap);
+  drawMarker(
+    ctx,
+    markerStart,
+    sTip,
+    sFrom,
+    el.strokeColor,
+    el.strokeWidth,
+    markerOpacity,
+    cap as CanvasLineCap,
+  );
+  drawMarker(
+    ctx,
+    markerEnd,
+    eTip,
+    eFrom,
+    el.strokeColor,
+    el.strokeWidth,
+    markerOpacity,
+    cap as CanvasLineCap,
+  );
 }
 
 function svgConnector(el: BoardElement, opacity: number) {
-  if ((el.type !== 'line' && el.type !== 'arrow') || el.points.length < 2) return '';
+  if ((el.type !== "line" && el.type !== "arrow") || el.points.length < 2)
+    return "";
 
   const start = el.points[0];
   const end = el.points[el.points.length - 1];
   const hasCorner = el.points.length >= 3;
   const control = hasCorner ? el.points[1] : null;
-  const style = el.connectorStyle || 'sharp';
+  const style = el.connectorStyle || "sharp";
   const route = getConnectorRoute(el, start, end);
-  const cap = el.lineCap || 'round';
-  const dash = (el.strokeStyle || 'solid') === 'dashed' ? '10,10' : (el.strokeStyle || 'solid') === 'dotted' ? '2,6' : '';
-  const dashAttr = dash ? ` stroke-dasharray="${dash}"` : '';
+  const cap = el.lineCap || "round";
+  const dash =
+    (el.strokeStyle || "solid") === "dashed"
+      ? "10,10"
+      : (el.strokeStyle || "solid") === "dotted"
+        ? "2,6"
+        : "";
+  const dashAttr = dash ? ` stroke-dasharray="${dash}"` : "";
 
-  let base = '';
+  let base = "";
   if (!hasCorner || !control) {
     base = `<line x1="${start.x}" y1="${start.y}" x2="${end.x}" y2="${end.y}" stroke="${el.strokeColor}" stroke-width="${el.strokeWidth}" stroke-linecap="${cap}" opacity="${opacity}"${dashAttr}/>`;
-  } else if (style === 'curved') {
+  } else if (style === "curved") {
     const d = `M ${start.x} ${start.y} Q ${control.x} ${control.y} ${end.x} ${end.y}`;
     base = `<path d="${d}" stroke="${el.strokeColor}" stroke-width="${el.strokeWidth}" fill="none" stroke-linecap="${cap}" stroke-linejoin="round" opacity="${opacity}"${dashAttr}/>`;
-  } else if (style === 'elbow') {
+  } else if (style === "elbow") {
     const pts =
-      route === 'vertical'
+      route === "vertical"
         ? [start, { x: control.x, y: start.y }, { x: control.x, y: end.y }, end]
-        : [start, { x: start.x, y: control.y }, { x: end.x, y: control.y }, end];
-    base = `<polyline points="${pts.map(p => `${p.x},${p.y}`).join(' ')}" stroke="${el.strokeColor}" stroke-width="${el.strokeWidth}" fill="none" stroke-linecap="${cap}" stroke-linejoin="round" opacity="${opacity}"${dashAttr}/>`;
+        : [
+            start,
+            { x: start.x, y: control.y },
+            { x: end.x, y: control.y },
+            end,
+          ];
+    base = `<polyline points="${pts.map((p) => `${p.x},${p.y}`).join(" ")}" stroke="${el.strokeColor}" stroke-width="${el.strokeWidth}" fill="none" stroke-linecap="${cap}" stroke-linejoin="round" opacity="${opacity}"${dashAttr}/>`;
   } else {
-    base = `<polyline points="${[start, control, end].map(p => `${p.x},${p.y}`).join(' ')}" stroke="${el.strokeColor}" stroke-width="${el.strokeWidth}" fill="none" stroke-linecap="${cap}" stroke-linejoin="round" opacity="${opacity}"${dashAttr}/>`;
+    base = `<polyline points="${[start, control, end].map((p) => `${p.x},${p.y}`).join(" ")}" stroke="${el.strokeColor}" stroke-width="${el.strokeWidth}" fill="none" stroke-linecap="${cap}" stroke-linejoin="round" opacity="${opacity}"${dashAttr}/>`;
   }
 
-  if (el.type !== 'arrow') return base;
+  if (el.type !== "arrow") return base;
 
-  const markerStart = el.arrowStart || 'none';
-  const markerEnd = el.arrowEnd || 'arrow';
+  const markerStart = el.arrowStart || "none";
+  const markerEnd = el.arrowEnd || "arrow";
   const markerSize = Math.max(6, el.strokeWidth * 3);
 
   const headLines = (tip: Point, from: Point) => {
@@ -497,23 +562,27 @@ function svgConnector(el: BoardElement, opacity: number) {
     <line x1="${tip.x}" y1="${tip.y}" x2="${b.x}" y2="${b.y}" stroke="${el.strokeColor}" stroke-width="${el.strokeWidth}" stroke-linecap="${cap}" opacity="${opacity}"/>`;
   };
 
-  const svgMarker = (marker: NonNullable<BoardElement['arrowEnd']>, tip: Point, from: Point) => {
-    if (marker === 'none') return '';
+  const svgMarker = (
+    marker: NonNullable<BoardElement["arrowEnd"]>,
+    tip: Point,
+    from: Point,
+  ) => {
+    if (marker === "none") return "";
 
     const { bx, by, px, py } = getMarkerBasis(tip, from);
     const size = markerSize;
     const outline = Math.min(Math.max(1.5, el.strokeWidth), 6);
 
-    if (marker === 'arrow') return headLines(tip, from);
+    if (marker === "arrow") return headLines(tip, from);
 
-    if (marker === 'triangle' || marker === 'triangle-outline') {
+    if (marker === "triangle" || marker === "triangle-outline") {
       const back = size * 1.1;
       const spread = size * 0.85;
       const baseX = tip.x + bx * back;
       const baseY = tip.y + by * back;
       const p1 = { x: baseX + px * spread, y: baseY + py * spread };
       const p2 = { x: baseX - px * spread, y: baseY - py * spread };
-      if (marker === 'triangle') {
+      if (marker === "triangle") {
         return `
     <polygon points="${tip.x},${tip.y} ${p1.x},${p1.y} ${p2.x},${p2.y}" fill="${el.strokeColor}" opacity="${opacity}"/>`;
       }
@@ -521,7 +590,7 @@ function svgConnector(el: BoardElement, opacity: number) {
     <polygon points="${tip.x},${tip.y} ${p1.x},${p1.y} ${p2.x},${p2.y}" fill="none" stroke="${el.strokeColor}" stroke-width="${outline}" stroke-linejoin="round" opacity="${opacity}"/>`;
     }
 
-    if (marker === 'diamond' || marker === 'diamond-outline') {
+    if (marker === "diamond" || marker === "diamond-outline") {
       const back1 = size * 0.9;
       const back2 = size * 1.8;
       const spread = size * 0.75;
@@ -531,7 +600,7 @@ function svgConnector(el: BoardElement, opacity: number) {
       const rearY = tip.y + by * back2;
       const left = { x: midX + px * spread, y: midY + py * spread };
       const right = { x: midX - px * spread, y: midY - py * spread };
-      if (marker === 'diamond') {
+      if (marker === "diamond") {
         return `
     <polygon points="${tip.x},${tip.y} ${left.x},${left.y} ${rearX},${rearY} ${right.x},${right.y}" fill="${el.strokeColor}" opacity="${opacity}"/>`;
       }
@@ -539,12 +608,12 @@ function svgConnector(el: BoardElement, opacity: number) {
     <polygon points="${tip.x},${tip.y} ${left.x},${left.y} ${rearX},${rearY} ${right.x},${right.y}" fill="none" stroke="${el.strokeColor}" stroke-width="${outline}" stroke-linejoin="round" opacity="${opacity}"/>`;
     }
 
-    if (marker === 'circle' || marker === 'circle-outline') {
+    if (marker === "circle" || marker === "circle-outline") {
       const back = size * 0.9;
       const r = Math.max(3, size * 0.55);
       const cx = tip.x + bx * back;
       const cy = tip.y + by * back;
-      if (marker === 'circle') {
+      if (marker === "circle") {
         return `
     <circle cx="${cx}" cy="${cy}" r="${r}" fill="${el.strokeColor}" opacity="${opacity}"/>`;
       }
@@ -552,7 +621,7 @@ function svgConnector(el: BoardElement, opacity: number) {
     <circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="${el.strokeColor}" stroke-width="${outline}" opacity="${opacity}"/>`;
     }
 
-    if (marker === 'bar') {
+    if (marker === "bar") {
       const half = size * 0.65;
       const x1 = tip.x + px * half;
       const y1 = tip.y + py * half;
@@ -576,14 +645,14 @@ function svgConnector(el: BoardElement, opacity: number) {
         .map(
           (p) =>
             `
-    <line x1="${tip.x}" y1="${tip.y}" x2="${p.x}" y2="${p.y}" stroke="${el.strokeColor}" stroke-width="${el.strokeWidth}" stroke-linecap="${cap}" opacity="${opacity}"/>`
+    <line x1="${tip.x}" y1="${tip.y}" x2="${p.x}" y2="${p.y}" stroke="${el.strokeColor}" stroke-width="${el.strokeWidth}" stroke-linecap="${cap}" opacity="${opacity}"/>`,
         )
-        .join('');
+        .join("");
     };
 
-    if (marker === 'crowfoot-one') return crowfoot(false);
-    if (marker === 'crowfoot-many') return crowfoot(true);
-    if (marker === 'crowfoot-one-many') {
+    if (marker === "crowfoot-one") return crowfoot(false);
+    if (marker === "crowfoot-many") return crowfoot(true);
+    if (marker === "crowfoot-one-many") {
       const barOffset = size * 0.45;
       const movedTip = { x: tip.x + bx * barOffset, y: tip.y + by * barOffset };
       const half = size * 0.65;
@@ -592,23 +661,23 @@ function svgConnector(el: BoardElement, opacity: number) {
       return `${barSvg}${crowfoot(true)}`;
     }
 
-    return '';
+    return "";
   };
 
   const fromForStart =
-    style === 'curved' && control
+    style === "curved" && control
       ? control
-      : style === 'elbow' && control
-        ? route === 'vertical'
+      : style === "elbow" && control
+        ? route === "vertical"
           ? { x: control.x, y: start.y }
           : { x: start.x, y: control.y }
         : control || end;
 
   const fromForEnd =
-    style === 'curved' && control
+    style === "curved" && control
       ? control
-      : style === 'elbow' && control
-        ? route === 'vertical'
+      : style === "elbow" && control
+        ? route === "vertical"
           ? { x: control.x, y: end.y }
           : { x: end.x, y: control.y }
         : control || start;
@@ -616,29 +685,41 @@ function svgConnector(el: BoardElement, opacity: number) {
   return `${base}${svgMarker(markerStart, start, fromForStart)}${svgMarker(markerEnd, end, fromForEnd)}`;
 }
 
-export function ExportImageModal({ isOpen, onClose, elements, canvasBackground }: ExportImageModalProps) {
+export function ExportImageModal({
+  isOpen,
+  onClose,
+  elements,
+  canvasBackground,
+}: ExportImageModalProps) {
   const [includeBackground, setIncludeBackground] = useState(true);
   const [darkMode, setDarkMode] = useState(false);
   const [embedScene, setEmbedScene] = useState(false);
   const [scale, setScale] = useState<1 | 2 | 3>(2);
-  const [fileName, setFileName] = useState('');
+  const [fileName, setFileName] = useState("");
   const [showEmbedTooltip, setShowEmbedTooltip] = useState(false);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const previewCanvasRef = useRef<HTMLCanvasElement>(null);
 
   useEffect(() => {
     if (isOpen) {
-      const date = new Date().toISOString().split('T')[0];
+      const date = new Date().toISOString().split("T")[0];
       setFileName(`shadeworks-${date}`);
       updatePreview();
     }
-  }, [isOpen, includeBackground, darkMode, embedScene, elements, canvasBackground]);
+  }, [
+    isOpen,
+    includeBackground,
+    darkMode,
+    embedScene,
+    elements,
+    canvasBackground,
+  ]);
 
   const updatePreview = () => {
     const canvas = previewCanvasRef.current;
     if (!canvas) return;
 
-    const ctx = canvas.getContext('2d');
+    const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
     const bounds = getSceneBounds(elements);
@@ -652,18 +733,20 @@ export function ExportImageModal({ isOpen, onClose, elements, canvasBackground }
 
     // Draw background
     if (includeBackground) {
-      ctx.fillStyle = darkMode ? '#0a0a0a' : '#f2f2f2';
+      ctx.fillStyle = darkMode ? "#0a0a0a" : "#f2f2f2";
       ctx.fillRect(0, 0, canvas.width, canvas.height);
 
       // Draw grid pattern if enabled
-      if (canvasBackground !== 'none') {
+      if (canvasBackground !== "none") {
         ctx.save();
-        ctx.strokeStyle = darkMode ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.08)';
+        ctx.strokeStyle = darkMode
+          ? "rgba(255, 255, 255, 0.05)"
+          : "rgba(0, 0, 0, 0.08)";
         ctx.lineWidth = 1;
 
         const spacing = 40 * previewScale;
 
-        if (canvasBackground === 'grid' || canvasBackground === 'lines') {
+        if (canvasBackground === "grid" || canvasBackground === "lines") {
           for (let x = 0; x <= canvas.width; x += spacing) {
             ctx.beginPath();
             ctx.moveTo(x, 0);
@@ -672,7 +755,7 @@ export function ExportImageModal({ isOpen, onClose, elements, canvasBackground }
           }
         }
 
-        if (canvasBackground === 'grid') {
+        if (canvasBackground === "grid") {
           for (let y = 0; y <= canvas.height; y += spacing) {
             ctx.beginPath();
             ctx.moveTo(0, y);
@@ -681,8 +764,10 @@ export function ExportImageModal({ isOpen, onClose, elements, canvasBackground }
           }
         }
 
-        if (canvasBackground === 'dots') {
-          ctx.fillStyle = darkMode ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.08)';
+        if (canvasBackground === "dots") {
+          ctx.fillStyle = darkMode
+            ? "rgba(255, 255, 255, 0.05)"
+            : "rgba(0, 0, 0, 0.08)";
           for (let x = 0; x <= canvas.width; x += spacing) {
             for (let y = 0; y <= canvas.height; y += spacing) {
               ctx.beginPath();
@@ -701,7 +786,7 @@ export function ExportImageModal({ isOpen, onClose, elements, canvasBackground }
     ctx.translate(-bounds.x * previewScale, -bounds.y * previewScale);
     ctx.scale(previewScale, previewScale);
 
-    elements.forEach(el => {
+    elements.forEach((el) => {
       ctx.save();
       ctx.globalAlpha = (el.opacity ?? 100) / 100;
 
@@ -712,29 +797,46 @@ export function ExportImageModal({ isOpen, onClose, elements, canvasBackground }
         ctx.translate(-rot.cx, -rot.cy);
       }
 
-      if (el.type === 'rectangle') {
+      if (el.type === "rectangle") {
         ctx.strokeStyle = el.strokeColor;
         ctx.lineWidth = el.strokeWidth;
-        ctx.fillStyle = el.fillColor || 'transparent';
+        ctx.fillStyle = el.fillColor || "transparent";
         ctx.beginPath();
-        ctx.roundRect(el.x!, el.y!, el.width!, el.height!, el.cornerRadius ?? 0);
-        if (el.fillColor && el.fillColor !== 'transparent') ctx.fill();
+        ctx.roundRect(
+          el.x!,
+          el.y!,
+          el.width!,
+          el.height!,
+          el.cornerRadius ?? 0,
+        );
+        if (el.fillColor && el.fillColor !== "transparent") ctx.fill();
         ctx.stroke();
-      } else if (el.type === 'ellipse') {
+      } else if (el.type === "ellipse") {
         ctx.strokeStyle = el.strokeColor;
         ctx.lineWidth = el.strokeWidth;
-        ctx.fillStyle = el.fillColor || 'transparent';
+        ctx.fillStyle = el.fillColor || "transparent";
         ctx.beginPath();
-        ctx.ellipse((el.x ?? 0) + (el.width ?? 0) / 2, (el.y ?? 0) + (el.height ?? 0) / 2, (el.width ?? 0) / 2, (el.height ?? 0) / 2, 0, 0, Math.PI * 2);
-        if (el.fillColor && el.fillColor !== 'transparent') ctx.fill();
+        ctx.ellipse(
+          (el.x ?? 0) + (el.width ?? 0) / 2,
+          (el.y ?? 0) + (el.height ?? 0) / 2,
+          (el.width ?? 0) / 2,
+          (el.height ?? 0) / 2,
+          0,
+          0,
+          Math.PI * 2,
+        );
+        if (el.fillColor && el.fillColor !== "transparent") ctx.fill();
         ctx.stroke();
-      } else if ((el.type === 'line' || el.type === 'arrow') && el.points.length >= 2) {
+      } else if (
+        (el.type === "line" || el.type === "arrow") &&
+        el.points.length >= 2
+      ) {
         drawConnector(ctx, el);
-      } else if (el.type === 'text') {
+      } else if (el.type === "text") {
         const fontSize = (el.strokeWidth || 1) * 4 + 12;
         ctx.fillStyle = el.strokeColor;
         ctx.font = `${fontSize}px sans-serif`;
-        ctx.fillText(el.text || '', el.x ?? 0, (el.y ?? 0) + fontSize);
+        ctx.fillText(el.text || "", el.x ?? 0, (el.y ?? 0) + fontSize);
       }
 
       ctx.restore();
@@ -743,8 +845,8 @@ export function ExportImageModal({ isOpen, onClose, elements, canvasBackground }
     ctx.restore();
   };
 
-  const exportImage = async (format: 'png' | 'svg') => {
-    if (format === 'png') {
+  const exportImage = async (format: "png" | "svg") => {
+    if (format === "png") {
       await exportPNG();
     } else {
       await exportSVG();
@@ -755,7 +857,7 @@ export function ExportImageModal({ isOpen, onClose, elements, canvasBackground }
     const canvas = canvasRef.current;
     if (!canvas) return;
 
-    const ctx = canvas.getContext('2d');
+    const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
     const bounds = getSceneBounds(elements);
@@ -769,18 +871,20 @@ export function ExportImageModal({ isOpen, onClose, elements, canvasBackground }
 
     // Draw background
     if (includeBackground) {
-      ctx.fillStyle = darkMode ? '#0a0a0a' : '#f2f2f2';
+      ctx.fillStyle = darkMode ? "#0a0a0a" : "#f2f2f2";
       ctx.fillRect(0, 0, bounds.width, bounds.height);
 
       // Draw grid pattern
-      if (canvasBackground !== 'none') {
+      if (canvasBackground !== "none") {
         ctx.save();
-        ctx.strokeStyle = darkMode ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.08)';
+        ctx.strokeStyle = darkMode
+          ? "rgba(255, 255, 255, 0.05)"
+          : "rgba(0, 0, 0, 0.08)";
         ctx.lineWidth = 1;
 
         const spacing = 40;
 
-        if (canvasBackground === 'grid' || canvasBackground === 'lines') {
+        if (canvasBackground === "grid" || canvasBackground === "lines") {
           for (let x = 0; x <= bounds.width; x += spacing) {
             ctx.beginPath();
             ctx.moveTo(x, 0);
@@ -789,7 +893,7 @@ export function ExportImageModal({ isOpen, onClose, elements, canvasBackground }
           }
         }
 
-        if (canvasBackground === 'grid') {
+        if (canvasBackground === "grid") {
           for (let y = 0; y <= bounds.height; y += spacing) {
             ctx.beginPath();
             ctx.moveTo(0, y);
@@ -798,8 +902,10 @@ export function ExportImageModal({ isOpen, onClose, elements, canvasBackground }
           }
         }
 
-        if (canvasBackground === 'dots') {
-          ctx.fillStyle = darkMode ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.08)';
+        if (canvasBackground === "dots") {
+          ctx.fillStyle = darkMode
+            ? "rgba(255, 255, 255, 0.05)"
+            : "rgba(0, 0, 0, 0.08)";
           for (let x = 0; x <= bounds.width; x += spacing) {
             for (let y = 0; y <= bounds.height; y += spacing) {
               ctx.beginPath();
@@ -816,7 +922,7 @@ export function ExportImageModal({ isOpen, onClose, elements, canvasBackground }
     // Draw elements
     ctx.translate(-bounds.x, -bounds.y);
 
-    elements.forEach(el => {
+    elements.forEach((el) => {
       ctx.save();
       ctx.globalAlpha = (el.opacity ?? 100) / 100;
 
@@ -827,53 +933,70 @@ export function ExportImageModal({ isOpen, onClose, elements, canvasBackground }
         ctx.translate(-rot.cx, -rot.cy);
       }
 
-      if (el.type === 'rectangle') {
+      if (el.type === "rectangle") {
         ctx.strokeStyle = el.strokeColor;
         ctx.lineWidth = el.strokeWidth;
-        ctx.fillStyle = el.fillColor || 'transparent';
+        ctx.fillStyle = el.fillColor || "transparent";
         ctx.beginPath();
-        ctx.roundRect(el.x!, el.y!, el.width!, el.height!, el.cornerRadius ?? 0);
-        if (el.fillColor && el.fillColor !== 'transparent') ctx.fill();
+        ctx.roundRect(
+          el.x!,
+          el.y!,
+          el.width!,
+          el.height!,
+          el.cornerRadius ?? 0,
+        );
+        if (el.fillColor && el.fillColor !== "transparent") ctx.fill();
         ctx.stroke();
-      } else if (el.type === 'ellipse') {
+      } else if (el.type === "ellipse") {
         ctx.strokeStyle = el.strokeColor;
         ctx.lineWidth = el.strokeWidth;
-        ctx.fillStyle = el.fillColor || 'transparent';
+        ctx.fillStyle = el.fillColor || "transparent";
         ctx.beginPath();
-        ctx.ellipse((el.x ?? 0) + (el.width ?? 0) / 2, (el.y ?? 0) + (el.height ?? 0) / 2, (el.width ?? 0) / 2, (el.height ?? 0) / 2, 0, 0, Math.PI * 2);
-        if (el.fillColor && el.fillColor !== 'transparent') ctx.fill();
+        ctx.ellipse(
+          (el.x ?? 0) + (el.width ?? 0) / 2,
+          (el.y ?? 0) + (el.height ?? 0) / 2,
+          (el.width ?? 0) / 2,
+          (el.height ?? 0) / 2,
+          0,
+          0,
+          Math.PI * 2,
+        );
+        if (el.fillColor && el.fillColor !== "transparent") ctx.fill();
         ctx.stroke();
-      } else if ((el.type === 'line' || el.type === 'arrow') && el.points.length >= 2) {
+      } else if (
+        (el.type === "line" || el.type === "arrow") &&
+        el.points.length >= 2
+      ) {
         drawConnector(ctx, el);
-      } else if (el.type === 'pen') {
+      } else if (el.type === "pen") {
         ctx.strokeStyle = el.strokeColor;
         ctx.lineWidth = el.strokeWidth;
-        ctx.lineCap = 'round';
-        ctx.lineJoin = 'round';
+        ctx.lineCap = "round";
+        ctx.lineJoin = "round";
         ctx.beginPath();
         el.points.forEach((p, i) => {
           if (i === 0) ctx.moveTo(p.x, p.y);
           else ctx.lineTo(p.x, p.y);
         });
         ctx.stroke();
-      } else if (el.type === 'text') {
+      } else if (el.type === "text") {
         const fontSize = (el.strokeWidth || 1) * 4 + 12;
         ctx.fillStyle = el.strokeColor;
         ctx.font = `${fontSize}px sans-serif`;
-        ctx.textBaseline = 'top';
+        ctx.textBaseline = "top";
 
         if (el.isTextBox && el.width && el.height) {
           const padding = 8;
           const lineHeight = fontSize * 1.4;
-          const lines = (el.text || '').split('\n');
+          const lines = (el.text || "").split("\n");
           let yOffset = (el.y ?? 0) + padding;
 
-          lines.forEach(line => {
+          lines.forEach((line) => {
             ctx.fillText(line, (el.x ?? 0) + padding, yOffset);
             yOffset += lineHeight;
           });
         } else {
-          ctx.fillText(el.text || '', el.x ?? 0, el.y ?? 0);
+          ctx.fillText(el.text || "", el.x ?? 0, el.y ?? 0);
         }
       }
 
@@ -884,9 +1007,9 @@ export function ExportImageModal({ isOpen, onClose, elements, canvasBackground }
     canvas.toBlob((blob) => {
       if (!blob) return;
       const url = URL.createObjectURL(blob);
-      const link = document.createElement('a');
+      const link = document.createElement("a");
       link.href = url;
-      link.download = `${fileName || 'export'}.png`;
+      link.download = `${fileName || "export"}.png`;
       link.click();
       URL.revokeObjectURL(url);
     });
@@ -900,28 +1023,30 @@ export function ExportImageModal({ isOpen, onClose, elements, canvasBackground }
 
     // Add background
     if (includeBackground) {
-      svgContent += `\n  <rect width="${bounds.width}" height="${bounds.height}" fill="${darkMode ? '#0a0a0a' : '#f2f2f2'}"/>`;
+      svgContent += `\n  <rect width="${bounds.width}" height="${bounds.height}" fill="${darkMode ? "#0a0a0a" : "#f2f2f2"}"/>`;
 
       // Add grid pattern
-      if (canvasBackground !== 'none') {
+      if (canvasBackground !== "none") {
         const spacing = 40;
-        const color = darkMode ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.08)';
+        const color = darkMode
+          ? "rgba(255, 255, 255, 0.05)"
+          : "rgba(0, 0, 0, 0.08)";
 
-        if (canvasBackground === 'grid') {
+        if (canvasBackground === "grid") {
           svgContent += `\n  <defs>
     <pattern id="grid" width="${spacing}" height="${spacing}" patternUnits="userSpaceOnUse">
       <path d="M ${spacing} 0 L 0 0 0 ${spacing}" fill="none" stroke="${color}" stroke-width="1"/>
     </pattern>
   </defs>
   <rect width="${bounds.width}" height="${bounds.height}" fill="url(#grid)"/>`;
-        } else if (canvasBackground === 'dots') {
+        } else if (canvasBackground === "dots") {
           svgContent += `\n  <defs>
     <pattern id="dots" width="${spacing}" height="${spacing}" patternUnits="userSpaceOnUse">
       <circle cx="0" cy="0" r="1.5" fill="${color}"/>
     </pattern>
   </defs>
   <rect width="${bounds.width}" height="${bounds.height}" fill="url(#dots)"/>`;
-        } else if (canvasBackground === 'lines') {
+        } else if (canvasBackground === "lines") {
           svgContent += `\n  <defs>
     <pattern id="lines" width="${spacing}" height="${spacing}" patternUnits="userSpaceOnUse">
       <path d="M ${spacing} 0 L 0 0" fill="none" stroke="${color}" stroke-width="1"/>
@@ -935,25 +1060,28 @@ export function ExportImageModal({ isOpen, onClose, elements, canvasBackground }
     // Add elements
     svgContent += `\n  <g transform="translate(${-bounds.x}, ${-bounds.y})">`;
 
-    elements.forEach(el => {
+    elements.forEach((el) => {
       const opacity = (el.opacity ?? 100) / 100;
       const rot = getRotationTransform(el);
 
-      let content = '';
-      if (el.type === 'rectangle') {
-        content = `<rect x="${el.x}" y="${el.y}" width="${el.width}" height="${el.height}" stroke="${el.strokeColor}" stroke-width="${el.strokeWidth}" fill="${el.fillColor || 'none'}" rx="${el.cornerRadius ?? 0}" opacity="${opacity}"/>`;
-      } else if (el.type === 'ellipse') {
+      let content = "";
+      if (el.type === "rectangle") {
+        content = `<rect x="${el.x}" y="${el.y}" width="${el.width}" height="${el.height}" stroke="${el.strokeColor}" stroke-width="${el.strokeWidth}" fill="${el.fillColor || "none"}" rx="${el.cornerRadius ?? 0}" opacity="${opacity}"/>`;
+      } else if (el.type === "ellipse") {
         const cx = (el.x ?? 0) + (el.width ?? 0) / 2;
         const cy = (el.y ?? 0) + (el.height ?? 0) / 2;
-        content = `<ellipse cx="${cx}" cy="${cy}" rx="${(el.width ?? 0) / 2}" ry="${(el.height ?? 0) / 2}" stroke="${el.strokeColor}" stroke-width="${el.strokeWidth}" fill="${el.fillColor || 'none'}" opacity="${opacity}"/>`;
-      } else if ((el.type === 'line' || el.type === 'arrow') && el.points.length >= 2) {
+        content = `<ellipse cx="${cx}" cy="${cy}" rx="${(el.width ?? 0) / 2}" ry="${(el.height ?? 0) / 2}" stroke="${el.strokeColor}" stroke-width="${el.strokeWidth}" fill="${el.fillColor || "none"}" opacity="${opacity}"/>`;
+      } else if (
+        (el.type === "line" || el.type === "arrow") &&
+        el.points.length >= 2
+      ) {
         content = svgConnector(el, opacity);
-      } else if (el.type === 'pen' && el.points.length > 0) {
-        const pathData = `M ${el.points.map(p => `${p.x},${p.y}`).join(' L ')}`;
+      } else if (el.type === "pen" && el.points.length > 0) {
+        const pathData = `M ${el.points.map((p) => `${p.x},${p.y}`).join(" L ")}`;
         content = `<path d="${pathData}" stroke="${el.strokeColor}" stroke-width="${el.strokeWidth}" fill="none" stroke-linecap="round" stroke-linejoin="round" opacity="${opacity}"/>`;
-      } else if (el.type === 'text') {
+      } else if (el.type === "text") {
         const fontSize = (el.strokeWidth || 1) * 4 + 12;
-        content = `<text x="${el.x}" y="${(el.y ?? 0) + fontSize}" fill="${el.strokeColor}" font-size="${fontSize}" font-family="sans-serif" opacity="${opacity}">${el.text || ''}</text>`;
+        content = `<text x="${el.x}" y="${(el.y ?? 0) + fontSize}" fill="${el.strokeColor}" font-size="${fontSize}" font-family="sans-serif" opacity="${opacity}">${el.text || ""}</text>`;
       }
 
       if (!content) return;
@@ -965,12 +1093,12 @@ export function ExportImageModal({ isOpen, onClose, elements, canvasBackground }
       }
     });
 
-    svgContent += '\n  </g>';
+    svgContent += "\n  </g>";
 
     // Embed scene data if requested
     if (embedScene) {
       const sceneData = JSON.stringify({
-        type: 'shadeworks',
+        type: "shadeworks",
         version: 1,
         elements,
         appState: { canvasBackground },
@@ -980,14 +1108,14 @@ export function ExportImageModal({ isOpen, onClose, elements, canvasBackground }
   </metadata>`;
     }
 
-    svgContent += '\n</svg>';
+    svgContent += "\n</svg>";
 
     // Download SVG
-    const blob = new Blob([svgContent], { type: 'image/svg+xml' });
+    const blob = new Blob([svgContent], { type: "image/svg+xml" });
     const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
+    const link = document.createElement("a");
     link.href = url;
-    link.download = `${fileName || 'export'}.svg`;
+    link.download = `${fileName || "export"}.svg`;
     link.click();
     URL.revokeObjectURL(url);
   };
@@ -996,7 +1124,7 @@ export function ExportImageModal({ isOpen, onClose, elements, canvasBackground }
     const canvas = canvasRef.current;
     if (!canvas) return;
 
-    const ctx = canvas.getContext('2d');
+    const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
     const bounds = getSceneBounds(elements);
@@ -1008,22 +1136,28 @@ export function ExportImageModal({ isOpen, onClose, elements, canvasBackground }
     ctx.scale(scale, scale);
 
     if (includeBackground) {
-      ctx.fillStyle = darkMode ? '#0a0a0a' : '#f2f2f2';
+      ctx.fillStyle = darkMode ? "#0a0a0a" : "#f2f2f2";
       ctx.fillRect(0, 0, bounds.width, bounds.height);
     }
 
     ctx.translate(-bounds.x, -bounds.y);
 
-    elements.forEach(el => {
+    elements.forEach((el) => {
       ctx.globalAlpha = (el.opacity ?? 100) / 100;
 
-      if (el.type === 'rectangle') {
+      if (el.type === "rectangle") {
         ctx.strokeStyle = el.strokeColor;
         ctx.lineWidth = el.strokeWidth;
-        ctx.fillStyle = el.fillColor || 'transparent';
+        ctx.fillStyle = el.fillColor || "transparent";
         ctx.beginPath();
-        ctx.roundRect(el.x!, el.y!, el.width!, el.height!, el.cornerRadius ?? 0);
-        if (el.fillColor && el.fillColor !== 'transparent') ctx.fill();
+        ctx.roundRect(
+          el.x!,
+          el.y!,
+          el.width!,
+          el.height!,
+          el.cornerRadius ?? 0,
+        );
+        if (el.fillColor && el.fillColor !== "transparent") ctx.fill();
         ctx.stroke();
       }
     });
@@ -1032,10 +1166,10 @@ export function ExportImageModal({ isOpen, onClose, elements, canvasBackground }
       if (!blob) return;
       try {
         await navigator.clipboard.write([
-          new ClipboardItem({ 'image/png': blob })
+          new ClipboardItem({ "image/png": blob }),
         ]);
       } catch (err) {
-        console.error('Failed to copy to clipboard:', err);
+        console.error("Failed to copy to clipboard:", err);
       }
     });
   };
@@ -1068,7 +1202,7 @@ export function ExportImageModal({ isOpen, onClose, elements, canvasBackground }
               <canvas
                 ref={previewCanvasRef}
                 className="max-w-full max-h-[300px] rounded"
-                style={{ imageRendering: 'auto' }}
+                style={{ imageRendering: "auto" }}
               />
             </div>
             <input
@@ -1088,12 +1222,12 @@ export function ExportImageModal({ isOpen, onClose, elements, canvasBackground }
               <button
                 onClick={() => setIncludeBackground(!includeBackground)}
                 className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                  includeBackground ? 'bg-accent' : 'bg-muted'
+                  includeBackground ? "bg-accent" : "bg-muted"
                 }`}
               >
                 <span
                   className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                    includeBackground ? 'translate-x-6' : 'translate-x-1'
+                    includeBackground ? "translate-x-6" : "translate-x-1"
                   }`}
                 />
               </button>
@@ -1105,12 +1239,12 @@ export function ExportImageModal({ isOpen, onClose, elements, canvasBackground }
               <button
                 onClick={() => setDarkMode(!darkMode)}
                 className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                  darkMode ? 'bg-accent' : 'bg-muted'
+                  darkMode ? "bg-accent" : "bg-muted"
                 }`}
               >
                 <span
                   className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                    darkMode ? 'translate-x-6' : 'translate-x-1'
+                    darkMode ? "translate-x-6" : "translate-x-1"
                   }`}
                 />
               </button>
@@ -1130,7 +1264,9 @@ export function ExportImageModal({ isOpen, onClose, elements, canvasBackground }
                   </button>
                   {showEmbedTooltip && (
                     <div className="absolute left-0 top-6 w-64 p-2 bg-popover border border-border rounded-md shadow-lg text-xs z-10">
-                      Scene data will be saved into the PNG/SVG file so that the scene can be restored from it. Will increase exported file size.
+                      Scene data will be saved into the PNG/SVG file so that the
+                      scene can be restored from it. Will increase exported file
+                      size.
                     </div>
                   )}
                 </div>
@@ -1138,12 +1274,12 @@ export function ExportImageModal({ isOpen, onClose, elements, canvasBackground }
               <button
                 onClick={() => setEmbedScene(!embedScene)}
                 className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                  embedScene ? 'bg-accent' : 'bg-muted'
+                  embedScene ? "bg-accent" : "bg-muted"
                 }`}
               >
                 <span
                   className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                    embedScene ? 'translate-x-6' : 'translate-x-1'
+                    embedScene ? "translate-x-6" : "translate-x-1"
                   }`}
                 />
               </button>
@@ -1159,8 +1295,8 @@ export function ExportImageModal({ isOpen, onClose, elements, canvasBackground }
                     onClick={() => setScale(s)}
                     className={`px-3 py-1 rounded-md transition-colors text-sm ${
                       scale === s
-                        ? 'bg-accent text-accent-foreground'
-                        : 'bg-muted hover:bg-muted/80'
+                        ? "bg-accent text-accent-foreground"
+                        : "bg-muted hover:bg-muted/80"
                     }`}
                   >
                     {s}×
@@ -1173,14 +1309,14 @@ export function ExportImageModal({ isOpen, onClose, elements, canvasBackground }
             <div className="pt-4 space-y-2">
               <div className="flex gap-2">
                 <button
-                  onClick={() => exportImage('png')}
+                  onClick={() => exportImage("png")}
                   className="flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 bg-accent hover:bg-accent/90 text-accent-foreground rounded-md transition-colors text-sm"
                 >
                   <Download className="w-3.5 h-3.5" />
                   PNG
                 </button>
                 <button
-                  onClick={() => exportImage('svg')}
+                  onClick={() => exportImage("svg")}
                   className="flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 bg-accent hover:bg-accent/90 text-accent-foreground rounded-md transition-colors text-sm"
                 >
                   <Download className="w-3.5 h-3.5" />

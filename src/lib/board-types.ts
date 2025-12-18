@@ -1,14 +1,15 @@
 export type Tool =
-  | 'hand'
-  | 'select'
-  | 'pen'
-  | 'line'
-  | 'arrow'
-  | 'rectangle'
-  | 'ellipse'
-  | 'eraser'
-  | 'text'
-  | 'laser';
+  | "hand"
+  | "select"
+  | "pen"
+  | "line"
+  | "arrow"
+  | "rectangle"
+  | "diamond"
+  | "ellipse"
+  | "eraser"
+  | "text"
+  | "laser";
 
 export interface Point {
   x: number;
@@ -17,7 +18,17 @@ export interface Point {
 
 export interface BoardElement {
   id: string;
-  type: 'pen' | 'line' | 'arrow' | 'rectangle' | 'ellipse' | 'text' | 'frame' | 'web-embed' | 'laser';
+  type:
+    | "pen"
+    | "line"
+    | "arrow"
+    | "rectangle"
+    | "diamond"
+    | "ellipse"
+    | "text"
+    | "frame"
+    | "web-embed"
+    | "laser";
   groupId?: string;
   points: Point[];
   /**
@@ -45,42 +56,42 @@ export interface BoardElement {
   timestamp?: number;
   // Style properties
   opacity?: number;
-  strokeStyle?: 'solid' | 'dashed' | 'dotted';
+  strokeStyle?: "solid" | "dashed" | "dotted";
   cornerRadius?: number;
-  lineCap?: 'butt' | 'round';
+  lineCap?: "butt" | "round";
   // Connector (line/arrow) properties
-  connectorStyle?: 'sharp' | 'curved' | 'elbow';
-  elbowRoute?: 'vertical' | 'horizontal';
+  connectorStyle?: "sharp" | "curved" | "elbow";
+  elbowRoute?: "vertical" | "horizontal";
   arrowStart?:
-    | 'none'
-    | 'arrow'
-    | 'triangle'
-    | 'triangle-outline'
-    | 'diamond'
-    | 'diamond-outline'
-    | 'circle'
-    | 'circle-outline'
-    | 'bar';
+    | "none"
+    | "arrow"
+    | "triangle"
+    | "triangle-outline"
+    | "diamond"
+    | "diamond-outline"
+    | "circle"
+    | "circle-outline"
+    | "bar";
   arrowEnd?:
-    | 'none'
-    | 'arrow'
-    | 'triangle'
-    | 'triangle-outline'
-    | 'diamond'
-    | 'diamond-outline'
-    | 'circle'
-    | 'circle-outline'
-    | 'bar';
+    | "none"
+    | "arrow"
+    | "triangle"
+    | "triangle-outline"
+    | "diamond"
+    | "diamond-outline"
+    | "circle"
+    | "circle-outline"
+    | "bar";
   // Text properties
   fontFamily?: string;
-  textAlign?: 'left' | 'center' | 'right';
+  textAlign?: "left" | "center" | "right";
   fontSize?: number;
   letterSpacing?: number;
   lineHeight?: number;
   // Layer order
   zIndex?: number;
   // Pattern fill properties
-  fillPattern?: 'none' | 'solid' | 'criss-cross';
+  fillPattern?: "none" | "solid" | "criss-cross";
   isClosed?: boolean;
 }
 
@@ -93,59 +104,64 @@ export interface Cursor {
 }
 
 export const COLORS = [
-  '#000000',
-  '#ffffff',
-  '#f87171',
-  '#fb923c',
-  '#fbbf24',
-  '#a3e635',
-  '#4ade80',
-  '#34d399',
-  '#22d3d8',
-  '#38bdf8',
-  '#60a5fa',
-  '#818cf8',
-  '#a78bfa',
-  '#c084fc',
-  '#e879f9',
-  '#f472b6',
+  "#000000",
+  "#ffffff",
+  "#f87171",
+  "#fb923c",
+  "#fbbf24",
+  "#a3e635",
+  "#4ade80",
+  "#34d399",
+  "#22d3d8",
+  "#38bdf8",
+  "#60a5fa",
+  "#818cf8",
+  "#a78bfa",
+  "#c084fc",
+  "#e879f9",
+  "#f472b6",
 ];
 
 export const STROKE_WIDTHS = [2, 4, 6, 8, 12];
 
 export const FONTS = [
-  { name: 'Inter', value: 'var(--font-inter)' },
-  { name: 'Roboto', value: 'var(--font-roboto)' },
-  { name: 'Playfair', value: 'var(--font-playfair)' },
-  { name: 'Merriweather', value: 'var(--font-merriweather)' },
-  { name: 'Fira Code', value: 'var(--font-fira-code)' },
-  { name: 'Caveat', value: 'var(--font-caveat)' },
-  { name: 'Lobster', value: 'var(--font-lobster)' },
+  { name: "Inter", value: "var(--font-inter)" },
+  { name: "Roboto", value: "var(--font-roboto)" },
+  { name: "Playfair", value: "var(--font-playfair)" },
+  { name: "Merriweather", value: "var(--font-merriweather)" },
+  { name: "Fira Code", value: "var(--font-fira-code)" },
+  { name: "Caveat", value: "var(--font-caveat)" },
+  { name: "Lobster", value: "var(--font-lobster)" },
 ];
 
-export const FONT_SIZES = [8, 10, 12, 14, 16, 18, 20, 24, 28, 32, 36, 40, 48, 56, 64, 72, 80, 96];
+export const FONT_SIZES = [
+  8, 10, 12, 14, 16, 18, 20, 24, 28, 32, 36, 40, 48, 56, 64, 72, 80, 96,
+];
 
-export const DEFAULT_PEN_FILL_COLOR = '#d1d5db';
+export const DEFAULT_PEN_FILL_COLOR = "#d1d5db";
 
 // Utility function to detect if a pen stroke forms a closed shape
-export function isClosedShape(points: Point[], threshold: number = 10): boolean {
+export function isClosedShape(
+  points: Point[],
+  threshold: number = 10,
+): boolean {
   if (points.length < 10) return false;
 
   const first = points[0];
   const last = points[points.length - 1];
   const distance = Math.sqrt(
-    Math.pow(last.x - first.x, 2) + Math.pow(last.y - first.y, 2)
+    Math.pow(last.x - first.x, 2) + Math.pow(last.y - first.y, 2),
   );
 
   return distance < threshold;
 }
 
 export interface ShadeworksFile {
-  type: 'shadeworks';
+  type: "shadeworks";
   version: number;
   elements: BoardElement[];
   appState: {
-    canvasBackground: 'none' | 'dots' | 'lines' | 'grid';
+    canvasBackground: "none" | "dots" | "lines" | "grid";
     gridSize?: number;
     viewBackgroundColor?: string;
   };

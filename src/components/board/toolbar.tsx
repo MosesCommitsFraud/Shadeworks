@@ -1,4 +1,4 @@
-'use client';
+"use client";
 
 import {
   MousePointer2,
@@ -6,6 +6,7 @@ import {
   Minus,
   ArrowRight,
   Square,
+  Diamond,
   Circle,
   Eraser,
   Type,
@@ -16,13 +17,17 @@ import {
   Lock,
   Unlock,
   Hand,
-} from 'lucide-react';
-import { Tool } from '@/lib/board-types';
-import type { ConnectionStatus } from '@/lib/collaboration';
-import { cn } from '@/lib/utils';
-import { useState, useEffect } from 'react';
-import { CollaboratorAvatars } from './collaborator-avatars';
-import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/animate-ui/components/radix/tooltip';
+} from "lucide-react";
+import { Tool } from "@/lib/board-types";
+import type { ConnectionStatus } from "@/lib/collaboration";
+import { cn } from "@/lib/utils";
+import { useState, useEffect } from "react";
+import { CollaboratorAvatars } from "./collaborator-avatars";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/animate-ui/components/radix/tooltip";
 
 interface ToolbarProps {
   selectedTool: Tool;
@@ -37,24 +42,35 @@ interface ToolbarProps {
   peerCount: number;
   connectionStatus: ConnectionStatus;
   myName: string;
-  collaboratorUsers: Array<{ id: string; name: string; color: string; viewport?: { pan: { x: number; y: number }; zoom: number } }>;
+  collaboratorUsers: Array<{
+    id: string;
+    name: string;
+    color: string;
+    viewport?: { pan: { x: number; y: number }; zoom: number };
+  }>;
   onFollowUser: (userId: string) => void;
   followedUserId: string | null;
   isToolLocked: boolean;
   onToggleToolLock: () => void;
 }
 
-const tools: { id: Tool; icon: React.ElementType; label: string; hotkey: number | string }[] = [
-  { id: 'hand', icon: Hand, label: 'Hand', hotkey: 'H' },
-  { id: 'select', icon: MousePointer2, label: 'Select', hotkey: 'V' },
-  { id: 'pen', icon: Pencil, label: 'Pen', hotkey: 1 },
-  { id: 'line', icon: Minus, label: 'Line', hotkey: 2 },
-  { id: 'arrow', icon: ArrowRight, label: 'Arrow', hotkey: 3 },
-  { id: 'rectangle', icon: Square, label: 'Rectangle', hotkey: 4 },
-  { id: 'ellipse', icon: Circle, label: 'Ellipse', hotkey: 5 },
-  { id: 'text', icon: Type, label: 'Text', hotkey: 6 },
-  { id: 'eraser', icon: Eraser, label: 'Eraser', hotkey: 7 },
-  { id: 'laser', icon: Pointer, label: 'Laser Pointer', hotkey: 8 },
+const tools: {
+  id: Tool;
+  icon: React.ElementType;
+  label: string;
+  hotkey: number | string;
+}[] = [
+  { id: "hand", icon: Hand, label: "Hand", hotkey: "H" },
+  { id: "select", icon: MousePointer2, label: "Select", hotkey: "V" },
+  { id: "pen", icon: Pencil, label: "Pen", hotkey: 1 },
+  { id: "line", icon: Minus, label: "Line", hotkey: 2 },
+  { id: "arrow", icon: ArrowRight, label: "Arrow", hotkey: 3 },
+  { id: "rectangle", icon: Square, label: "Rectangle", hotkey: 4 },
+  { id: "diamond", icon: Diamond, label: "Diamond", hotkey: 5 },
+  { id: "ellipse", icon: Circle, label: "Ellipse", hotkey: 6 },
+  { id: "text", icon: Type, label: "Text", hotkey: 7 },
+  { id: "eraser", icon: Eraser, label: "Eraser", hotkey: 8 },
+  { id: "laser", icon: Pointer, label: "Laser Pointer", hotkey: 9 },
 ];
 
 export function Toolbar({
@@ -89,17 +105,20 @@ export function Toolbar({
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       // Don't trigger if user is typing in an input
-      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
+      if (
+        e.target instanceof HTMLInputElement ||
+        e.target instanceof HTMLTextAreaElement
+      ) {
         return;
       }
 
       // Letter keys for tools
-      if (e.key === 'h' || e.key === 'H') {
-        onToolChange('hand');
+      if (e.key === "h" || e.key === "H") {
+        onToolChange("hand");
         return;
       }
-      if (e.key === 'v' || e.key === 'V') {
-        onToolChange('select');
+      if (e.key === "v" || e.key === "V") {
+        onToolChange("select");
         return;
       }
 
@@ -111,8 +130,8 @@ export function Toolbar({
       }
     };
 
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
   }, [onToolChange]);
 
   return (
@@ -124,11 +143,11 @@ export function Toolbar({
             <button
               onClick={onToggleToolLock}
               className={cn(
-                'relative h-10 w-10 rounded-sm transition-all duration-200 flex items-center justify-center',
-                'hover:bg-secondary/80',
+                "relative h-10 w-10 rounded-sm transition-all duration-200 flex items-center justify-center",
+                "hover:bg-secondary/80",
                 isToolLocked
-                  ? 'bg-accent text-accent-foreground shadow-lg'
-                  : 'text-muted-foreground hover:text-foreground'
+                  ? "bg-accent text-accent-foreground shadow-lg"
+                  : "text-muted-foreground hover:text-foreground",
               )}
             >
               {isToolLocked ? (
@@ -140,11 +159,11 @@ export function Toolbar({
           </TooltipTrigger>
           <TooltipContent>
             <div className="flex flex-col gap-1">
-              <span>{isToolLocked ? 'Tool Locked' : 'Tool Unlocked'}</span>
+              <span>{isToolLocked ? "Tool Locked" : "Tool Unlocked"}</span>
               <span className="text-xs text-muted-foreground">
                 {isToolLocked
-                  ? 'Tool will not switch after drawing'
-                  : 'Tool will switch to select after drawing'}
+                  ? "Tool will not switch after drawing"
+                  : "Tool will switch to select after drawing"}
               </span>
             </div>
           </TooltipContent>
@@ -158,11 +177,11 @@ export function Toolbar({
             key={tool.id}
             onClick={() => onToolChange(tool.id)}
             className={cn(
-              'relative h-10 w-10 rounded-sm transition-all duration-200 flex items-center justify-center',
-              'hover:bg-secondary/80',
+              "relative h-10 w-10 rounded-sm transition-all duration-200 flex items-center justify-center",
+              "hover:bg-secondary/80",
               selectedTool === tool.id
-                ? 'bg-accent text-accent-foreground shadow-lg'
-                : 'text-muted-foreground hover:text-foreground'
+                ? "bg-accent text-accent-foreground shadow-lg"
+                : "text-muted-foreground hover:text-foreground",
             )}
           >
             <tool.icon className="w-[18px] h-[18px]" />
@@ -181,25 +200,36 @@ export function Toolbar({
           <div
             className={cn(
               "w-2 h-2 rounded-full shrink-0",
-              connectionStatus === 'connected' && peerCount > 0 ? "bg-green-500" :
-              connectionStatus === 'connected' ? "bg-yellow-500 animate-pulse" :
-              connectionStatus === 'connecting' ? "bg-yellow-500 animate-pulse" :
-              "bg-red-500"
+              connectionStatus === "connected" && peerCount > 0
+                ? "bg-green-500"
+                : connectionStatus === "connected"
+                  ? "bg-yellow-500 animate-pulse"
+                  : connectionStatus === "connecting"
+                    ? "bg-yellow-500 animate-pulse"
+                    : "bg-red-500",
             )}
             title={
-              connectionStatus === 'connected' && peerCount > 0
+              connectionStatus === "connected" && peerCount > 0
                 ? `Connected to ${peerCount} peer(s)`
-                : connectionStatus === 'connected'
-                  ? 'Waiting for collaborators...'
-                  : connectionStatus === 'connecting'
-                    ? 'Connecting...'
-                    : 'Disconnected'
+                : connectionStatus === "connected"
+                  ? "Waiting for collaborators..."
+                  : connectionStatus === "connecting"
+                    ? "Connecting..."
+                    : "Disconnected"
             }
           />
-          <span className="text-xs font-medium text-foreground max-w-[140px] truncate" title={myName}>
+          <span
+            className="text-xs font-medium text-foreground max-w-[140px] truncate"
+            title={myName}
+          >
             {myName}
           </span>
-          <CollaboratorAvatars users={collaboratorUsers} maxDisplay={5} onFollowUser={onFollowUser} followedUserId={followedUserId} />
+          <CollaboratorAvatars
+            users={collaboratorUsers}
+            maxDisplay={5}
+            onFollowUser={onFollowUser}
+            followedUserId={followedUserId}
+          />
         </div>
 
         <div className="w-px h-5 bg-border" />
@@ -208,10 +238,10 @@ export function Toolbar({
         <button
           onClick={copyInviteLink}
           className={cn(
-            'flex items-center gap-1.5 px-2.5 py-1.5 rounded-sm transition-all duration-200',
+            "flex items-center gap-1.5 px-2.5 py-1.5 rounded-sm transition-all duration-200",
             copied
-              ? 'bg-green-500/20 text-green-400'
-              : 'hover:bg-secondary/80 text-muted-foreground hover:text-foreground'
+              ? "bg-green-500/20 text-green-400"
+              : "hover:bg-secondary/80 text-muted-foreground hover:text-foreground",
           )}
         >
           {copied ? (
