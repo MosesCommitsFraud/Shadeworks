@@ -3231,6 +3231,12 @@ export function Canvas({
           <g>
             {handles.slice(0, -1).map((h, i) => {
               const next = handles[i + 1];
+              const segLenPx = Math.hypot(next.pos.x - h.pos.x, next.pos.y - h.pos.y) * zoom;
+              const existingDiameterPx = existingRadius * 2 * zoom;
+              const insertDiameterPx = baseRadius * 2 * zoom;
+              const minGapPx = 6;
+              const canShow = segLenPx >= existingDiameterPx + insertDiameterPx + minGapPx;
+              if (!canShow) return null;
               const cx = (h.pos.x + next.pos.x) / 2;
               const cy = (h.pos.y + next.pos.y) / 2;
               return (
