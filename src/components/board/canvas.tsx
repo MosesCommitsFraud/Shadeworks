@@ -936,6 +936,13 @@ export function Canvas({
   const [remoteDrawingElements, setRemoteDrawingElements] = useState<
     Array<{ id: string; color: string; element: BoardElement }>
   >([]);
+  const remotelyEditingTextIds = useMemo(() => {
+    const ids = new Set<string>();
+    remoteDrawingElements.forEach(({ element }) => {
+      if (element.type === "text") ids.add(element.id);
+    });
+    return ids;
+  }, [remoteDrawingElements]);
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const [isPanning, setIsPanning] = useState(false);
   const [panStart, setPanStart] = useState({ x: 0, y: 0 });
@@ -949,6 +956,19 @@ export function Canvas({
   } | null>(null);
   const [textValue, setTextValue] = useState("");
   const textInputRef = useRef<HTMLTextAreaElement>(null);
+  const [editingTextElementId, setEditingTextElementId] = useState<
+    string | null
+  >(null);
+  const [editingTextStyle, setEditingTextStyle] = useState<{
+    strokeColor: string;
+    strokeWidth: number;
+    opacity: number;
+    fontFamily: string;
+    textAlign: "left" | "center" | "right";
+    fontSize: number;
+    letterSpacing: number;
+    lineHeight: number;
+  } | null>(null);
   const [lastMousePos, setLastMousePos] = useState<Point>({ x: 0, y: 0 });
 
   // Eraser preview state
@@ -963,6 +983,8 @@ export function Canvas({
   const elementsRef = useRef(elements);
   const pendingCursorPosRef = useRef<Point | null>(null);
   const cursorBroadcastRafRef = useRef<number | null>(null);
+  const pendingDrawingElementRef = useRef<BoardElement | null>(null);
+  const drawingElementBroadcastRafRef = useRef<number | null>(null);
 
   // Move and resize state
   const [isDragging, setIsDragging] = useState(false);
@@ -1180,8 +1202,63 @@ export function Canvas({
   // Broadcast current drawing element to other users
   useEffect(() => {
     if (!collaboration) return;
+
+    // Prefer sending a live text draft while editing; otherwise send in-progress drawings.
+    if (textInput) {
+      const draft: BoardElement = {
+        id:
+          editingTextElementId ??
+          `text-draft-${collaboration.getUserInfo().id}`,
+        type: "text",
+        points: [],
+        text: textValue,
+        x: textInput.x,
+        y: textInput.y,
+        width: textInput.width ?? 200,
+        height:
+          textInput.height ??
+          (editingTextStyle?.fontSize ?? fontSize) *
+            (editingTextStyle?.lineHeight ?? lineHeight) +
+            8 * 2,
+        isTextBox: true,
+        strokeColor: editingTextStyle?.strokeColor ?? strokeColor,
+        strokeWidth: editingTextStyle?.strokeWidth ?? strokeWidth,
+        opacity: editingTextStyle?.opacity ?? opacity,
+        fontFamily: editingTextStyle?.fontFamily ?? fontFamily,
+        textAlign: editingTextStyle?.textAlign ?? textAlign,
+        fontSize: editingTextStyle?.fontSize ?? fontSize,
+        letterSpacing: editingTextStyle?.letterSpacing ?? letterSpacing,
+        lineHeight: editingTextStyle?.lineHeight ?? lineHeight,
+        scaleX: 1,
+        scaleY: 1,
+      };
+      pendingDrawingElementRef.current = draft;
+      if (drawingElementBroadcastRafRef.current === null) {
+        drawingElementBroadcastRafRef.current = requestAnimationFrame(() => {
+          drawingElementBroadcastRafRef.current = null;
+          collaboration.updateDrawingElement(pendingDrawingElementRef.current);
+        });
+      }
+      return;
+    }
+
     collaboration.updateDrawingElement(currentElement);
-  }, [collaboration, currentElement]);
+  }, [
+    collaboration,
+    currentElement,
+    editingTextElementId,
+    editingTextStyle,
+    fontFamily,
+    fontSize,
+    letterSpacing,
+    lineHeight,
+    opacity,
+    strokeColor,
+    strokeWidth,
+    textAlign,
+    textInput,
+    textValue,
+  ]);
 
   // Broadcast viewport changes to other users
   useEffect(() => {
@@ -1215,6 +1292,9 @@ export function Canvas({
     return () => {
       if (cursorBroadcastRafRef.current !== null) {
         cancelAnimationFrame(cursorBroadcastRafRef.current);
+      }
+      if (drawingElementBroadcastRafRef.current !== null) {
+        cancelAnimationFrame(drawingElementBroadcastRafRef.current);
       }
     };
   }, []);
@@ -2828,13 +2908,24 @@ export function Canvas({
             isTextBox: true,
           });
           setTextValue(clickedElement.text ?? "");
-          // Delete the existing element so we can recreate it when done
-          onDeleteElement(clickedElement.id);
+          setEditingTextElementId(clickedElement.id);
+          setEditingTextStyle({
+            strokeColor: clickedElement.strokeColor,
+            strokeWidth: clickedElement.strokeWidth,
+            opacity: clickedElement.opacity ?? 100,
+            fontFamily: clickedElement.fontFamily || "var(--font-inter)",
+            textAlign: clickedElement.textAlign || "left",
+            fontSize: clickedElement.fontSize ?? editFontSize,
+            letterSpacing: clickedElement.letterSpacing ?? 0,
+            lineHeight: clickedElement.lineHeight ?? editLineHeight,
+          });
           setTimeout(() => textInputRef.current?.focus(), 10);
           return;
         }
 
         // Start tracking if user drags to create a text box (click does nothing)
+        setEditingTextElementId(null);
+        setEditingTextStyle(null);
         setStartPoint(point);
         setIsDrawing(true);
         return;
@@ -3056,12 +3147,11 @@ export function Canvas({
 
         const padding = 8;
         const minHeight = fontSize * lineHeight + padding * 2 + 4 / zoom;
-        const nextWidth = Math.max(width, 60);
 
         setTextInput({
           x,
           y,
-          width: nextWidth,
+          width,
           height: minHeight,
           isTextBox: true,
         });
@@ -3176,29 +3266,56 @@ export function Canvas({
   const handleTextSubmit = useCallback(() => {
     if (textInput && textValue.trim()) {
       // Always create a text box (single-line by default, expands on Enter).
-      const nextElementId = uuid();
-      const newElement: BoardElement = {
+      const activeStrokeColor = editingTextStyle?.strokeColor ?? strokeColor;
+      const activeStrokeWidth = editingTextStyle?.strokeWidth ?? strokeWidth;
+      const activeOpacity = editingTextStyle?.opacity ?? opacity;
+      const activeFontFamily = editingTextStyle?.fontFamily ?? fontFamily;
+      const activeTextAlign = editingTextStyle?.textAlign ?? textAlign;
+      const activeFontSize = editingTextStyle?.fontSize ?? fontSize;
+      const activeLetterSpacing =
+        editingTextStyle?.letterSpacing ?? letterSpacing;
+      const activeLineHeight = editingTextStyle?.lineHeight ?? lineHeight;
+
+      const nextElementId = editingTextElementId ?? uuid();
+      const measuredWidth =
+        textInputRef.current && zoom
+          ? textInputRef.current.offsetWidth / zoom
+          : undefined;
+      const measuredHeight =
+        textInputRef.current && zoom
+          ? textInputRef.current.offsetHeight / zoom
+          : undefined;
+      const nextElement: BoardElement = {
         id: nextElementId,
         type: "text",
         points: [],
-        strokeColor,
-        strokeWidth,
+        strokeColor: activeStrokeColor,
+        strokeWidth: activeStrokeWidth,
         text: textValue,
         x: textInput.x,
         y: textInput.y,
-        width: textInput.width ?? 200,
-        height: textInput.height ?? fontSize * lineHeight + 8 * 2 + 4 / zoom,
+        width: measuredWidth ?? textInput.width ?? 200,
+        height:
+          measuredHeight ??
+          textInput.height ??
+          activeFontSize * activeLineHeight + 8 * 2 + 4 / zoom,
         isTextBox: true,
         scaleX: 1,
         scaleY: 1,
-        opacity,
-        fontFamily,
-        textAlign,
-        fontSize,
-        letterSpacing,
-        lineHeight,
+        opacity: activeOpacity,
+        fontFamily: activeFontFamily,
+        textAlign: activeTextAlign,
+        fontSize: activeFontSize,
+        letterSpacing: activeLetterSpacing,
+        lineHeight: activeLineHeight,
       };
-      onAddElement(newElement);
+
+      if (editingTextElementId) {
+        const { id: _ignoredId, ...updates } = nextElement;
+        onUpdateElement(editingTextElementId, updates);
+      } else {
+        onAddElement(nextElement);
+      }
 
       setSelectedIds([nextElementId]);
       if (onToolChange && !isToolLocked) {
@@ -3207,7 +3324,11 @@ export function Canvas({
     }
     setTextInput(null);
     setTextValue("");
+    setEditingTextElementId(null);
+    setEditingTextStyle(null);
   }, [
+    editingTextElementId,
+    editingTextStyle,
     textInput,
     textValue,
     strokeColor,
@@ -3219,6 +3340,7 @@ export function Canvas({
     letterSpacing,
     lineHeight,
     onAddElement,
+    onUpdateElement,
     onToolChange,
     setSelectedIds,
     textInputRef,
@@ -3250,7 +3372,10 @@ export function Canvas({
     if (textInputRef.current && textInput) {
       const textarea = textInputRef.current;
       const padding = 8;
-      const minHeightWorld = fontSize * lineHeight + padding * 2 + 4 / zoom;
+      const activeFontSize = editingTextStyle?.fontSize ?? fontSize;
+      const activeLineHeight = editingTextStyle?.lineHeight ?? lineHeight;
+      const minHeightWorld =
+        activeFontSize * activeLineHeight + padding * 2 + 4 / zoom;
       const minHeightPx = Math.max(
         minHeightWorld * zoom,
         (textInput.height ?? 0) * zoom,
@@ -3269,7 +3394,7 @@ export function Canvas({
         );
       }
     }
-  }, [fontSize, lineHeight, textValue, textInput, zoom]);
+  }, [editingTextStyle, fontSize, lineHeight, textValue, textInput, zoom]);
 
   const getConnectorDragPreviewElement = useCallback(
     (element: BoardElement): BoardElement => {
@@ -4349,6 +4474,13 @@ export function Canvas({
         );
       }
       case "text": {
+        if (editingTextElementId && element.id === editingTextElementId) {
+          return null;
+        }
+        if (remotelyEditingTextIds.has(element.id)) {
+          return null;
+        }
+
         const elOpacity = (element.opacity ?? 100) / 100;
         const fontSize = element.fontSize ?? element.strokeWidth * 4 + 12;
         const elLetterSpacing = element.letterSpacing ?? 0;
@@ -4417,7 +4549,8 @@ export function Canvas({
                       textAnchor={textAnchor}
                       letterSpacing={`${elLetterSpacing}px`}
                       x={textX}
-                      y={y + padding + baselineOffset + i * lineHeight}
+                      y={y + padding + i * lineHeight}
+                      dominantBaseline="text-before-edge"
                       opacity={
                         isMarkedForDeletion ? elOpacity * 0.3 : elOpacity
                       }
@@ -6167,10 +6300,12 @@ export function Canvas({
           {remoteDrawingElements.map(({ id, color, element }) => (
             <g key={`remote-drawing-${id}`} opacity={0.7}>
               {renderElement(
-                {
-                  ...element,
-                  strokeColor: color,
-                },
+                element.type === "text"
+                  ? element
+                  : {
+                      ...element,
+                      strokeColor: color,
+                    },
                 true,
               )}
             </g>
@@ -6292,6 +6427,8 @@ export function Canvas({
             if (e.key === "Escape") {
               setTextInput(null);
               setTextValue("");
+              setEditingTextElementId(null);
+              setEditingTextStyle(null);
             }
           }}
           onBlur={(e) => {
@@ -6312,6 +6449,8 @@ export function Canvas({
             } else {
               setTextInput(null);
               setTextValue("");
+              setEditingTextElementId(null);
+              setEditingTextStyle(null);
             }
           }}
           className="absolute bg-transparent border-2 border-dashed border-accent/50 outline-none text-foreground resize-none"
@@ -6319,16 +6458,22 @@ export function Canvas({
             left: textInput.x * zoom + pan.x,
             top: textInput.y * zoom + pan.y,
             width: (textInput.width ?? 200) * zoom,
-            fontSize: fontSize * zoom,
-            fontFamily: fontFamily,
-            letterSpacing: `${letterSpacing}px`,
-            color: strokeColor,
-            lineHeight: lineHeight.toString(),
-            textAlign: textAlign,
+            height:
+              (textInput.height ??
+                (editingTextStyle?.fontSize ?? fontSize) *
+                  (editingTextStyle?.lineHeight ?? lineHeight) +
+                  8 * 2 +
+                  4 / zoom) * zoom,
+            fontSize: (editingTextStyle?.fontSize ?? fontSize) * zoom,
+            fontFamily: editingTextStyle?.fontFamily ?? fontFamily,
+            letterSpacing: `${editingTextStyle?.letterSpacing ?? letterSpacing}px`,
+            color: editingTextStyle?.strokeColor ?? strokeColor,
+            lineHeight: (editingTextStyle?.lineHeight ?? lineHeight).toString(),
+            textAlign: editingTextStyle?.textAlign ?? textAlign,
             // Match SVG padding: horizontal is 8, vertical is 8 but adjusted for baseline
             paddingLeft: `${8 * zoom}px`,
             paddingRight: `${8 * zoom}px`,
-            paddingTop: `${(8 - fontSize * 0.18) * zoom}px`,
+            paddingTop: `${8 * zoom}px`,
             paddingBottom: `${8 * zoom}px`,
             overflowX: "auto",
             overflowY: "hidden",
