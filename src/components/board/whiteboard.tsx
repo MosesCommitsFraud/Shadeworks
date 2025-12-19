@@ -12,6 +12,7 @@ import { ExportImageModal } from "./export-image-modal";
 import { FindCanvas } from "./find-canvas";
 import { HotkeysDialog } from "./hotkeys-dialog";
 import { InviteDialog } from "./invite-dialog";
+import { JoinModal } from "./join-modal";
 import {
     CollaborationManager,
     type ConnectionStatus,
@@ -211,6 +212,8 @@ export function Whiteboard({ roomId }: WhiteboardProps) {
     const [showFindCanvas, setShowFindCanvas] = useState(false);
     const [showHotkeysDialog, setShowHotkeysDialog] = useState(false);
     const [showInviteDialog, setShowInviteDialog] = useState(false);
+    const [showJoinModal, setShowJoinModal] = useState(false);
+    const [pendingName, setPendingName] = useState<string | null>(null);
     const [highlightedElementIds, setHighlightedElementIds] = useState<
         string[]
     >([]);
@@ -252,8 +255,26 @@ export function Whiteboard({ roomId }: WhiteboardProps) {
         }
     }, [theme, resolvedTheme, strokeColor, collaboration, elements]);
 
-    // Initialize collaboration with a random funny name and E2E encryption
+    // Check if we need to show join modal (no existing name)
     useEffect(() => {
+        const existingName = sessionStorage.getItem("shadeworks-name");
+        if (!existingName && !isReadOnly) {
+            setShowJoinModal(true);
+        } else if (existingName) {
+            setPendingName(existingName);
+        } else {
+            // Read-only mode without a name - generate one silently
+            const name = generateFunnyName();
+            sessionStorage.setItem("shadeworks-name", name);
+            setPendingName(name);
+        }
+    }, [isReadOnly]);
+
+    // Initialize collaboration with the user's name and E2E encryption
+    useEffect(() => {
+        // Wait for name to be set (either from storage or join modal)
+        if (!pendingName) return;
+
         let mounted = true;
         let collab: CollaborationManager | null = null;
         let unsubElements: (() => void) | null = null;
@@ -261,12 +282,7 @@ export function Whiteboard({ roomId }: WhiteboardProps) {
         let unsubConnection: (() => void) | null = null;
 
         const initializeCollaboration = async () => {
-            // Get or generate a funny name for this session
-            let name = sessionStorage.getItem("shadeworks-name");
-            if (!name) {
-                name = generateFunnyName();
-                sessionStorage.setItem("shadeworks-name", name);
-            }
+            const name = pendingName;
             if (mounted) setMyName(name);
 
             // Try to get encryption key from URL hash
@@ -388,7 +404,7 @@ export function Whiteboard({ roomId }: WhiteboardProps) {
             unsubConnection?.();
             collab?.destroy();
         };
-    }, [roomId, isReadOnly]);
+    }, [roomId, isReadOnly, pendingName]);
 
     // Save state to undo stack
     const saveToUndoStack = useCallback(() => {
@@ -1389,6 +1405,14 @@ export function Whiteboard({ roomId }: WhiteboardProps) {
                 onNameChange={(newName) => {
                     setMyName(newName);
                     collaboration?.updateUserName(newName);
+                }}
+            />
+
+            <JoinModal
+                open={showJoinModal}
+                onJoin={(name) => {
+                    setShowJoinModal(false);
+                    setPendingName(name);
                 }}
             />
 
