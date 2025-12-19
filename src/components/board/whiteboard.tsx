@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useTheme } from "next-themes";
 import { v4 as uuid } from "uuid";
 import { Canvas } from "./canvas";
@@ -1238,12 +1238,23 @@ export function Whiteboard({ roomId }: WhiteboardProps) {
   }, [collaboration, followedUserId]);
 
   // Broadcast selected elements to other users
+  const selectedIdsKey = useMemo(() => {
+    if (selectedElements.length === 0) return "";
+    return selectedElements
+      .map((el) => el.id)
+      .slice()
+      .sort()
+      .join("|");
+  }, [selectedElements]);
+  const lastSentSelectedIdsKeyRef = useRef<string | null>(null);
   useEffect(() => {
-    if (collaboration) {
-      const selectedIds = selectedElements.map((el) => el.id);
-      collaboration.updateSelectedElements(selectedIds);
-    }
-  }, [collaboration, selectedElements]);
+    if (!collaboration) return;
+    if (lastSentSelectedIdsKeyRef.current === selectedIdsKey) return;
+
+    lastSentSelectedIdsKeyRef.current = selectedIdsKey;
+    const selectedIds = selectedIdsKey ? selectedIdsKey.split("|") : [];
+    collaboration.updateSelectedElements(selectedIds);
+  }, [collaboration, selectedIdsKey]);
 
   // Hide the logo bar in smaller windows (match ToolSidebar condensed thresholds).
   useEffect(() => {

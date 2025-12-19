@@ -249,8 +249,6 @@ export class CollaborationManager {
 
       const updated = { ...currentElement, ...updates };
 
-      this.elements.delete(index, 1);
-
       if (this.encryptionKey) {
         const { ciphertext, iv } = await encrypt(this.encryptionKey, updated);
         const encrypted: EncryptedElement = {
@@ -259,11 +257,19 @@ export class CollaborationManager {
           ciphertext,
           iv,
         };
-        this.elements.insert(index, [encrypted]);
+        // Replace atomically to avoid transient delete/insert flicker in observers.
+        this.doc.transact(() => {
+          this.elements.delete(index, 1);
+          this.elements.insert(index, [encrypted]);
+        });
         // Update cache
         this.decryptedElementsCache.set(id, updated);
       } else {
-        this.elements.insert(index, [updated]);
+        // Replace atomically to avoid transient delete/insert flicker in observers.
+        this.doc.transact(() => {
+          this.elements.delete(index, 1);
+          this.elements.insert(index, [updated]);
+        });
       }
     }
   }

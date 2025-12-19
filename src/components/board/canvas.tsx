@@ -125,6 +125,16 @@ function getBoundsCenter(bounds: BoundingBox): Point {
   return { x: bounds.x + bounds.width / 2, y: bounds.y + bounds.height / 2 };
 }
 
+let textMeasureCanvas: HTMLCanvasElement | null = null;
+function measureTextWidthPx(text: string, font: string): number {
+  if (typeof document === "undefined") return text.length * 8;
+  textMeasureCanvas ??= document.createElement("canvas");
+  const ctx = textMeasureCanvas.getContext("2d");
+  if (!ctx) return text.length * 8;
+  ctx.font = font;
+  return ctx.measureText(text).width;
+}
+
 function getHandlePointFromBounds(
   bounds: BoundingBox,
   handle: Exclude<ResizeHandle, null>,
@@ -907,6 +917,7 @@ export function Canvas({
     return map;
   }, [remoteSelections]);
 
+  const nameTagWidthCacheRef = useRef<Map<string, number>>(new Map());
   const svgRef = useRef<SVGSVGElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const eraserTrailPathRef = useRef<SVGPathElement>(null);
@@ -5476,6 +5487,19 @@ export function Canvas({
             const labelOffset = 4 / zoom;
             const labelFontSize = 11 / zoom;
             const labelPadding = { x: 6 / zoom, y: 3 / zoom };
+            const labelFontSizePx = labelFontSize * zoom;
+            const labelFont = `500 ${labelFontSizePx}px system-ui, sans-serif`;
+            const labelCacheKey = `${selection.userName}@@${labelFont}`;
+            let labelTextWidthPx =
+              nameTagWidthCacheRef.current.get(labelCacheKey);
+            if (labelTextWidthPx === undefined) {
+              labelTextWidthPx = measureTextWidthPx(
+                selection.userName,
+                labelFont,
+              );
+              nameTagWidthCacheRef.current.set(labelCacheKey, labelTextWidthPx);
+            }
+            const labelWidth = labelTextWidthPx / zoom + labelPadding.x * 2;
 
             return (
               <g key={`${selection.userId}-${elementId}`}>
@@ -5511,10 +5535,7 @@ export function Canvas({
                       labelPadding.y * 2 -
                       labelOffset
                     }
-                    width={
-                      selection.userName.length * labelFontSize * 0.6 +
-                      labelPadding.x * 2
-                    }
+                    width={labelWidth}
                     height={labelFontSize + labelPadding.y * 2}
                     fill={selection.userColor}
                     rx={3 / zoom}
