@@ -2810,13 +2810,22 @@ export function Canvas({
           clickedElement.type === "text" &&
           !isRemotelySelected
         ) {
+          const editFontSize =
+            clickedElement.fontSize ?? clickedElement.strokeWidth * 4 + 12;
+          const editLineHeight = clickedElement.lineHeight ?? 1.4;
+          const padding = 8;
+          const minHeight =
+            editFontSize * editLineHeight + padding * 2 + 4 / zoom;
+
           // Enter edit mode for the existing text element
           setTextInput({
             x: clickedElement.x ?? 0,
-            y: clickedElement.y ?? 0,
+            y: clickedElement.isTextBox
+              ? (clickedElement.y ?? 0)
+              : (clickedElement.y ?? 0) + editFontSize * 0.82,
             width: clickedElement.width,
-            height: clickedElement.height,
-            isTextBox: clickedElement.isTextBox,
+            height: Math.max(clickedElement.height ?? 0, minHeight),
+            isTextBox: true,
           });
           setTextValue(clickedElement.text ?? "");
           // Delete the existing element so we can recreate it when done
@@ -2825,7 +2834,7 @@ export function Canvas({
           return;
         }
 
-        // Start tracking if user drags to create a text box
+        // Start tracking if user drags to create a text box (click does nothing)
         setStartPoint(point);
         setIsDrawing(true);
         return;
@@ -3039,27 +3048,25 @@ export function Canvas({
         currentPoint.y - startPoint.y,
       );
 
-      if (dragDistance < 5) {
-        // It was a click - create simple text
-        setTextInput({
-          x: startPoint.x,
-          y: startPoint.y,
-          isTextBox: false,
-        });
-        setTextValue("");
-        setTimeout(() => textInputRef.current?.focus(), 10);
-      } else {
-        // It was a drag - create text box
+      // Only create text on a drag; a click does nothing.
+      if (dragDistance >= 5) {
         const width = Math.abs(currentPoint.x - startPoint.x);
-        const height = Math.abs(currentPoint.y - startPoint.y);
         const x = Math.min(startPoint.x, currentPoint.x);
         const y = Math.min(startPoint.y, currentPoint.y);
 
-        if (width > 10 && height > 10) {
-          setTextInput({ x, y, width, height, isTextBox: true });
-          setTextValue("");
-          setTimeout(() => textInputRef.current?.focus(), 10);
-        }
+        const padding = 8;
+        const minHeight = fontSize * lineHeight + padding * 2 + 4 / zoom;
+        const nextWidth = Math.max(width, 60);
+
+        setTextInput({
+          x,
+          y,
+          width: nextWidth,
+          height: minHeight,
+          isTextBox: true,
+        });
+        setTextValue("");
+        setTimeout(() => textInputRef.current?.focus(), 10);
       }
       setIsDrawing(false);
       setStartPoint(null);
@@ -3168,103 +3175,34 @@ export function Canvas({
 
   const handleTextSubmit = useCallback(() => {
     if (textInput && textValue.trim()) {
-      const fontSize = strokeWidth * 4 + 12;
+      // Always create a text box (single-line by default, expands on Enter).
+      const nextElementId = uuid();
+      const newElement: BoardElement = {
+        id: nextElementId,
+        type: "text",
+        points: [],
+        strokeColor,
+        strokeWidth,
+        text: textValue,
+        x: textInput.x,
+        y: textInput.y,
+        width: textInput.width ?? 200,
+        height: textInput.height ?? fontSize * lineHeight + 8 * 2 + 4 / zoom,
+        isTextBox: true,
+        scaleX: 1,
+        scaleY: 1,
+        opacity,
+        fontFamily,
+        textAlign,
+        fontSize,
+        letterSpacing,
+        lineHeight,
+      };
+      onAddElement(newElement);
 
-      if (textInput.isTextBox) {
-        // Get actual height from textarea
-        let contentHeight = textInput.height ?? 100;
-        const padding = 8;
-        const fontSize = strokeWidth * 4 + 12;
-
-        if (textInputRef.current) {
-          // The textarea's scrollHeight includes its asymmetric padding and border (2px top + 2px bottom)
-          const textareaScrollHeight = textInputRef.current.scrollHeight;
-          const paddingTop = (8 - fontSize * 0.18) * zoom;
-          const paddingBottom = 8 * zoom;
-          const borderWidth = 4 * zoom; // 2px top + 2px bottom
-          const textareaPadding = paddingTop + paddingBottom + borderWidth;
-          const contentOnlyHeight =
-            (textareaScrollHeight - textareaPadding) / zoom;
-
-          contentHeight = Math.max(
-            textInput.height ?? 100,
-            contentOnlyHeight + padding * 2, // Add back unscaled padding
-          );
-        } else {
-          // Fallback: Calculate height based on content
-          const lineHeight = fontSize * 1.4;
-          const lines = textValue.split("\n");
-          const totalLines = lines.reduce((acc, line) => {
-            if (!line) return acc + 1; // Empty line
-            const wrappedLines = wrapText(
-              line,
-              (textInput.width ?? 200) - padding * 2,
-              fontSize,
-            );
-            return acc + wrappedLines.length;
-          }, 0);
-
-          contentHeight = Math.max(
-            textInput.height ?? 100,
-            totalLines * lineHeight + padding * 2 + fontSize * 0.82,
-          );
-        }
-
-        // Create a text box with defined dimensions
-        const newElement: BoardElement = {
-          id: uuid(),
-          type: "text",
-          points: [],
-          strokeColor,
-          strokeWidth,
-          text: textValue,
-          x: textInput.x,
-          y: textInput.y,
-          width: textInput.width,
-          height: contentHeight,
-          isTextBox: true,
-          scaleX: 1,
-          scaleY: 1,
-          opacity,
-          fontFamily,
-          textAlign,
-          fontSize,
-          letterSpacing,
-          lineHeight,
-        };
-        onAddElement(newElement);
-
-        // Don't switch tools - stay in text mode for continued text creation
-        // setSelectedIds([newElement.id]);
-      } else {
-        // Create simple single-line text
-        const textWidth = textValue.length * fontSize * 0.55;
-        const textHeight = fontSize * 1.2;
-
-        const newElement: BoardElement = {
-          id: uuid(),
-          type: "text",
-          points: [],
-          strokeColor,
-          strokeWidth,
-          text: textValue,
-          x: textInput.x,
-          y: textInput.y - fontSize * 0.82, // Adjust for baseline
-          width: Math.max(textWidth, 60),
-          height: textHeight,
-          scaleX: 1,
-          scaleY: 1,
-          opacity,
-          fontFamily,
-          textAlign,
-          fontSize,
-          letterSpacing,
-          lineHeight,
-        };
-        onAddElement(newElement);
-
-        // Don't switch tools - stay in text mode for continued text creation
-        // setSelectedIds([newElement.id]);
+      setSelectedIds([nextElementId]);
+      if (onToolChange && !isToolLocked) {
+        onToolChange("select");
       }
     }
     setTextInput(null);
@@ -3285,6 +3223,7 @@ export function Canvas({
     setSelectedIds,
     textInputRef,
     zoom,
+    isToolLocked,
   ]);
 
   // Auto-save text on blur or after typing stops
@@ -3308,18 +3247,29 @@ export function Canvas({
 
   // Auto-resize textarea to fit content
   useEffect(() => {
-    if (textInputRef.current && textInput?.isTextBox) {
+    if (textInputRef.current && textInput) {
       const textarea = textInputRef.current;
+      const padding = 8;
+      const minHeightWorld = fontSize * lineHeight + padding * 2 + 4 / zoom;
+      const minHeightPx = Math.max(
+        minHeightWorld * zoom,
+        (textInput.height ?? 0) * zoom,
+      );
+      const borderPx = 4;
       // Reset height to auto to get the correct scrollHeight
       textarea.style.height = "auto";
       // Set height to scrollHeight to fit content
-      const newHeight = Math.max(
-        textarea.scrollHeight,
-        (textInput.height ?? 100) * zoom,
-      );
+      const newHeight = Math.max(textarea.scrollHeight + borderPx, minHeightPx);
       textarea.style.height = `${newHeight}px`;
+
+      const nextHeightWorld = newHeight / zoom;
+      if (Math.abs((textInput.height ?? 0) - nextHeightWorld) > 0.5) {
+        setTextInput((prev) =>
+          prev ? { ...prev, height: nextHeightWorld, isTextBox: true } : prev,
+        );
+      }
     }
-  }, [textValue, textInput, zoom]);
+  }, [fontSize, lineHeight, textValue, textInput, zoom]);
 
   const getConnectorDragPreviewElement = useCallback(
     (element: BoardElement): BoardElement => {
@@ -4410,26 +4360,11 @@ export function Canvas({
         const baselineOffset = fontSize * 0.82;
 
         if (element.isTextBox && element.width && element.height) {
-          // Render text box with wrapping
+          // Render text box (no soft wrapping; new lines only)
           const padding = 8;
           const lineHeight = fontSize * elLineHeight;
-
-          // Split by newlines first, then wrap each line
-          const paragraphs = (element.text || "").split("\n");
-          const allLines: string[] = [];
-
-          paragraphs.forEach((paragraph) => {
-            if (!paragraph) {
-              allLines.push(""); // Preserve empty lines
-            } else {
-              const wrappedLines = wrapText(
-                paragraph,
-                (element.width ?? 200) - padding * 2,
-                fontSize,
-              );
-              allLines.push(...wrappedLines);
-            }
-          });
+          const allLines = (element.text || "").split("\n");
+          const clipId = `clip-${element.id}`;
 
           return (
             <g
@@ -4437,6 +4372,16 @@ export function Canvas({
               transform={rotationTransform}
               data-element-id={element.id}
             >
+              <defs>
+                <clipPath id={clipId}>
+                  <rect
+                    x={x}
+                    y={y}
+                    width={element.width}
+                    height={element.height}
+                  />
+                </clipPath>
+              </defs>
               {/* Clickable area for the entire text box */}
               <rect
                 x={x}
@@ -4449,36 +4394,40 @@ export function Canvas({
                 pointerEvents="fill"
               />
               {/* Wrapped text */}
-              {allLines.map((line, i) => {
-                const elTextAlign = element.textAlign || "left";
-                let textX = x + padding;
-                let textAnchor: "start" | "middle" | "end" = "start";
+              <g clipPath={`url(#${clipId})`}>
+                {allLines.map((line, i) => {
+                  const elTextAlign = element.textAlign || "left";
+                  let textX = x + padding;
+                  let textAnchor: "start" | "middle" | "end" = "start";
 
-                if (elTextAlign === "center") {
-                  textX = x + (element.width ?? 0) / 2;
-                  textAnchor = "middle";
-                } else if (elTextAlign === "right") {
-                  textX = x + (element.width ?? 0) - padding;
-                  textAnchor = "end";
-                }
+                  if (elTextAlign === "center") {
+                    textX = x + (element.width ?? 0) / 2;
+                    textAnchor = "middle";
+                  } else if (elTextAlign === "right") {
+                    textX = x + (element.width ?? 0) - padding;
+                    textAnchor = "end";
+                  }
 
-                return (
-                  <text
-                    key={i}
-                    fill={element.strokeColor}
-                    fontSize={fontSize}
-                    fontFamily={element.fontFamily || "var(--font-inter)"}
-                    textAnchor={textAnchor}
-                    letterSpacing={`${elLetterSpacing}px`}
-                    x={textX}
-                    y={y + padding + baselineOffset + i * lineHeight}
-                    opacity={isMarkedForDeletion ? elOpacity * 0.3 : elOpacity}
-                    pointerEvents="none"
-                  >
-                    {line}
-                  </text>
-                );
-              })}
+                  return (
+                    <text
+                      key={i}
+                      fill={element.strokeColor}
+                      fontSize={fontSize}
+                      fontFamily={element.fontFamily || "var(--font-inter)"}
+                      textAnchor={textAnchor}
+                      letterSpacing={`${elLetterSpacing}px`}
+                      x={textX}
+                      y={y + padding + baselineOffset + i * lineHeight}
+                      opacity={
+                        isMarkedForDeletion ? elOpacity * 0.3 : elOpacity
+                      }
+                      pointerEvents="none"
+                    >
+                      {line}
+                    </text>
+                  );
+                })}
+              </g>
               {isMarkedForDeletion && (
                 <rect
                   x={x}
@@ -6259,7 +6208,7 @@ export function Canvas({
               x={Math.min(startPoint.x, lastMousePos.x)}
               y={Math.min(startPoint.y, lastMousePos.y)}
               width={Math.abs(lastMousePos.x - startPoint.x)}
-              height={Math.abs(lastMousePos.y - startPoint.y)}
+              height={fontSize * lineHeight + 8 * 2 + 4 / zoom}
               fill="none"
               stroke={strokeColor}
               strokeWidth={strokeWidth * 0.5}
@@ -6333,114 +6282,64 @@ export function Canvas({
       </div>
 
       {/* Text Input */}
-      {textInput &&
-        (textInput.isTextBox ? (
-          <textarea
-            ref={textInputRef}
-            value={textValue}
-            onChange={(e) => handleTextChange(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && !e.shiftKey) {
-                e.preventDefault();
-                handleTextSubmit();
-              }
-              if (e.key === "Escape") {
-                setTextInput(null);
-                setTextValue("");
-              }
-            }}
-            onBlur={(e) => {
-              // Don't close if clicking on sidebar or other UI elements
-              const relatedTarget = e.relatedTarget as HTMLElement;
-              if (
-                relatedTarget &&
-                (relatedTarget.closest(".fixed.right-4") || // Sidebar
-                  relatedTarget.tagName === "BUTTON" ||
-                  relatedTarget.tagName === "SELECT" ||
-                  relatedTarget.tagName === "INPUT")
-              ) {
-                return;
-              }
-              // Save text on blur if there's content
-              if (textValue.trim()) {
-                handleTextSubmit();
-              } else {
-                setTextInput(null);
-                setTextValue("");
-              }
-            }}
-            className="absolute bg-transparent border-2 border-dashed border-accent/50 outline-none text-foreground resize-none overflow-hidden"
-            style={{
-              left: textInput.x * zoom + pan.x,
-              top: textInput.y * zoom + pan.y - 2 * zoom, // Account for 2px border
-              width: (textInput.width ?? 200) * zoom,
-              fontSize: fontSize * zoom,
-              fontFamily: fontFamily,
-              letterSpacing: `${letterSpacing}px`,
-              color: strokeColor,
-              lineHeight: lineHeight.toString(),
-              textAlign: textAlign,
-              // Match SVG padding: horizontal is 8, vertical is 8 but adjusted for baseline
-              paddingLeft: `${8 * zoom}px`,
-              paddingRight: `${8 * zoom}px`,
-              paddingTop: `${(8 - fontSize * 0.18) * zoom}px`,
-              paddingBottom: `${8 * zoom}px`,
-              wordWrap: "break-word",
-              whiteSpace: "pre-wrap",
-              boxSizing: "border-box",
-            }}
-            placeholder="Type..."
-          />
-        ) : (
-          <input
-            ref={textInputRef as any}
-            type="text"
-            value={textValue}
-            onChange={(e) => handleTextChange(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") {
-                e.preventDefault();
-                handleTextSubmit();
-              }
-              if (e.key === "Escape") {
-                setTextInput(null);
-                setTextValue("");
-              }
-            }}
-            onBlur={(e) => {
-              // Don't close if clicking on sidebar or other UI elements
-              const relatedTarget = e.relatedTarget as HTMLElement;
-              if (
-                relatedTarget &&
-                (relatedTarget.closest(".fixed.right-4") || // Sidebar
-                  relatedTarget.tagName === "BUTTON" ||
-                  relatedTarget.tagName === "SELECT" ||
-                  relatedTarget.tagName === "INPUT")
-              ) {
-                return;
-              }
-              // Save text on blur if there's content
-              if (textValue.trim()) {
-                handleTextSubmit();
-              } else {
-                setTextInput(null);
-                setTextValue("");
-              }
-            }}
-            className="absolute bg-transparent border-none outline-none text-foreground"
-            style={{
-              left: textInput.x * zoom + pan.x,
-              top: textInput.y * zoom + pan.y - fontSize * 0.82 * zoom,
-              fontSize: fontSize * zoom,
-              fontFamily: fontFamily,
-              letterSpacing: `${letterSpacing}px`,
-              color: strokeColor,
-              textAlign: textAlign,
-              minWidth: "100px",
-            }}
-            placeholder="Type..."
-          />
-        ))}
+      {textInput && (
+        <textarea
+          ref={textInputRef}
+          value={textValue}
+          wrap="off"
+          onChange={(e) => handleTextChange(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Escape") {
+              setTextInput(null);
+              setTextValue("");
+            }
+          }}
+          onBlur={(e) => {
+            // Don't close if clicking on sidebar or other UI elements
+            const relatedTarget = e.relatedTarget as HTMLElement;
+            if (
+              relatedTarget &&
+              (relatedTarget.closest(".fixed.right-4") || // Sidebar
+                relatedTarget.tagName === "BUTTON" ||
+                relatedTarget.tagName === "SELECT" ||
+                relatedTarget.tagName === "INPUT")
+            ) {
+              return;
+            }
+            // Save text on blur if there's content
+            if (textValue.trim()) {
+              handleTextSubmit();
+            } else {
+              setTextInput(null);
+              setTextValue("");
+            }
+          }}
+          className="absolute bg-transparent border-2 border-dashed border-accent/50 outline-none text-foreground resize-none"
+          style={{
+            left: textInput.x * zoom + pan.x,
+            top: textInput.y * zoom + pan.y,
+            width: (textInput.width ?? 200) * zoom,
+            fontSize: fontSize * zoom,
+            fontFamily: fontFamily,
+            letterSpacing: `${letterSpacing}px`,
+            color: strokeColor,
+            lineHeight: lineHeight.toString(),
+            textAlign: textAlign,
+            // Match SVG padding: horizontal is 8, vertical is 8 but adjusted for baseline
+            paddingLeft: `${8 * zoom}px`,
+            paddingRight: `${8 * zoom}px`,
+            paddingTop: `${(8 - fontSize * 0.18) * zoom}px`,
+            paddingBottom: `${8 * zoom}px`,
+            overflowX: "auto",
+            overflowY: "hidden",
+            wordWrap: "normal",
+            overflowWrap: "normal",
+            whiteSpace: "pre",
+            boxSizing: "border-box",
+          }}
+          placeholder="Type..."
+        />
+      )}
 
       {/* Zoom and Undo/Redo Controls */}
       <div className="absolute bottom-4 left-4 flex items-center gap-2">
