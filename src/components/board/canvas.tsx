@@ -135,6 +135,10 @@ function measureTextWidthPx(text: string, font: string): number {
   return ctx.measureText(text).width;
 }
 
+function getTextFontString(fontSize: number, fontFamily: string) {
+  return `500 ${fontSize}px ${fontFamily}`;
+}
+
 function getHandlePointFromBounds(
   bounds: BoundingBox,
   handle: Exclude<ResizeHandle, null>,
@@ -534,6 +538,90 @@ function wrapTextBreakWord(
     }
 
     if (line.length > 0) {
+      result.push(line);
+    }
+  }
+
+  return result.length ? result : [""];
+}
+
+function wrapTextBreakWordMeasured(
+  text: string,
+  maxWidth: number,
+  font: string,
+): string[] {
+  if (text === "") return [""];
+  const effectiveMaxWidth = Math.max(0, maxWidth);
+
+  const result: string[] = [];
+  const paragraphs = text.split("\n");
+
+  for (const paragraph of paragraphs) {
+    if (paragraph === "") {
+      result.push("");
+      continue;
+    }
+
+    const tokens = paragraph.split(/(\s+)/).filter((t) => t.length > 0);
+    let line = "";
+
+    const pushLine = () => {
+      result.push(line);
+      line = "";
+    };
+
+    const fits = (candidate: string) =>
+      measureTextWidthPx(candidate, font) <= effectiveMaxWidth ||
+      candidate.length <= 1 ||
+      effectiveMaxWidth <= 0;
+
+    const appendChunked = (chunk: string) => {
+      if (chunk === "") return;
+      if (line.length === 0) {
+        if (fits(chunk)) {
+          line = chunk;
+          return;
+        }
+
+        // Break by characters, making sure we always progress.
+        let remaining = chunk;
+        while (remaining.length) {
+          if (remaining.length === 1) {
+            result.push(remaining);
+            break;
+          }
+
+          let lo = 1;
+          let hi = remaining.length;
+          while (lo < hi) {
+            const mid = Math.ceil((lo + hi) / 2);
+            const part = remaining.slice(0, mid);
+            if (fits(part)) lo = mid;
+            else hi = mid - 1;
+          }
+          const take = Math.max(1, lo);
+          result.push(remaining.slice(0, take));
+          remaining = remaining.slice(take);
+        }
+        return;
+      }
+
+      const candidate = `${line}${chunk}`;
+      if (fits(candidate)) {
+        line = candidate;
+        return;
+      }
+
+      pushLine();
+      appendChunked(chunk);
+    };
+
+    for (const token of tokens) {
+      if (line.length === 0 && /^\s+$/.test(token)) continue;
+      appendChunked(token);
+    }
+
+    if (line.length) {
       result.push(line);
     }
   }
@@ -2102,11 +2190,39 @@ export function Canvas({
           };
           const vLocal = rotateVector(vWorld, -rotationDeg);
 
-          const minAbsSize = 0;
-          const clampSigned = (value: number) => {
+          const minAbsWidth =
+            originalElement?.type === "text"
+              ? Math.max(
+                  2,
+                  measureTextWidthPx(
+                    "W",
+                    getTextFontString(
+                      originalElement.fontSize ??
+                        originalElement.strokeWidth * 4 + 12,
+                      originalElement.fontFamily || "var(--font-inter)",
+                    ),
+                  ),
+                )
+              : 0;
+          const minAbsHeight =
+            originalElement?.type === "text"
+              ? Math.max(
+                  2,
+                  (originalElement.fontSize ??
+                    originalElement.strokeWidth * 4 + 12) *
+                    (originalElement.lineHeight ?? 1.4),
+                )
+              : 0;
+          const clampSignedWidth = (value: number) => {
             const s = value === 0 ? 1 : Math.sign(value);
             const abs = Math.abs(value);
-            if (abs < minAbsSize) return s * minAbsSize;
+            if (abs < minAbsWidth) return s * minAbsWidth;
+            return value;
+          };
+          const clampSignedHeight = (value: number) => {
+            const s = value === 0 ? 1 : Math.sign(value);
+            const abs = Math.abs(value);
+            if (abs < minAbsHeight) return s * minAbsHeight;
             return value;
           };
 
@@ -2115,8 +2231,8 @@ export function Canvas({
 
           const isCorner = startHandle.length === 2;
           if (isCorner) {
-            widthSigned = clampSigned(vLocal.x);
-            heightSigned = clampSigned(vLocal.y);
+            widthSigned = clampSignedWidth(vLocal.x);
+            heightSigned = clampSignedHeight(vLocal.y);
 
             if (shiftPressed) {
               const aspect =
@@ -2136,11 +2252,11 @@ export function Canvas({
               }
             }
           } else if (startHandle === "e" || startHandle === "w") {
-            widthSigned = clampSigned(vLocal.x);
+            widthSigned = clampSignedWidth(vLocal.x);
             heightSigned = originalBounds.height;
           } else if (startHandle === "n" || startHandle === "s") {
             widthSigned = originalBounds.width;
-            heightSigned = clampSigned(vLocal.y);
+            heightSigned = clampSignedHeight(vLocal.y);
           }
 
           const nextW = Math.abs(widthSigned);
@@ -2293,28 +2409,67 @@ export function Canvas({
         if (selectedIds.length === 1 && originalElements.length === 1) {
           const originalElement = originalElements[0];
 
-          const minAbsSize =
-            originalElement.type === "rectangle" ||
-            originalElement.type === "diamond" ||
-            originalElement.type === "ellipse" ||
-            originalElement.type === "frame" ||
-            originalElement.type === "web-embed" ||
+          const fontSizeForMin =
             originalElement.type === "text"
-              ? 2
-              : 0;
+              ? (originalElement.fontSize ??
+                originalElement.strokeWidth * 4 + 12)
+              : null;
+          const fontFamilyForMin =
+            originalElement.type === "text"
+              ? originalElement.fontFamily || "var(--font-inter)"
+              : null;
+
+          const minAbsWidth =
+            originalElement.type === "text"
+              ? Math.max(
+                  2,
+                  measureTextWidthPx(
+                    "W",
+                    getTextFontString(fontSizeForMin!, fontFamilyForMin!),
+                  ),
+                )
+              : originalElement.type === "rectangle" ||
+                  originalElement.type === "diamond" ||
+                  originalElement.type === "ellipse" ||
+                  originalElement.type === "frame" ||
+                  originalElement.type === "web-embed"
+                ? 2
+                : 0;
+
+          const minAbsHeight =
+            originalElement.type === "text"
+              ? Math.max(
+                  2,
+                  fontSizeForMin! * (originalElement.lineHeight ?? 1.4),
+                )
+              : originalElement.type === "rectangle" ||
+                  originalElement.type === "diamond" ||
+                  originalElement.type === "ellipse" ||
+                  originalElement.type === "frame" ||
+                  originalElement.type === "web-embed"
+                ? 2
+                : 0;
 
           // Avoid snapping/flipping when elements get very small (especially lines/pen),
           // while still keeping box-like elements at a small minimum size.
-          const clampSignedSize = (size: number) => {
-            if (Number.isNaN(size)) return minAbsSize;
-            if (minAbsSize <= 0) return size;
+          const clampSignedWidth = (size: number) => {
+            if (Number.isNaN(size)) return minAbsWidth;
+            if (minAbsWidth <= 0) return size;
             if (size === 0) return 0;
-            if (Math.abs(size) < minAbsSize)
-              return Math.sign(size) * minAbsSize;
+            if (Math.abs(size) < minAbsWidth)
+              return Math.sign(size) * minAbsWidth;
+            return size;
+          };
+          const clampSignedHeight = (size: number) => {
+            if (Number.isNaN(size)) return minAbsHeight;
+            if (minAbsHeight <= 0) return size;
+            if (size === 0) return 0;
+            if (Math.abs(size) < minAbsHeight)
+              return Math.sign(size) * minAbsHeight;
             return size;
           };
 
-          const nextWidth = clampSignedSize(newWidth);
+          const nextWidth = clampSignedWidth(newWidth);
           if (nextWidth !== newWidth) {
             if (resizeHandle.includes("w") && !resizeHandle.includes("e")) {
               newX = originalRight - nextWidth;
@@ -2330,7 +2485,7 @@ export function Canvas({
             newWidth = nextWidth;
           }
 
-          const nextHeight = clampSignedSize(newHeight);
+          const nextHeight = clampSignedHeight(newHeight);
           if (nextHeight !== newHeight) {
             if (resizeHandle.includes("n") && !resizeHandle.includes("s")) {
               newY = originalBottom - nextHeight;
@@ -2655,6 +2810,48 @@ export function Canvas({
           : clickedElement;
 
       if (tool === "select") {
+        // Double-click text to edit (Excalidraw-style).
+        if (
+          e.detail === 2 &&
+          selectableClickedElement &&
+          selectableClickedElement.type === "text" &&
+          !isRemotelySelected
+        ) {
+          const editFontSize =
+            selectableClickedElement.fontSize ??
+            selectableClickedElement.strokeWidth * 4 + 12;
+          const editLineHeight = selectableClickedElement.lineHeight ?? 1.4;
+          setTextInput({
+            x: selectableClickedElement.x ?? 0,
+            y: selectableClickedElement.y ?? 0,
+            width: selectableClickedElement.width,
+            height:
+              selectableClickedElement.height ?? editFontSize * editLineHeight,
+            isTextBox: true,
+          });
+          setTextValue(selectableClickedElement.text ?? "");
+          setEditingTextElementId(selectableClickedElement.id);
+          setEditingTextStyle({
+            strokeColor: selectableClickedElement.strokeColor,
+            strokeWidth: selectableClickedElement.strokeWidth,
+            opacity: selectableClickedElement.opacity ?? 100,
+            fontFamily:
+              selectableClickedElement.fontFamily || "var(--font-inter)",
+            textAlign: selectableClickedElement.textAlign || "left",
+            fontSize: selectableClickedElement.fontSize ?? editFontSize,
+            letterSpacing: selectableClickedElement.letterSpacing ?? 0,
+            lineHeight: selectableClickedElement.lineHeight ?? editLineHeight,
+          });
+          setTimeout(() => {
+            const editor = textInputRef.current;
+            editor?.focus();
+            if (editor) {
+              editor.setSelectionRange(0, editor.value.length);
+            }
+          }, 10);
+          return;
+        }
+
         // Check if clicking on a resize handle first (supports multi-selection)
         if (selectedBounds && selectedIds.length >= 1) {
           const handleSize = 10 / zoom;
@@ -4550,12 +4747,17 @@ export function Canvas({
         if (element.isTextBox && element.width && element.height) {
           // Render text box (Excalidraw-style: no padding; new lines only)
           const lineHeight = fontSize * elLineHeight;
-          const allLines = wrapTextBreakWord(
+          const font = getTextFontString(
+            fontSize,
+            element.fontFamily || "var(--font-inter)",
+          );
+          const allLines = wrapTextBreakWordMeasured(
             element.text || "",
             element.width,
-            fontSize,
+            font,
           );
           const clipId = `clip-${element.id}`;
+          const yOffset = (lineHeight - fontSize) / 2;
 
           return (
             <g
@@ -4608,7 +4810,7 @@ export function Canvas({
                       textAnchor={textAnchor}
                       letterSpacing={`${elLetterSpacing}px`}
                       x={textX}
-                      y={y + i * lineHeight}
+                      y={y + yOffset + i * lineHeight}
                       dominantBaseline="text-before-edge"
                       opacity={
                         isMarkedForDeletion ? elOpacity * 0.3 : elOpacity
