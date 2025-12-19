@@ -601,6 +601,9 @@ export function ToolSidebar({
     : selectedTool === "text";
 
   const showStrokeWidthAndStyle = !isTextTool;
+  const showLineCapControls = hasSelectedElements
+    ? selectedElements.some((el) => el.type === "line" || el.type === "arrow")
+    : selectedTool === "line" || selectedTool === "arrow";
 
   const showConnectorControls = hasSelectedElements
     ? selectedElements.some((el) => el.type === "line" || el.type === "arrow")
@@ -856,7 +859,7 @@ export function ToolSidebar({
         </div>
       )}
 
-      {showStrokeWidthAndStyle && onLineCapChange && (
+      {showStrokeWidthAndStyle && showLineCapControls && onLineCapChange && (
         <div className="space-y-2">
           <div className="flex items-center justify-between">
             <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
