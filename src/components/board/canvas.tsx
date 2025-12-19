@@ -2213,17 +2213,25 @@ export function Canvas({
                     (originalElement.lineHeight ?? 1.4),
                 )
               : 0;
-          const clampSignedWidth = (value: number) => {
-            const s = value === 0 ? 1 : Math.sign(value);
-            const abs = Math.abs(value);
-            if (abs < minAbsWidth) return s * minAbsWidth;
-            return value;
-          };
-          const clampSignedHeight = (value: number) => {
-            const s = value === 0 ? 1 : Math.sign(value);
-            const abs = Math.abs(value);
-            if (abs < minAbsHeight) return s * minAbsHeight;
-            return value;
+
+          const expectedSignX = startHandle.includes("w")
+            ? -1
+            : startHandle.includes("e")
+              ? 1
+              : 0;
+          const expectedSignY = startHandle.includes("n")
+            ? -1
+            : startHandle.includes("s")
+              ? 1
+              : 0;
+          const clampDirectional = (
+            value: number,
+            expectedSign: -1 | 0 | 1,
+            minAbs: number,
+          ) => {
+            if (expectedSign === 0) return value;
+            const projected = expectedSign * value;
+            return expectedSign * Math.max(minAbs, projected);
           };
 
           let widthSigned = originalBounds.width;
@@ -2231,8 +2239,16 @@ export function Canvas({
 
           const isCorner = startHandle.length === 2;
           if (isCorner) {
-            widthSigned = clampSignedWidth(vLocal.x);
-            heightSigned = clampSignedHeight(vLocal.y);
+            widthSigned = clampDirectional(
+              vLocal.x,
+              expectedSignX,
+              minAbsWidth,
+            );
+            heightSigned = clampDirectional(
+              vLocal.y,
+              expectedSignY,
+              minAbsHeight,
+            );
 
             if (shiftPressed) {
               const aspect =
@@ -2252,11 +2268,19 @@ export function Canvas({
               }
             }
           } else if (startHandle === "e" || startHandle === "w") {
-            widthSigned = clampSignedWidth(vLocal.x);
+            widthSigned = clampDirectional(
+              vLocal.x,
+              expectedSignX,
+              minAbsWidth,
+            );
             heightSigned = originalBounds.height;
           } else if (startHandle === "n" || startHandle === "s") {
             widthSigned = originalBounds.width;
-            heightSigned = clampSignedHeight(vLocal.y);
+            heightSigned = clampDirectional(
+              vLocal.y,
+              expectedSignY,
+              minAbsHeight,
+            );
           }
 
           const nextW = Math.abs(widthSigned);
@@ -2297,15 +2321,11 @@ export function Canvas({
           }
 
           if (originalElement.type === "text") {
-            const scaleX = nextW / (originalBounds.width || 1);
-            const scaleY = nextH / (originalBounds.height || 1);
             onUpdateElement(selectedIds[0], {
               x: nextX,
               y: nextY,
               width: nextW,
               height: nextH,
-              scaleX: (originalElement.scaleX ?? 1) * scaleX,
-              scaleY: (originalElement.scaleY ?? 1) * scaleY,
             });
             return;
           }
@@ -2403,6 +2423,50 @@ export function Canvas({
               newY = originalBounds.y + (originalBounds.height - newHeight) / 2;
             }
             break;
+        }
+
+        // Text should never flip/invert. Clamp to minimum size and keep the opposite edge fixed.
+        if (selectedIds.length === 1 && originalElements.length === 1) {
+          const originalElement = originalElements[0];
+          if (originalElement.type === "text") {
+            const fs =
+              originalElement.fontSize ?? originalElement.strokeWidth * 4 + 12;
+            const ff = originalElement.fontFamily || "var(--font-inter)";
+            const minW = Math.max(
+              2,
+              measureTextWidthPx("W", getTextFontString(fs, ff)),
+            );
+            const minH = Math.max(2, fs * (originalElement.lineHeight ?? 1.4));
+
+            if (newWidth < minW) {
+              newWidth = minW;
+              if (resizeHandle.includes("w") && !resizeHandle.includes("e")) {
+                newX = originalRight - minW;
+              } else {
+                newX = originalLeft;
+              }
+            }
+            if (newHeight < minH) {
+              newHeight = minH;
+              if (resizeHandle.includes("n") && !resizeHandle.includes("s")) {
+                newY = originalBottom - minH;
+              } else {
+                newY = originalTop;
+              }
+            }
+
+            const normalizedX = Math.min(newX, newX + newWidth);
+            const normalizedY = Math.min(newY, newY + newHeight);
+            const normalizedWidth = Math.abs(newWidth);
+            const normalizedHeight = Math.abs(newHeight);
+            onUpdateElement(selectedIds[0], {
+              x: normalizedX,
+              y: normalizedY,
+              width: normalizedWidth,
+              height: normalizedHeight,
+            });
+            return;
+          }
         }
 
         // Single element resize keeps the existing behavior (including mirroring for point-based shapes).
@@ -2533,22 +2597,11 @@ export function Canvas({
             }));
             onUpdateElement(selectedIds[0], { points: newPoints });
           } else if (originalElement.type === "text") {
-            const normalizedX = Math.min(newX, newX + newWidth);
-            const normalizedY = Math.min(newY, newY + newHeight);
-            const normalizedWidth = Math.abs(newWidth);
-            const normalizedHeight = Math.abs(newHeight);
-            const scaleX = normalizedWidth / (originalBounds.width || 1);
-            const scaleY = normalizedHeight / (originalBounds.height || 1);
-            const origScaleX = originalElement.scaleX ?? 1;
-            const origScaleY = originalElement.scaleY ?? 1;
-
             onUpdateElement(selectedIds[0], {
-              x: normalizedX,
-              y: normalizedY,
-              width: normalizedWidth,
-              height: normalizedHeight,
-              scaleX: origScaleX * scaleX,
-              scaleY: origScaleY * scaleY,
+              x: Math.min(newX, newX + newWidth),
+              y: Math.min(newY, newY + newHeight),
+              width: Math.abs(newWidth),
+              height: Math.abs(newHeight),
             });
           }
           return;
@@ -2604,8 +2657,6 @@ export function Canvas({
               y: nextY,
               width: nextW,
               height: nextH,
-              scaleX: (origEl.scaleX ?? 1) * scaleX,
-              scaleY: (origEl.scaleY ?? 1) * scaleY,
             });
             return;
           }
@@ -3620,6 +3671,36 @@ export function Canvas({
     //   }
     // }, 2000);
   }, []);
+
+  // While editing an existing text element, allow style changes (letter spacing, font, etc)
+  // to apply immediately and persist on submit.
+  useEffect(() => {
+    if (!textInput) return;
+    setEditingTextStyle((prev) => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        strokeColor,
+        strokeWidth,
+        opacity,
+        fontFamily,
+        textAlign,
+        fontSize,
+        letterSpacing,
+        lineHeight,
+      };
+    });
+  }, [
+    fontFamily,
+    fontSize,
+    letterSpacing,
+    lineHeight,
+    opacity,
+    strokeColor,
+    strokeWidth,
+    textAlign,
+    textInput,
+  ]);
 
   // Auto-resize textarea to fit content
   useEffect(() => {
@@ -4745,36 +4826,13 @@ export function Canvas({
         const baselineOffset = fontSize * 0.82;
 
         if (element.isTextBox && element.width && element.height) {
-          // Render text box (Excalidraw-style: no padding; new lines only)
-          const lineHeight = fontSize * elLineHeight;
-          const font = getTextFontString(
-            fontSize,
-            element.fontFamily || "var(--font-inter)",
-          );
-          const allLines = wrapTextBreakWordMeasured(
-            element.text || "",
-            element.width,
-            font,
-          );
-          const clipId = `clip-${element.id}`;
-          const yOffset = (lineHeight - fontSize) / 2;
-
+          // Render text box using HTML inside SVG for true WYSIWYG alignment.
           return (
             <g
               key={element.id}
               transform={rotationTransform}
               data-element-id={element.id}
             >
-              <defs>
-                <clipPath id={clipId}>
-                  <rect
-                    x={x}
-                    y={y}
-                    width={element.width}
-                    height={element.height}
-                  />
-                </clipPath>
-              </defs>
               {/* Clickable area for the entire text box */}
               <rect
                 x={x}
@@ -4786,42 +4844,32 @@ export function Canvas({
                 strokeWidth={1}
                 pointerEvents="fill"
               />
-              {/* Wrapped text */}
-              <g clipPath={`url(#${clipId})`}>
-                {allLines.map((line, i) => {
-                  const elTextAlign = element.textAlign || "left";
-                  let textX = x;
-                  let textAnchor: "start" | "middle" | "end" = "start";
-
-                  if (elTextAlign === "center") {
-                    textX = x + (element.width ?? 0) / 2;
-                    textAnchor = "middle";
-                  } else if (elTextAlign === "right") {
-                    textX = x + (element.width ?? 0);
-                    textAnchor = "end";
-                  }
-
-                  return (
-                    <text
-                      key={i}
-                      fill={element.strokeColor}
-                      fontSize={fontSize}
-                      fontFamily={element.fontFamily || "var(--font-inter)"}
-                      textAnchor={textAnchor}
-                      letterSpacing={`${elLetterSpacing}px`}
-                      x={textX}
-                      y={y + yOffset + i * lineHeight}
-                      dominantBaseline="text-before-edge"
-                      opacity={
-                        isMarkedForDeletion ? elOpacity * 0.3 : elOpacity
-                      }
-                      pointerEvents="none"
-                    >
-                      {line}
-                    </text>
-                  );
-                })}
-              </g>
+              <foreignObject
+                x={x}
+                y={y}
+                width={element.width}
+                height={element.height}
+                pointerEvents="none"
+                opacity={isMarkedForDeletion ? elOpacity * 0.3 : elOpacity}
+              >
+                <div
+                  style={{
+                    width: "100%",
+                    height: "100%",
+                    color: element.strokeColor,
+                    fontFamily: element.fontFamily || "var(--font-inter)",
+                    fontSize: `${fontSize}px`,
+                    lineHeight: `${elLineHeight}`,
+                    letterSpacing: `${elLetterSpacing}px`,
+                    whiteSpace: "pre-wrap",
+                    overflowWrap: "anywhere",
+                    wordBreak: "break-word",
+                    textAlign: element.textAlign || "left",
+                  }}
+                >
+                  {element.text || ""}
+                </div>
+              </foreignObject>
               {isMarkedForDeletion && (
                 <rect
                   x={x}
