@@ -1,8 +1,26 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { X, Download, Copy, HelpCircle } from "lucide-react";
+import { Download, Copy, HelpCircle } from "lucide-react";
 import type { BoardElement, Point } from "@/lib/board-types";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Separator } from "@/components/ui/separator";
+import { Toggle } from "@/components/ui/toggle";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 interface ExportImageModalProps {
   isOpen: boolean;
@@ -696,24 +714,31 @@ export function ExportImageModal({
   const [embedScene, setEmbedScene] = useState(false);
   const [scale, setScale] = useState<1 | 2 | 3>(2);
   const [fileName, setFileName] = useState("");
-  const [showEmbedTooltip, setShowEmbedTooltip] = useState(false);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const previewCanvasRef = useRef<HTMLCanvasElement>(null);
 
   useEffect(() => {
-    if (isOpen) {
-      const date = new Date().toISOString().split("T")[0];
-      setFileName(`shadeworks-${date}`);
+    if (!isOpen) return;
+    const date = new Date().toISOString().split("T")[0];
+    setFileName(`shadeworks-${date}`);
+  }, [isOpen]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const frame = requestAnimationFrame(() => {
       updatePreview();
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [isOpen, includeBackground, darkMode, elements, canvasBackground, scale]);
+
+  const handleOpenChange = (open: boolean) => {
+    if (!open) {
+      onClose();
     }
-  }, [
-    isOpen,
-    includeBackground,
-    darkMode,
-    embedScene,
-    elements,
-    canvasBackground,
-  ]);
+  };
+  const toggleClassName =
+    "border border-border/60 data-[state=on]:bg-muted/70 data-[state=on]:text-foreground data-[state=on]:border-foreground/20 data-[state=on]:shadow-sm";
+  const toggleGroupItemClassName = `w-full ${toggleClassName}`;
 
   const updatePreview = () => {
     const canvas = previewCanvasRef.current;
@@ -723,11 +748,21 @@ export function ExportImageModal({
     if (!ctx) return;
 
     const bounds = getSceneBounds(elements);
-    const previewScale = 0.5; // Scale down for preview
+    const maxPreviewWidth = 520;
+    const maxPreviewHeight = 320;
+    const exportWidth = bounds.width * scale;
+    const exportHeight = bounds.height * scale;
+    const fitScale = Math.min(
+      maxPreviewWidth / exportWidth,
+      maxPreviewHeight / exportHeight,
+      1,
+    );
+    const previewScale = fitScale * scale;
 
-    canvas.width = Math.min(bounds.width * previewScale, 400);
-    canvas.height = Math.min(bounds.height * previewScale, 300);
+    canvas.width = Math.max(1, Math.floor(bounds.width * previewScale));
+    canvas.height = Math.max(1, Math.floor(bounds.height * previewScale));
 
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
     // Clear canvas
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
@@ -783,8 +818,8 @@ export function ExportImageModal({
 
     // Draw elements (simplified preview)
     ctx.save();
-    ctx.translate(-bounds.x * previewScale, -bounds.y * previewScale);
     ctx.scale(previewScale, previewScale);
+    ctx.translate(-bounds.x, -bounds.y);
 
     elements.forEach((el) => {
       ctx.save();
@@ -1174,169 +1209,155 @@ export function ExportImageModal({
     });
   };
 
-  if (!isOpen) return null;
+  if (!isOpen) {
+    return <Dialog open={false} onOpenChange={handleOpenChange} />;
+  }
 
   return (
-    <div
-      className="fixed inset-0 z-[200] flex items-center justify-center bg-black/50 backdrop-blur-sm"
-      onClick={onClose}
-    >
-      <div
-        className="bg-card/95 backdrop-blur-md border border-border rounded-xl shadow-2xl p-6 w-[800px] max-w-[90vw] max-h-[90vh] overflow-y-auto"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="flex items-center justify-between mb-6">
-          <h2 className="text-xl font-semibold">Export image</h2>
-          <button
-            onClick={onClose}
-            className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-border/60 bg-card/60 text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground"
-          >
-            <X className="w-5 h-5" />
-          </button>
-        </div>
+    <Dialog open={isOpen} onOpenChange={handleOpenChange}>
+      <DialogContent className="max-w-5xl w-[min(960px,95vw)] max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>Export image</DialogTitle>
+          <DialogDescription>
+            Export the current canvas as PNG or SVG.
+          </DialogDescription>
+        </DialogHeader>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {/* Preview */}
-          <div>
-            <div className="border-2 border-dashed border-border rounded-lg p-4 bg-muted/20 flex items-center justify-center min-h-[200px]">
+        <div className="grid gap-6 md:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)]">
+          <div className="space-y-4">
+            <div className="rounded-xl border border-dashed border-border/70 bg-muted/30 p-4 flex min-h-[220px] items-center justify-center">
               <canvas
                 ref={previewCanvasRef}
-                className="max-w-full max-h-[300px] rounded"
+                className="max-h-[320px] max-w-full rounded-md"
                 style={{ imageRendering: "auto" }}
               />
             </div>
-            <input
-              type="text"
-              value={fileName}
-              onChange={(e) => setFileName(e.target.value)}
-              className="mt-4 w-full px-3 py-2 bg-background border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-accent"
-              placeholder="File name"
-            />
+            <div className="space-y-2">
+              <Label htmlFor="export-file-name">File name</Label>
+              <Input
+                id="export-file-name"
+                value={fileName}
+                onChange={(e) => setFileName(e.target.value)}
+                placeholder="File name"
+                data-dialog-initial-focus
+              />
+            </div>
           </div>
 
-          {/* Options */}
-          <div className="space-y-4">
-            {/* Background Toggle */}
-            <div className="flex items-center justify-between">
-              <span className="text-sm font-medium">Background</span>
-              <button
-                onClick={() => setIncludeBackground(!includeBackground)}
-                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                  includeBackground ? "bg-accent" : "bg-muted"
-                }`}
+          <div className="flex flex-col gap-4">
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <Label>Background</Label>
+                <p className="text-xs text-muted-foreground">
+                  Include the canvas background.
+                </p>
+              </div>
+              <Toggle
+                pressed={includeBackground}
+                onPressedChange={setIncludeBackground}
+                size="sm"
+                className={toggleClassName}
               >
-                <span
-                  className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                    includeBackground ? "translate-x-6" : "translate-x-1"
-                  }`}
-                />
-              </button>
+                {includeBackground ? "On" : "Off"}
+              </Toggle>
             </div>
 
-            {/* Dark Mode Toggle */}
-            <div className="flex items-center justify-between">
-              <span className="text-sm font-medium">Dark mode</span>
-              <button
-                onClick={() => setDarkMode(!darkMode)}
-                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                  darkMode ? "bg-accent" : "bg-muted"
-                }`}
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <Label>Dark mode</Label>
+                <p className="text-xs text-muted-foreground">
+                  Export with a dark background.
+                </p>
+              </div>
+              <Toggle
+                pressed={darkMode}
+                onPressedChange={setDarkMode}
+                size="sm"
+                className={toggleClassName}
               >
-                <span
-                  className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                    darkMode ? "translate-x-6" : "translate-x-1"
-                  }`}
-                />
-              </button>
+                {darkMode ? "On" : "Off"}
+              </Toggle>
             </div>
 
-            {/* Embed Scene Toggle */}
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between gap-4">
               <div className="flex items-center gap-2">
-                <span className="text-sm font-medium">Embed scene</span>
-                <div className="relative">
-                  <button
-                    onMouseEnter={() => setShowEmbedTooltip(true)}
-                    onMouseLeave={() => setShowEmbedTooltip(false)}
-                    className="text-muted-foreground hover:text-foreground"
-                  >
-                    <HelpCircle className="w-4 h-4" />
-                  </button>
-                  {showEmbedTooltip && (
-                    <div className="absolute left-0 top-6 w-64 p-2 bg-popover border border-border rounded-md shadow-lg text-xs z-10">
-                      Scene data will be saved into the PNG/SVG file so that the
-                      scene can be restored from it. Will increase exported file
-                      size.
-                    </div>
-                  )}
-                </div>
+                <Label>Embed scene</Label>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button
+                      type="button"
+                      className="text-muted-foreground hover:text-foreground"
+                      aria-label="Embed scene info"
+                    >
+                      <HelpCircle className="h-4 w-4" />
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent side="top" sideOffset={8}>
+                    Scene data is saved inside the file so it can be restored
+                    later.
+                  </TooltipContent>
+                </Tooltip>
               </div>
-              <button
-                onClick={() => setEmbedScene(!embedScene)}
-                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                  embedScene ? "bg-accent" : "bg-muted"
-                }`}
+              <Toggle
+                pressed={embedScene}
+                onPressedChange={setEmbedScene}
+                size="sm"
+                className={toggleClassName}
               >
-                <span
-                  className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                    embedScene ? "translate-x-6" : "translate-x-1"
-                  }`}
-                />
-              </button>
+                {embedScene ? "On" : "Off"}
+              </Toggle>
             </div>
 
-            {/* Scale */}
-            <div>
-              <span className="text-sm font-medium mb-2 block">Scale</span>
-              <div className="flex gap-1.5">
-                {([1, 2, 3] as const).map((s) => (
-                  <button
-                    key={s}
-                    onClick={() => setScale(s)}
-                    className={`px-3 py-1 rounded-md transition-colors text-sm ${
-                      scale === s
-                        ? "bg-accent text-accent-foreground"
-                        : "bg-muted hover:bg-muted/80"
-                    }`}
-                  >
-                    {s}×
-                  </button>
-                ))}
-              </div>
+            <div className="space-y-2">
+              <Label>Scale</Label>
+              <ToggleGroup
+                type="single"
+                value={scale.toString()}
+                onValueChange={(value) => {
+                  if (!value) return;
+                  setScale(Number(value) as 1 | 2 | 3);
+                }}
+                className="grid grid-cols-3 gap-2"
+              >
+                <ToggleGroupItem value="1" className={toggleGroupItemClassName}>
+                  1x
+                </ToggleGroupItem>
+                <ToggleGroupItem value="2" className={toggleGroupItemClassName}>
+                  2x
+                </ToggleGroupItem>
+                <ToggleGroupItem value="3" className={toggleGroupItemClassName}>
+                  3x
+                </ToggleGroupItem>
+              </ToggleGroup>
+              <p className="text-xs text-muted-foreground">
+                Higher scales create larger images.
+              </p>
             </div>
 
-            {/* Export Buttons */}
-            <div className="pt-4 space-y-2">
-              <div className="flex gap-2">
-                <button
-                  onClick={() => exportImage("png")}
-                  className="flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 bg-accent hover:bg-accent/90 text-accent-foreground rounded-md transition-colors text-sm"
-                >
-                  <Download className="w-3.5 h-3.5" />
+            <Separator />
+
+            <div className="space-y-2">
+              <div className="grid grid-cols-2 gap-2">
+                <Button onClick={() => exportImage("png")}>
+                  <Download className="h-4 w-4" />
                   PNG
-                </button>
-                <button
-                  onClick={() => exportImage("svg")}
-                  className="flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 bg-accent hover:bg-accent/90 text-accent-foreground rounded-md transition-colors text-sm"
-                >
-                  <Download className="w-3.5 h-3.5" />
+                </Button>
+                <Button variant="secondary" onClick={() => exportImage("svg")}>
+                  <Download className="h-4 w-4" />
                   SVG
-                </button>
+                </Button>
               </div>
-              <button
-                onClick={copyToClipboard}
-                className="w-full flex items-center justify-center gap-1.5 px-3 py-1.5 bg-secondary hover:bg-secondary/80 text-secondary-foreground rounded-md transition-colors text-sm"
-              >
-                <Copy className="w-3.5 h-3.5" />
+              <Button variant="outline" onClick={copyToClipboard}>
+                <Copy className="h-4 w-4" />
                 Copy to clipboard
-              </button>
+              </Button>
             </div>
           </div>
         </div>
-      </div>
+      </DialogContent>
 
       {/* Hidden canvas for export */}
       <canvas ref={canvasRef} className="hidden" />
-    </div>
+    </Dialog>
   );
 }
