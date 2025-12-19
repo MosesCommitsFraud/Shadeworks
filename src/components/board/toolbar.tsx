@@ -17,6 +17,7 @@ import {
     Lock,
     Unlock,
     Hand,
+    Eye,
 } from "lucide-react";
 import { Tool } from "@/lib/board-types";
 import type { ConnectionStatus } from "@/lib/collaboration";
@@ -51,6 +52,7 @@ interface ToolbarProps {
     onFollowUser: (userId: string) => void;
     followedUserId: string | null;
     spectatedUserIds: Set<string>;
+    isBeingSpectated: boolean;
     isToolLocked: boolean;
     onToggleToolLock: () => void;
 }
@@ -91,6 +93,7 @@ export function Toolbar({
     onFollowUser,
     followedUserId,
     spectatedUserIds,
+    isBeingSpectated,
     isToolLocked,
     onToggleToolLock,
 }: ToolbarProps) {
@@ -234,6 +237,9 @@ export function Toolbar({
                             >
                                 {myName}
                             </span>
+                            {isBeingSpectated && (
+                                <Eye className="w-3.5 h-3.5 text-muted-foreground" />
+                            )}
                             <CollaboratorAvatars
                                 users={collaboratorUsers}
                                 maxDisplay={5}

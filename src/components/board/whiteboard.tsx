@@ -170,6 +170,7 @@ export function Whiteboard({ roomId }: WhiteboardProps) {
     const [connectionStatus, setConnectionStatus] =
         useState<ConnectionStatus>("connecting");
     const [myName, setMyName] = useState<string | null>(null);
+    const [myUserId, setMyUserId] = useState<string | null>(null);
     const [collaboratorUsers, setCollaboratorUsers] = useState<
         Array<{
             id: string;
@@ -276,6 +277,7 @@ export function Whiteboard({ roomId }: WhiteboardProps) {
 
             collab = new CollaborationManager(roomId, name, encryptionKey);
             setCollaboration(collab);
+            setMyUserId(collab.getUserInfo().id);
 
             // Load initial elements (async for encrypted rooms)
             if (encryptionKey) {
@@ -1365,6 +1367,9 @@ export function Whiteboard({ roomId }: WhiteboardProps) {
                 onFollowUser={handleFollowUser}
                 followedUserId={followedUserId}
                 spectatedUserIds={spectatedUserIds}
+                isBeingSpectated={
+                    myUserId ? spectatedUserIds.has(myUserId) : false
+                }
                 isToolLocked={isToolLocked}
                 onToggleToolLock={() => setIsToolLocked(!isToolLocked)}
             />

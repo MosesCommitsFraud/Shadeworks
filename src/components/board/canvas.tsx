@@ -55,6 +55,7 @@ interface RemoteCursor {
     color: string;
     x: number;
     y: number;
+    lastActivity: number;
 }
 
 type ResizeHandle = "nw" | "n" | "ne" | "e" | "se" | "s" | "sw" | "w" | null;
@@ -1081,21 +1082,41 @@ export function Canvas({
 
         const unsubscribe = collaboration.onAwarenessChange((states) => {
             const myId = collaboration.getUserInfo().id;
-            const cursors: RemoteCursor[] = [];
+            const now = Date.now();
 
-            states.forEach((state) => {
-                if (state.user && state.user.id !== myId && state.user.cursor) {
-                    cursors.push({
-                        id: state.user.id,
-                        name: state.user.name,
-                        color: state.user.color,
-                        x: state.user.cursor.x,
-                        y: state.user.cursor.y,
-                    });
-                }
+            setRemoteCursors((prevCursors) => {
+                const cursors: RemoteCursor[] = [];
+
+                states.forEach((state) => {
+                    if (
+                        state.user &&
+                        state.user.id !== myId &&
+                        state.user.cursor
+                    ) {
+                        // Check if cursor position changed
+                        const prevCursor = prevCursors.find(
+                            (c) => c.id === state.user.id,
+                        );
+                        const positionChanged =
+                            !prevCursor ||
+                            prevCursor.x !== state.user.cursor.x ||
+                            prevCursor.y !== state.user.cursor.y;
+
+                        cursors.push({
+                            id: state.user.id,
+                            name: state.user.name,
+                            color: state.user.color,
+                            x: state.user.cursor.x,
+                            y: state.user.cursor.y,
+                            lastActivity: positionChanged
+                                ? now
+                                : (prevCursor?.lastActivity ?? now),
+                        });
+                    }
+                });
+
+                return cursors;
             });
-
-            setRemoteCursors(cursors);
         });
 
         return unsubscribe;
@@ -6517,14 +6538,13 @@ export function Canvas({
                 </g>
             </svg>
 
-            {/* Remote Cursors - Animated */}
-            <div
-                className="absolute inset-0 pointer-events-none overflow-hidden"
-                style={{
-                    transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
-                }}
-            >
-                <CollaboratorCursors cursors={remoteCursors} />
+            {/* Remote Cursors - Animated (not scaled with zoom) */}
+            <div className="absolute inset-0 pointer-events-none overflow-hidden">
+                <CollaboratorCursors
+                    cursors={remoteCursors}
+                    pan={pan}
+                    zoom={zoom}
+                />
             </div>
 
             {/* Text Input */}
