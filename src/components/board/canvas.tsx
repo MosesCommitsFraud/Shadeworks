@@ -2515,7 +2515,7 @@ export function Canvas({
                 fontFamily: ff,
                 letterSpacing: originalElement.letterSpacing ?? 0,
                 textAlign: originalElement.textAlign ?? "left",
-              }) + Math.max(TEXT_CLIP_BUFFER_PX, Math.ceil(fs * 0.15)),
+              }),
             );
 
             if (newWidth < minW) {
@@ -3670,8 +3670,15 @@ export function Canvas({
         ? textInputRef.current.offsetWidth
         : undefined;
       const measuredHeight = textInputRef.current
-        ? textInputRef.current.scrollHeight +
-          Math.max(TEXT_CLIP_BUFFER_PX, Math.ceil(activeFontSize * 0.15))
+        ? measureWrappedTextHeightPx({
+            text: textValue,
+            width: measuredWidth ?? textInput.width ?? 200,
+            fontSize: activeFontSize,
+            lineHeight: activeLineHeight,
+            fontFamily: activeFontFamily,
+            letterSpacing: activeLetterSpacing,
+            textAlign: activeTextAlign,
+          })
         : undefined;
       const nextElement: BoardElement = {
         id: nextElementId,
@@ -3686,8 +3693,7 @@ export function Canvas({
         height:
           measuredHeight ??
           textInput.height ??
-          activeFontSize * activeLineHeight +
-            Math.max(TEXT_CLIP_BUFFER_PX, Math.ceil(activeFontSize * 0.15)),
+          activeFontSize * activeLineHeight,
         isTextBox: true,
         scaleX: 1,
         scaleY: 1,
@@ -3716,7 +3722,6 @@ export function Canvas({
     setEditingTextElementId(null);
     setEditingTextStyle(null);
   }, [
-    TEXT_CLIP_BUFFER_PX,
     editingTextElementId,
     editingTextStyle,
     textInput,
@@ -6512,9 +6517,6 @@ export function Canvas({
 
   // Ensure selected text boxes never clip their content (e.g. after style changes like letterSpacing).
   useEffect(() => {
-    const bufferFor = (fs: number) =>
-      Math.max(TEXT_CLIP_BUFFER_PX, Math.ceil(fs * 0.15));
-
     selectedIds.forEach((id) => {
       const el = elements.find((e) => e.id === id);
       if (!el || el.type !== "text" || !el.isTextBox) return;
@@ -6535,7 +6537,7 @@ export function Canvas({
           fontFamily: ff,
           letterSpacing: el.letterSpacing ?? 0,
           textAlign: el.textAlign ?? "left",
-        }) + bufferFor(fs),
+        }),
       );
 
       if (required <= el.height + 0.5) return;
@@ -6545,14 +6547,7 @@ export function Canvas({
       lastEnforcedTextHeightsRef.current.set(id, required);
       onUpdateElement(id, { height: required });
     });
-  }, [
-    TEXT_CLIP_BUFFER_PX,
-    editingTextElementId,
-    elements,
-    onUpdateElement,
-    selectedIds,
-    textInput,
-  ]);
+  }, [editingTextElementId, elements, onUpdateElement, selectedIds, textInput]);
 
   // Helper function to get background style
   const getBackgroundStyle = () => {
@@ -7013,7 +7008,8 @@ export function Canvas({
             style={{
               position: "absolute",
               width: "2px",
-              backgroundColor: editingTextStyle?.strokeColor ?? strokeColor,
+              backgroundColor: "var(--accent)",
+              borderRadius: "1px",
               top: 0,
               left: 0,
               display: "none",
