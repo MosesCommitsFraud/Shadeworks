@@ -59,20 +59,20 @@ Work in progress. Not ready for use.
 
 **Prerequisites**
 - Node.js 18+
-- npm
+- pnpm
 
 **Setup**
 
 ```bash
 # Install dependencies
-npm install
+pnpm install
 
 # Create environment file
 cp .env.example .env.local
 # Edit .env.local and set NEXT_PUBLIC_PARTYKIT_HOST
 
 # Start development server
-npm run dev
+pnpm dev
 ```
 
 Open [http://localhost:3000](http://localhost:3000) in your browser.
@@ -81,10 +81,10 @@ Open [http://localhost:3000](http://localhost:3000) in your browser.
 
 | Command | Description |
 |---------|-------------|
-| `npm run dev` | Start development server |
-| `npm run build` | Build for production |
-| `npm start` | Start production server |
-| `npm run lint` | Run ESLint |
+| `pnpm dev` | Start development server |
+| `pnpm build` | Build for production |
+| `pnpm start` | Start production server |
+| `pnpm lint` | Run ESLint |
 
 **Environment Variables**
 
