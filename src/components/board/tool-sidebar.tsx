@@ -1227,7 +1227,7 @@ export function ToolSidebar({
   );
 
   const condensedSidebar = (
-    <div className="fixed right-4 top-1/2 -translate-y-1/2 z-40">
+    <div className="fixed right-4 top-1/2 -translate-y-1/2 z-40 select-none">
       <div className="bg-card/95 backdrop-blur-md border border-border rounded-md shadow-2xl py-3 px-2 flex flex-col items-center gap-3">
         <DropdownMenu open={openStrokeMenu} onOpenChange={setOpenStrokeMenu}>
           <DropdownMenuTrigger asChild>
@@ -1621,7 +1621,7 @@ export function ToolSidebar({
   const fullSidebar = (
     <div
       className={cn(
-        "fixed right-4 top-1/2 -translate-y-1/2 z-40 transition-all duration-300 ease-out",
+        "fixed right-4 top-1/2 -translate-y-1/2 z-40 transition-all duration-300 ease-out select-none",
         isCollapsed ? "translate-x-[calc(100%-3rem)]" : "translate-x-0",
       )}
     >

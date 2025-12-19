@@ -7149,7 +7149,7 @@ export function Canvas({
       )}
 
       {/* Zoom and Undo/Redo Controls */}
-      <div className="absolute bottom-4 left-4 flex items-center gap-2">
+      <div className="absolute bottom-4 left-4 flex items-center gap-2 select-none">
         <div className="flex items-center gap-2 bg-card/95 backdrop-blur-md border border-border rounded-md p-1.5 shadow-xl">
           <button
             onClick={() => {

@@ -237,7 +237,7 @@ export function BurgerMenu({
       <DropdownMenuTrigger asChild>
         <button
           className={cn(
-            "p-2.5 rounded-md transition-all duration-200 inline-flex items-center justify-center leading-none",
+            "p-2.5 rounded-md transition-all duration-200 inline-flex items-center justify-center leading-none select-none",
             "bg-card/95 backdrop-blur-md border border-border",
             "hover:bg-muted/60 text-muted-foreground hover:text-foreground",
             "shadow-2xl",
@@ -247,7 +247,7 @@ export function BurgerMenu({
           <Menu className="w-5 h-5 block" />
         </button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="start" className="w-64">
+      <DropdownMenuContent align="start" className="w-64 select-none">
         {/* Main Actions */}
         <DropdownMenuItem onClick={onOpen}>
           <FolderOpen className="w-4 h-4" />
