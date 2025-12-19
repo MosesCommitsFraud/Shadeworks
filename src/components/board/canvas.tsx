@@ -2254,6 +2254,7 @@ export function Canvas({
           };
           const vLocal = rotateVector(vWorld, -rotationDeg);
 
+          // Add 1px buffer to prevent letter clipping (some glyphs extend beyond measured width)
           const minAbsWidth =
             originalElement?.type === "text"
               ? Math.max(
@@ -2265,7 +2266,7 @@ export function Canvas({
                         originalElement.strokeWidth * 4 + 12,
                       originalElement.fontFamily || "var(--font-inter)",
                     ),
-                  ),
+                  ) + 1,
                 )
               : 0;
           const minAbsHeight =
@@ -2496,9 +2497,10 @@ export function Canvas({
             const fs =
               originalElement.fontSize ?? originalElement.strokeWidth * 4 + 12;
             const ff = originalElement.fontFamily || "var(--font-inter)";
+            // Add 1px buffer to prevent letter clipping (some glyphs extend beyond measured width)
             const minW = Math.max(
               2,
-              measureTextWidthPx("W", getTextFontString(fs, ff)),
+              measureTextWidthPx("W", getTextFontString(fs, ff)) + 1,
             );
             const lh = originalElement.lineHeight ?? 1.4;
             const lineHeightPx = fs * lh;
@@ -2563,6 +2565,7 @@ export function Canvas({
               ? originalElement.fontFamily || "var(--font-inter)"
               : null;
 
+          // Add 1px buffer to prevent letter clipping (some glyphs extend beyond measured width)
           const minAbsWidth =
             originalElement.type === "text"
               ? Math.max(
@@ -2570,7 +2573,7 @@ export function Canvas({
                   measureTextWidthPx(
                     "W",
                     getTextFontString(fontSizeForMin!, fontFamilyForMin!),
-                  ),
+                  ) + 1,
                 )
               : originalElement.type === "rectangle" ||
                   originalElement.type === "diamond" ||
@@ -4987,7 +4990,6 @@ export function Canvas({
                 <div
                   style={{
                     width: "100%",
-                    height: "100%",
                     color: element.strokeColor,
                     fontFamily: element.fontFamily || "var(--font-inter)",
                     fontSize: `${fontSize}px`,
@@ -4997,6 +4999,8 @@ export function Canvas({
                     overflowWrap: "anywhere",
                     wordBreak: "break-word",
                     textAlign: element.textAlign || "left",
+                    padding: 0,
+                    margin: 0,
                   }}
                 >
                   {element.text || ""}
