@@ -36,11 +36,12 @@ interface BurgerMenuProps {
   onSave?: () => void;
   onFindOnCanvas?: () => void;
   onHelp?: () => void;
+  onInvite?: () => void;
   canvasBackground: "none" | "dots" | "lines" | "grid";
   onCanvasBackgroundChange: (
     background: "none" | "dots" | "lines" | "grid",
   ) => void;
-  roomId?: string;
+  isReadOnly?: boolean;
 }
 
 function CanvasBackgroundPreview({
@@ -150,29 +151,18 @@ export function BurgerMenu({
   onSave,
   onFindOnCanvas,
   onHelp,
+  onInvite,
   canvasBackground,
   onCanvasBackgroundChange,
-  roomId,
+  isReadOnly = false,
 }: BurgerMenuProps) {
   const { theme, setTheme } = useTheme();
-  const [copied, setCopied] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
 
   const selectedTheme =
     theme === "light" || theme === "dark" || theme === "system"
       ? theme
       : "system";
-
-  const copyInviteLink = async () => {
-    if (roomId) {
-      // Include the hash (encryption key) in the invite link
-      const hash = window.location.hash || "";
-      const link = `${window.location.origin}/board/${roomId}${hash}`;
-      await navigator.clipboard.writeText(link);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    }
-  };
 
   const handleExportImage = () => {
     if (onExportImage) {
@@ -198,12 +188,14 @@ export function BurgerMenu({
       // Ctrl+O - Open
       if (ctrlKey && e.key === "o") {
         e.preventDefault();
+        if (isReadOnly) return;
         onOpen?.();
       }
 
       // Ctrl+S - Save
       if (ctrlKey && e.key === "s") {
         e.preventDefault();
+        if (isReadOnly) return;
         onSave?.();
       }
 
@@ -228,7 +220,7 @@ export function BurgerMenu({
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [onOpen, onSave, onExportImage, onFindOnCanvas, onHelp]);
+  }, [onOpen, onSave, onExportImage, onFindOnCanvas, onHelp, isReadOnly]);
 
   const modKey = isMac() ? "⌘" : "Ctrl";
 
@@ -249,7 +241,7 @@ export function BurgerMenu({
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" className="w-64 select-none">
         {/* Main Actions */}
-        <DropdownMenuItem onClick={onOpen}>
+        <DropdownMenuItem onClick={onOpen} disabled={isReadOnly}>
           <FolderOpen className="w-4 h-4" />
           <span>Open</span>
           <div className="ml-auto flex gap-0.5">
@@ -258,7 +250,7 @@ export function BurgerMenu({
           </div>
         </DropdownMenuItem>
 
-        <DropdownMenuItem onClick={onSave}>
+        <DropdownMenuItem onClick={onSave} disabled={isReadOnly}>
           <Save className="w-4 h-4" />
           <span>Save to...</span>
           <div className="ml-auto flex gap-0.5">
@@ -280,9 +272,9 @@ export function BurgerMenu({
         <DropdownMenuSeparator />
 
         {/* Collaboration */}
-        <DropdownMenuItem onClick={copyInviteLink}>
+        <DropdownMenuItem onClick={onInvite} disabled={!onInvite}>
           <Share2 className="w-4 h-4" />
-          <span>{copied ? "Link Copied!" : "Invite"}</span>
+          <span>Invite</span>
         </DropdownMenuItem>
 
         <DropdownMenuSeparator />
@@ -306,6 +298,7 @@ export function BurgerMenu({
         <DropdownMenuItem
           onClick={onClear}
           className="text-red-400 dark:text-red-400"
+          disabled={isReadOnly}
         >
           <RotateCcw className="w-4 h-4 !text-red-400 dark:!text-red-400" />
           <span>Reset the canvas</span>

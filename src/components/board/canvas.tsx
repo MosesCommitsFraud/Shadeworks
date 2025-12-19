@@ -55,6 +55,9 @@ interface CanvasProps {
   isToolLocked?: boolean;
   isEditArrowMode?: boolean;
   remoteSelections?: RemoteSelection[];
+  isReadOnly?: boolean;
+  showRemoteCursors?: boolean;
+  showUndoRedo?: boolean;
 }
 
 interface RemoteCursor {
@@ -1134,6 +1137,9 @@ export function Canvas({
   isToolLocked = false,
   isEditArrowMode = false,
   remoteSelections = [],
+  isReadOnly = false,
+  showRemoteCursors = true,
+  showUndoRedo = true,
 }: CanvasProps) {
   const TEXT_CLIP_BUFFER_PX = 2;
   const LASER_HOLD_DURATION_MS = 3000;
@@ -1279,6 +1285,7 @@ export function Canvas({
   // Track shift key and other shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      if (isReadOnly) return;
       if (e.key === "Shift") setShiftPressed(true);
       if (e.key === "Delete" && selectedIds.length > 0) {
         selectedIds.forEach((id) => onDeleteElement(id));
@@ -1300,7 +1307,7 @@ export function Canvas({
       window.removeEventListener("keydown", handleKeyDown);
       window.removeEventListener("keyup", handleKeyUp);
     };
-  }, [selectedIds, onDeleteElement]);
+  }, [selectedIds, onDeleteElement, isReadOnly]);
 
   // Wheel zoom handler with native event listener to prevent browser zoom
   useEffect(() => {
@@ -1827,6 +1834,8 @@ export function Canvas({
 
   const handleMouseMove = useCallback(
     (e: React.MouseEvent) => {
+      if (isReadOnly && !isPanning) return;
+
       const point = getMousePosition(e);
       setLastMousePos(point);
 
@@ -1840,7 +1849,7 @@ export function Canvas({
         setLaserCursorPos(point);
       }
 
-      if (collaboration) {
+      if (!isReadOnly && collaboration) {
         pendingCursorPosRef.current = point;
         if (cursorBroadcastRafRef.current === null) {
           cursorBroadcastRafRef.current = requestAnimationFrame(() => {
@@ -2947,6 +2956,7 @@ export function Canvas({
       currentElement,
       startPoint,
       tool,
+      isReadOnly,
       collaboration,
       getMousePosition,
       isPanning,
@@ -2979,13 +2989,16 @@ export function Canvas({
   const handleMouseDown = useCallback(
     (e: React.MouseEvent) => {
       // Middle mouse button for panning OR hand tool with left click
-      if (e.button === 1 || (e.button === 0 && tool === "hand")) {
+      const shouldPan = e.button === 1 || (e.button === 0 && tool === "hand");
+      if (shouldPan) {
         setIsPanning(true);
         setPanStart({ x: e.clientX - pan.x, y: e.clientY - pan.y });
         // User manually panning - stop following
         onManualViewportChange?.();
         return;
       }
+
+      if (isReadOnly) return;
 
       if (e.button !== 0) return;
 
@@ -3477,6 +3490,7 @@ export function Canvas({
     },
     [
       tool,
+      isReadOnly,
       strokeColor,
       strokeWidth,
       fillColor,
@@ -3505,6 +3519,7 @@ export function Canvas({
   );
 
   const handleMouseUp = useCallback(() => {
+    if (isReadOnly && !isPanning) return;
     if (isPanning) {
       setIsPanning(false);
       return;
@@ -3694,6 +3709,7 @@ export function Canvas({
     currentElement,
     isDrawing,
     onAddElement,
+    isReadOnly,
     isPanning,
     isDragging,
     isResizing,
@@ -6993,9 +7009,11 @@ export function Canvas({
       </svg>
 
       {/* Remote Cursors - Animated (not scaled with zoom) */}
-      <div className="absolute inset-0 pointer-events-none overflow-hidden">
-        <CollaboratorCursors cursors={remoteCursors} pan={pan} zoom={zoom} />
-      </div>
+      {showRemoteCursors && (
+        <div className="absolute inset-0 pointer-events-none overflow-hidden">
+          <CollaboratorCursors cursors={remoteCursors} pan={pan} zoom={zoom} />
+        </div>
+      )}
 
       {/* Text Input */}
       {textInput && (
@@ -7210,52 +7228,56 @@ export function Canvas({
             Reset
           </button>
         </div>
-        <div className="flex items-center gap-2 bg-card/95 backdrop-blur-md border border-border rounded-md p-1.5 shadow-xl">
-          <button
-            onClick={onUndo}
-            className="p-1.5 rounded-sm hover:bg-secondary/80 text-muted-foreground hover:text-foreground transition-all"
-            title="Undo (Ctrl+Z)"
-          >
-            <svg
-              className="w-4 h-4"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
+        {showUndoRedo && (
+          <div className="flex items-center gap-2 bg-card/95 backdrop-blur-md border border-border rounded-md p-1.5 shadow-xl">
+            <button
+              onClick={onUndo}
+              className="p-1.5 rounded-sm hover:bg-secondary/80 text-muted-foreground hover:text-foreground transition-all"
+              title="Undo (Ctrl+Z)"
             >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6"
-              />
-            </svg>
-          </button>
-          <button
-            onClick={onRedo}
-            className="p-1.5 rounded-sm hover:bg-secondary/80 text-muted-foreground hover:text-foreground transition-all"
-            title="Redo (Ctrl+Y)"
-          >
-            <svg
-              className="w-4 h-4"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
+              <svg
+                className="w-4 h-4"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6"
+                />
+              </svg>
+            </button>
+            <button
+              onClick={onRedo}
+              className="p-1.5 rounded-sm hover:bg-secondary/80 text-muted-foreground hover:text-foreground transition-all"
+              title="Redo (Ctrl+Y)"
             >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M21 10h-10a8 8 0 00-8 8v2m18-10l-6 6m6-6l-6-6"
-              />
-            </svg>
-          </button>
-        </div>
+              <svg
+                className="w-4 h-4"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M21 10h-10a8 8 0 00-8 8v2m18-10l-6 6m6-6l-6-6"
+                />
+              </svg>
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Tooltip */}
-      <div className="absolute bottom-4 right-4 text-xs text-muted-foreground bg-card/80 backdrop-blur-sm px-3 py-1.5 rounded-lg border border-border">
-        Ctrl+Scroll to zoom • Two-finger/Middle-click to pan
-      </div>
+      {!isReadOnly && (
+        <div className="absolute bottom-4 right-4 text-xs text-muted-foreground bg-card/80 backdrop-blur-sm px-3 py-1.5 rounded-lg border border-border">
+          Ctrl+Scroll to zoom ? Two-finger/Middle-click to pan
+        </div>
+      )}
     </div>
   );
 }

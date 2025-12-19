@@ -41,8 +41,14 @@ export class CollaborationManager {
   private connectionStatus: ConnectionStatus = "connecting";
   private encryptionKey: CryptoKey | null = null;
   private decryptedElementsCache: Map<string, BoardElement> = new Map();
+  private isReadOnly: boolean;
 
-  constructor(roomId: string, userName?: string, encryptionKey?: CryptoKey) {
+  constructor(
+    roomId: string,
+    userName?: string,
+    encryptionKey?: CryptoKey,
+    options: { readOnly?: boolean } = {},
+  ) {
     this.doc = new Y.Doc();
     this.elements = this.doc.getArray<StoredElement>("elements");
     this.userId = Math.random().toString(36).substring(2, 9);
@@ -50,6 +56,7 @@ export class CollaborationManager {
     this.userName = userName || generateFunnyName();
     this.userColor = this.getRandomColor();
     this.encryptionKey = encryptionKey || null;
+    this.isReadOnly = options.readOnly ?? false;
 
     // Connect to PartyKit
     this.provider = new YPartyKitProvider(
@@ -76,13 +83,17 @@ export class CollaborationManager {
       }
     });
 
-    // Set user awareness
-    this.provider.awareness.setLocalStateField("user", {
-      id: this.userId,
-      name: this.userName,
-      color: this.userColor,
-      cursor: null,
-    });
+    // Set user awareness (skip in read-only mode)
+    if (!this.isReadOnly) {
+      this.provider.awareness.setLocalStateField("user", {
+        id: this.userId,
+        name: this.userName,
+        color: this.userColor,
+        cursor: null,
+      });
+    } else {
+      this.provider.awareness.setLocalState(null);
+    }
 
     console.log(
       "[Collaboration] Initialized for room:",
@@ -195,6 +206,7 @@ export class CollaborationManager {
    * Add a new element (encrypts if encryption is enabled)
    */
   async addElement(element: BoardElement): Promise<void> {
+    if (this.isReadOnly) return;
     if (this.encryptionKey) {
       const { ciphertext, iv } = await encrypt(this.encryptionKey, element);
       const encrypted: EncryptedElement = {
@@ -218,6 +230,7 @@ export class CollaborationManager {
     id: string,
     updates: Partial<BoardElement>,
   ): Promise<void> {
+    if (this.isReadOnly) return;
     const storedArray = this.elements.toArray();
     const index = storedArray.findIndex((el) => el.id === id);
 
@@ -278,6 +291,7 @@ export class CollaborationManager {
    * Delete an element
    */
   deleteElement(id: string): void {
+    if (this.isReadOnly) return;
     const index = this.elements.toArray().findIndex((el) => el.id === id);
     if (index !== -1) {
       this.elements.delete(index, 1);
@@ -290,6 +304,7 @@ export class CollaborationManager {
    * Clear all elements
    */
   clearAll(): void {
+    if (this.isReadOnly) return;
     this.elements.delete(0, this.elements.length);
     this.decryptedElementsCache.clear();
   }
@@ -342,6 +357,7 @@ export class CollaborationManager {
   }
 
   updateCursor(x: number, y: number): void {
+    if (this.isReadOnly) return;
     if (this.provider) {
       const currentState = this.provider.awareness.getLocalState() as {
         user?: any;
@@ -357,6 +373,7 @@ export class CollaborationManager {
   }
 
   updateViewport(pan: { x: number; y: number }, zoom: number): void {
+    if (this.isReadOnly) return;
     if (this.provider) {
       const currentState = this.provider.awareness.getLocalState() as {
         user?: any;
@@ -372,6 +389,7 @@ export class CollaborationManager {
   }
 
   updateDrawingElement(element: BoardElement | null): void {
+    if (this.isReadOnly) return;
     if (this.provider) {
       const currentState = this.provider.awareness.getLocalState() as {
         user?: any;
@@ -387,6 +405,7 @@ export class CollaborationManager {
   }
 
   updateFollowingUser(userId: string | null): void {
+    if (this.isReadOnly) return;
     if (this.provider) {
       const currentState = this.provider.awareness.getLocalState() as {
         user?: any;
@@ -402,6 +421,7 @@ export class CollaborationManager {
   }
 
   updateSelectedElements(elementIds: string[]): void {
+    if (this.isReadOnly) return;
     if (this.provider) {
       const currentState = this.provider.awareness.getLocalState() as {
         user?: any;

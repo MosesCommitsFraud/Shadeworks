@@ -12,7 +12,6 @@ import {
   Type,
   Trash2,
   Share2,
-  Check,
   Pointer,
   Lock,
   Unlock,
@@ -22,7 +21,7 @@ import {
 import { Tool } from "@/lib/board-types";
 import type { ConnectionStatus } from "@/lib/collaboration";
 import { cn } from "@/lib/utils";
-import { useState, useEffect } from "react";
+import { useEffect } from "react";
 import { CollaboratorAvatars } from "./collaborator-avatars";
 import {
   Tooltip,
@@ -38,7 +37,6 @@ interface ToolbarProps {
   strokeWidth: number;
   onStrokeWidthChange: (width: number) => void;
   onClear: () => void;
-  roomId: string;
   connectedUsers: number;
   peerCount: number;
   connectionStatus: ConnectionStatus;
@@ -55,6 +53,7 @@ interface ToolbarProps {
   isBeingSpectated: boolean;
   isToolLocked: boolean;
   onToggleToolLock: () => void;
+  onInvite?: () => void;
 }
 
 const tools: {
@@ -84,7 +83,6 @@ export function Toolbar({
   strokeWidth,
   onStrokeWidthChange,
   onClear,
-  roomId,
   connectedUsers,
   peerCount,
   connectionStatus,
@@ -96,18 +94,8 @@ export function Toolbar({
   isBeingSpectated,
   isToolLocked,
   onToggleToolLock,
+  onInvite,
 }: ToolbarProps) {
-  const [copied, setCopied] = useState(false);
-
-  const copyInviteLink = async () => {
-    // Include the hash (encryption key) in the invite link
-    const hash = window.location.hash || "";
-    const link = `${window.location.origin}/board/${roomId}${hash}`;
-    await navigator.clipboard.writeText(link);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  };
-
   // Keyboard shortcuts for tools
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -251,25 +239,16 @@ export function Toolbar({
 
         {/* Share Button */}
         <button
-          onClick={copyInviteLink}
+          onClick={onInvite}
+          disabled={!onInvite}
           className={cn(
             "flex items-center gap-1.5 px-2.5 py-1.5 rounded-sm transition-all duration-200",
-            copied
-              ? "bg-green-500/20 text-green-400"
-              : "hover:bg-secondary/80 text-muted-foreground hover:text-foreground",
+            "hover:bg-secondary/80 text-muted-foreground hover:text-foreground",
+            "disabled:opacity-50 disabled:pointer-events-none",
           )}
         >
-          {copied ? (
-            <>
-              <Check className="w-4 h-4" />
-              <span className="text-xs font-medium">Copied!</span>
-            </>
-          ) : (
-            <>
-              <Share2 className="w-4 h-4" />
-              <span className="text-xs font-medium">Invite</span>
-            </>
-          )}
+          <Share2 className="w-4 h-4" />
+          <span className="text-xs font-medium">Invite</span>
         </button>
       </div>
     </div>

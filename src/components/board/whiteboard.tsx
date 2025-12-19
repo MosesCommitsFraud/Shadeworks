@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
+import { useSearchParams } from "next/navigation";
 import { useTheme } from "next-themes";
 import { v4 as uuid } from "uuid";
 import { Canvas } from "./canvas";
@@ -10,6 +11,7 @@ import { BurgerMenu } from "./burger-menu";
 import { ExportImageModal } from "./export-image-modal";
 import { FindCanvas } from "./find-canvas";
 import { HotkeysDialog } from "./hotkeys-dialog";
+import { InviteDialog } from "./invite-dialog";
 import {
   CollaborationManager,
   type ConnectionStatus,
@@ -126,6 +128,10 @@ function translateElement(
 }
 
 export function Whiteboard({ roomId }: WhiteboardProps) {
+  const searchParams = useSearchParams();
+  const isReadOnly =
+    searchParams?.get("readonly") === "1" ||
+    searchParams?.get("readonly") === "true";
   const { theme, resolvedTheme } = useTheme();
   const [tool, setTool] = useState<Tool>("select");
   const [isToolLocked, setIsToolLocked] = useState(false);
@@ -202,10 +208,13 @@ export function Whiteboard({ roomId }: WhiteboardProps) {
   const [showExportDialog, setShowExportDialog] = useState(false);
   const [showFindCanvas, setShowFindCanvas] = useState(false);
   const [showHotkeysDialog, setShowHotkeysDialog] = useState(false);
+  const [showInviteDialog, setShowInviteDialog] = useState(false);
   const [highlightedElementIds, setHighlightedElementIds] = useState<string[]>(
     [],
   );
   const [hideLogoBar, setHideLogoBar] = useState(false);
+
+  const effectiveTool = isReadOnly ? "hand" : tool;
 
   // Undo/Redo stacks - store snapshots
   const undoStackRef = useRef<BoardElement[][]>([]);
@@ -280,7 +289,9 @@ export function Whiteboard({ roomId }: WhiteboardProps) {
 
       if (!mounted) return;
 
-      collab = new CollaborationManager(roomId, name, encryptionKey);
+      collab = new CollaborationManager(roomId, name, encryptionKey, {
+        readOnly: isReadOnly,
+      });
       setCollaboration(collab);
       setMyUserId(collab.getUserInfo().id);
 
@@ -374,7 +385,7 @@ export function Whiteboard({ roomId }: WhiteboardProps) {
       unsubConnection?.();
       collab?.destroy();
     };
-  }, [roomId]);
+  }, [roomId, isReadOnly]);
 
   // Save state to undo stack
   const saveToUndoStack = useCallback(() => {
@@ -447,6 +458,7 @@ export function Whiteboard({ roomId }: WhiteboardProps) {
   // Handle keyboard shortcuts for undo/redo
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      if (isReadOnly) return;
       // Don't trigger if typing in input
       if (
         e.target instanceof HTMLInputElement ||
@@ -471,10 +483,11 @@ export function Whiteboard({ roomId }: WhiteboardProps) {
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [handleUndo, handleRedo]);
+  }, [handleUndo, handleRedo, isReadOnly]);
 
   const handleAddElement = useCallback(
     (element: BoardElement) => {
+      if (isReadOnly) return;
       saveToUndoStack();
 
       if (collaboration) {
@@ -483,11 +496,12 @@ export function Whiteboard({ roomId }: WhiteboardProps) {
         setElements((prev) => [...prev, element]);
       }
     },
-    [collaboration, saveToUndoStack],
+    [collaboration, saveToUndoStack, isReadOnly],
   );
 
   const handleUpdateElement = useCallback(
     (id: string, updates: Partial<BoardElement>) => {
+      if (isReadOnly) return;
       if (collaboration) {
         collaboration.updateElement(id, updates);
       } else {
@@ -496,7 +510,7 @@ export function Whiteboard({ roomId }: WhiteboardProps) {
         );
       }
     },
-    [collaboration],
+    [collaboration, isReadOnly],
   );
 
   const handleStartTransform = useCallback(() => {
@@ -505,6 +519,7 @@ export function Whiteboard({ roomId }: WhiteboardProps) {
 
   const handleDeleteElement = useCallback(
     (id: string) => {
+      if (isReadOnly) return;
       saveToUndoStack();
 
       if (collaboration) {
@@ -513,10 +528,11 @@ export function Whiteboard({ roomId }: WhiteboardProps) {
         setElements((prev) => prev.filter((el) => el.id !== id));
       }
     },
-    [collaboration, saveToUndoStack],
+    [collaboration, saveToUndoStack, isReadOnly],
   );
 
   const handleClear = useCallback(() => {
+    if (isReadOnly) return;
     saveToUndoStack();
 
     if (collaboration) {
@@ -524,15 +540,17 @@ export function Whiteboard({ roomId }: WhiteboardProps) {
     } else {
       setElements([]);
     }
-  }, [collaboration, saveToUndoStack]);
+  }, [collaboration, saveToUndoStack, isReadOnly]);
 
   const handleSave = useCallback(() => {
+    if (isReadOnly) return;
     // Set default filename with current date
     setSaveFileName(`shadeworks-${new Date().toISOString().split("T")[0]}`);
     setShowSaveDialog(true);
-  }, []);
+  }, [isReadOnly]);
 
   const handleConfirmSave = useCallback(() => {
+    if (isReadOnly) return;
     const shadeworksFile: ShadeworksFile = {
       type: "shadeworks",
       version: 1,
@@ -560,9 +578,10 @@ export function Whiteboard({ roomId }: WhiteboardProps) {
 
     setShowSaveDialog(false);
     setSaveFileName("");
-  }, [elements, canvasBackground, saveFileName]);
+  }, [elements, canvasBackground, saveFileName, isReadOnly]);
 
   const handleOpen = useCallback(() => {
+    if (isReadOnly) return;
     const input = document.createElement("input");
     input.type = "file";
     input.accept = ".shadeworks,application/json";
@@ -610,7 +629,7 @@ export function Whiteboard({ roomId }: WhiteboardProps) {
     };
 
     input.click();
-  }, [collaboration, saveToUndoStack]);
+  }, [collaboration, saveToUndoStack, isReadOnly]);
 
   const handleExportImage = useCallback(() => {
     setShowExportDialog(true);
@@ -1293,9 +1312,10 @@ export function Whiteboard({ roomId }: WhiteboardProps) {
           onExportImage={handleExportImage}
           onFindOnCanvas={handleFindOnCanvas}
           onHelp={() => setShowHotkeysDialog(true)}
+          onInvite={() => setShowInviteDialog(true)}
           canvasBackground={canvasBackground}
           onCanvasBackgroundChange={setCanvasBackground}
-          roomId={roomId}
+          isReadOnly={isReadOnly}
         />
         {!hideLogoBar && (
           <a
@@ -1316,21 +1336,29 @@ export function Whiteboard({ roomId }: WhiteboardProps) {
       </div>
 
       {/* Hotkeys - Top Right */}
-      <div className="absolute top-4 right-4 z-50">
-        <button
-          onClick={() => setShowHotkeysDialog(true)}
-          className="p-2.5 rounded-md transition-all duration-200 bg-card/95 backdrop-blur-md border border-border hover:bg-muted/60 text-muted-foreground hover:text-foreground shadow-2xl"
-          aria-label="Keyboard shortcuts"
-        >
-          <span className="w-5 h-5 flex items-center justify-center font-semibold">
-            ?
-          </span>
-        </button>
-      </div>
+      {!isReadOnly && (
+        <div className="absolute top-4 right-4 z-50">
+          <button
+            onClick={() => setShowHotkeysDialog(true)}
+            className="p-2.5 rounded-md transition-all duration-200 bg-card/95 backdrop-blur-md border border-border hover:bg-muted/60 text-muted-foreground hover:text-foreground shadow-2xl"
+            aria-label="Keyboard shortcuts"
+          >
+            <span className="w-5 h-5 flex items-center justify-center font-semibold">
+              ?
+            </span>
+          </button>
+        </div>
+      )}
 
       <HotkeysDialog
         open={showHotkeysDialog}
         onOpenChange={setShowHotkeysDialog}
+      />
+
+      <InviteDialog
+        open={showInviteDialog}
+        onOpenChange={setShowInviteDialog}
+        roomId={roomId}
       />
 
       {/* Find Canvas */}
@@ -1371,82 +1399,86 @@ export function Whiteboard({ roomId }: WhiteboardProps) {
         </div>
       )}
 
-      <Toolbar
-        selectedTool={tool}
-        onToolChange={setTool}
-        strokeColor={strokeColor}
-        onStrokeColorChange={setStrokeColor}
-        strokeWidth={strokeWidth}
-        onStrokeWidthChange={setStrokeWidth}
-        onClear={handleClear}
-        roomId={roomId}
-        connectedUsers={connectedUsers}
-        peerCount={peerCount}
-        connectionStatus={connectionStatus}
-        myName={myName || "Connecting..."}
-        collaboratorUsers={collaboratorUsers}
-        onFollowUser={handleFollowUser}
-        followedUserId={followedUserId}
-        spectatedUserIds={spectatedUserIds}
-        isBeingSpectated={myUserId ? spectatedUserIds.has(myUserId) : false}
-        isToolLocked={isToolLocked}
-        onToggleToolLock={() => setIsToolLocked(!isToolLocked)}
-      />
+      {!isReadOnly && (
+        <Toolbar
+          selectedTool={tool}
+          onToolChange={setTool}
+          strokeColor={strokeColor}
+          onStrokeColorChange={setStrokeColor}
+          strokeWidth={strokeWidth}
+          onStrokeWidthChange={setStrokeWidth}
+          onClear={handleClear}
+          connectedUsers={connectedUsers}
+          peerCount={peerCount}
+          connectionStatus={connectionStatus}
+          myName={myName || "Connecting..."}
+          collaboratorUsers={collaboratorUsers}
+          onFollowUser={handleFollowUser}
+          followedUserId={followedUserId}
+          spectatedUserIds={spectatedUserIds}
+          isBeingSpectated={myUserId ? spectatedUserIds.has(myUserId) : false}
+          isToolLocked={isToolLocked}
+          onToggleToolLock={() => setIsToolLocked(!isToolLocked)}
+          onInvite={() => setShowInviteDialog(true)}
+        />
+      )}
 
-      <ToolSidebar
-        selectedTool={tool}
-        strokeColor={strokeColor}
-        onStrokeColorChange={handleStrokeColorChange}
-        strokeWidth={strokeWidth}
-        onStrokeWidthChange={handleStrokeWidthChange}
-        fillColor={fillColor}
-        onFillColorChange={handleFillColorChange}
-        opacity={opacity}
-        onOpacityChange={handleOpacityChange}
-        strokeStyle={strokeStyle}
-        onStrokeStyleChange={handleStrokeStyleChange}
-        lineCap={lineCap}
-        onLineCapChange={handleLineCapChange}
-        connectorStyle={connectorStyle}
-        onConnectorStyleChange={handleConnectorStyleChange}
-        arrowStart={arrowStart}
-        onArrowStartChange={handleArrowStartChange}
-        arrowEnd={arrowEnd}
-        onArrowEndChange={handleArrowEndChange}
-        cornerRadius={cornerRadius}
-        onCornerRadiusChange={handleCornerRadiusChange}
-        fontFamily={fontFamily}
-        onFontFamilyChange={handleFontFamilyChange}
-        textAlign={textAlign}
-        onTextAlignChange={handleTextAlignChange}
-        fontSize={fontSize}
-        onFontSizeChange={handleFontSizeChange}
-        letterSpacing={letterSpacing}
-        onLetterSpacingChange={handleLetterSpacingChange}
-        lineHeight={lineHeight}
-        onLineHeightChange={handleLineHeightChange}
-        fillPattern={fillPattern}
-        onFillPatternChange={handleFillPatternChange}
-        selectedElements={selectedElements}
-        onBringToFront={handleBringToFront}
-        onSendToBack={handleSendToBack}
-        onMoveForward={handleMoveForward}
-        onMoveBackward={handleMoveBackward}
-        onAlignLeft={handleAlignLeft}
-        onAlignCenterHorizontal={handleAlignCenterHorizontal}
-        onAlignRight={handleAlignRight}
-        onAlignTop={handleAlignTop}
-        onAlignCenterVertical={handleAlignCenterVertical}
-        onAlignBottom={handleAlignBottom}
-        onCopySelected={handleCopySelected}
-        onDeleteSelected={handleDeleteSelected}
-        onToggleGroupSelection={handleToggleGroupSelection}
-        isEditArrowMode={isEditArrowMode}
-        onToggleEditArrowMode={handleToggleEditArrowMode}
-      />
+      {!isReadOnly && (
+        <ToolSidebar
+          selectedTool={tool}
+          strokeColor={strokeColor}
+          onStrokeColorChange={handleStrokeColorChange}
+          strokeWidth={strokeWidth}
+          onStrokeWidthChange={handleStrokeWidthChange}
+          fillColor={fillColor}
+          onFillColorChange={handleFillColorChange}
+          opacity={opacity}
+          onOpacityChange={handleOpacityChange}
+          strokeStyle={strokeStyle}
+          onStrokeStyleChange={handleStrokeStyleChange}
+          lineCap={lineCap}
+          onLineCapChange={handleLineCapChange}
+          connectorStyle={connectorStyle}
+          onConnectorStyleChange={handleConnectorStyleChange}
+          arrowStart={arrowStart}
+          onArrowStartChange={handleArrowStartChange}
+          arrowEnd={arrowEnd}
+          onArrowEndChange={handleArrowEndChange}
+          cornerRadius={cornerRadius}
+          onCornerRadiusChange={handleCornerRadiusChange}
+          fontFamily={fontFamily}
+          onFontFamilyChange={handleFontFamilyChange}
+          textAlign={textAlign}
+          onTextAlignChange={handleTextAlignChange}
+          fontSize={fontSize}
+          onFontSizeChange={handleFontSizeChange}
+          letterSpacing={letterSpacing}
+          onLetterSpacingChange={handleLetterSpacingChange}
+          lineHeight={lineHeight}
+          onLineHeightChange={handleLineHeightChange}
+          fillPattern={fillPattern}
+          onFillPatternChange={handleFillPatternChange}
+          selectedElements={selectedElements}
+          onBringToFront={handleBringToFront}
+          onSendToBack={handleSendToBack}
+          onMoveForward={handleMoveForward}
+          onMoveBackward={handleMoveBackward}
+          onAlignLeft={handleAlignLeft}
+          onAlignCenterHorizontal={handleAlignCenterHorizontal}
+          onAlignRight={handleAlignRight}
+          onAlignTop={handleAlignTop}
+          onAlignCenterVertical={handleAlignCenterVertical}
+          onAlignBottom={handleAlignBottom}
+          onCopySelected={handleCopySelected}
+          onDeleteSelected={handleDeleteSelected}
+          onToggleGroupSelection={handleToggleGroupSelection}
+          isEditArrowMode={isEditArrowMode}
+          onToggleEditArrowMode={handleToggleEditArrowMode}
+        />
+      )}
 
       <Canvas
-        tool={tool}
+        tool={effectiveTool}
         strokeColor={strokeColor}
         strokeWidth={strokeWidth}
         fillColor={fillColor}
@@ -1471,7 +1503,7 @@ export function Whiteboard({ roomId }: WhiteboardProps) {
         onStartTransform={handleStartTransform}
         onUndo={handleUndo}
         onRedo={handleRedo}
-        onToolChange={setTool}
+        onToolChange={isReadOnly ? undefined : setTool}
         onSetViewport={(setter) => {
           setViewportRef.current = setter;
         }}
@@ -1483,7 +1515,10 @@ export function Whiteboard({ roomId }: WhiteboardProps) {
         highlightedElementIds={highlightedElementIds}
         isToolLocked={isToolLocked}
         isEditArrowMode={isEditArrowMode}
-        remoteSelections={remoteSelections}
+        remoteSelections={isReadOnly ? [] : remoteSelections}
+        isReadOnly={isReadOnly}
+        showRemoteCursors={!isReadOnly}
+        showUndoRedo={!isReadOnly}
       />
 
       {/* Save File Dialog */}
