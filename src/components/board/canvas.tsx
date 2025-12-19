@@ -1106,6 +1106,10 @@ export function Canvas({
   } | null>(null);
   const [textValue, setTextValue] = useState("");
   const textInputRef = useRef<HTMLTextAreaElement>(null);
+  const textEditorWrapperRef = useRef<HTMLDivElement>(null);
+  const textEditorMirrorRef = useRef<HTMLDivElement>(null);
+  const textEditorCaretRef = useRef<HTMLDivElement>(null);
+  const caretUpdateRafRef = useRef<number | null>(null);
   const [editingTextElementId, setEditingTextElementId] = useState<
     string | null
   >(null);
@@ -2155,8 +2159,7 @@ export function Canvas({
             originalElement.type === "diamond" ||
             originalElement.type === "ellipse" ||
             originalElement.type === "frame" ||
-            originalElement.type === "web-embed" ||
-            originalElement.type === "text");
+            originalElement.type === "web-embed");
 
         const centerForResize = supportsRotatedResize
           ? getBoundsCenter(originalBounds)
@@ -2436,7 +2439,20 @@ export function Canvas({
               2,
               measureTextWidthPx("W", getTextFontString(fs, ff)),
             );
-            const minH = Math.max(2, fs * (originalElement.lineHeight ?? 1.4));
+            const lh = originalElement.lineHeight ?? 1.4;
+            const lineHeightPx = fs * lh;
+            const minH = Math.max(2, lineHeightPx);
+
+            const effectiveWidth = Math.max(minW, newWidth);
+            const requiredHeight = (() => {
+              const font = getTextFontString(fs, ff);
+              const wrapped = wrapTextBreakWordMeasured(
+                originalElement.text || "",
+                effectiveWidth,
+                font,
+              );
+              return Math.max(minH, wrapped.length * lineHeightPx);
+            })();
 
             if (newWidth < minW) {
               newWidth = minW;
@@ -2446,10 +2462,10 @@ export function Canvas({
                 newX = originalLeft;
               }
             }
-            if (newHeight < minH) {
-              newHeight = minH;
+            if (newHeight < requiredHeight) {
+              newHeight = requiredHeight;
               if (resizeHandle.includes("n") && !resizeHandle.includes("s")) {
-                newY = originalBottom - minH;
+                newY = originalBottom - requiredHeight;
               } else {
                 newY = originalTop;
               }
@@ -2893,6 +2909,7 @@ export function Canvas({
             letterSpacing: selectableClickedElement.letterSpacing ?? 0,
             lineHeight: selectableClickedElement.lineHeight ?? editLineHeight,
           });
+          setSelectedIds([selectableClickedElement.id]);
           setTimeout(() => {
             const editor = textInputRef.current;
             editor?.focus();
@@ -3227,6 +3244,7 @@ export function Canvas({
             letterSpacing: clickedElement.letterSpacing ?? 0,
             lineHeight: clickedElement.lineHeight ?? editLineHeight,
           });
+          setSelectedIds([clickedElement.id]);
           setTimeout(() => textInputRef.current?.focus(), 10);
           return;
         }
@@ -3588,7 +3606,7 @@ export function Canvas({
         ? textInputRef.current.offsetWidth
         : undefined;
       const measuredHeight = textInputRef.current
-        ? textInputRef.current.offsetHeight
+        ? textInputRef.current.scrollHeight
         : undefined;
       const nextElement: BoardElement = {
         id: nextElementId,
@@ -3726,6 +3744,33 @@ export function Canvas({
         setTextInput((prev) =>
           prev ? { ...prev, height: nextHeight, isTextBox: true } : prev,
         );
+      }
+
+      // Update caret position after layout changes.
+      if (caretUpdateRafRef.current === null) {
+        caretUpdateRafRef.current = requestAnimationFrame(() => {
+          caretUpdateRafRef.current = null;
+          const textarea = textInputRef.current;
+          const mirror = textEditorMirrorRef.current;
+          const caret = textEditorCaretRef.current;
+          if (!textarea || !mirror || !caret) return;
+          if (textarea.selectionStart !== textarea.selectionEnd) {
+            caret.style.display = "none";
+            return;
+          }
+          const pos = textarea.selectionStart ?? textarea.value.length;
+          mirror.textContent = "";
+          mirror.append(document.createTextNode(textarea.value.slice(0, pos)));
+          const marker = document.createElement("span");
+          marker.textContent = "\u200b";
+          mirror.append(marker);
+          const mirrorRect = mirror.getBoundingClientRect();
+          const markerRect = marker.getBoundingClientRect();
+          caret.style.display = "block";
+          caret.style.left = `${markerRect.left - mirrorRect.left}px`;
+          caret.style.top = `${markerRect.top - mirrorRect.top}px`;
+          caret.style.height = `${markerRect.height || activeFontSize}px`;
+        });
       }
     }
   }, [editingTextStyle, fontSize, lineHeight, textValue, textInput]);
@@ -6727,43 +6772,9 @@ export function Canvas({
 
       {/* Text Input */}
       {textInput && (
-        <textarea
-          ref={textInputRef}
-          value={textValue}
-          wrap="off"
-          rows={1}
-          onChange={(e) => handleTextChange(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Escape") {
-              setTextInput(null);
-              setTextValue("");
-              setEditingTextElementId(null);
-              setEditingTextStyle(null);
-            }
-          }}
-          onBlur={(e) => {
-            // Don't close if clicking on sidebar or other UI elements
-            const relatedTarget = e.relatedTarget as HTMLElement;
-            if (
-              relatedTarget &&
-              (relatedTarget.closest(".fixed.right-4") || // Sidebar
-                relatedTarget.tagName === "BUTTON" ||
-                relatedTarget.tagName === "SELECT" ||
-                relatedTarget.tagName === "INPUT")
-            ) {
-              return;
-            }
-            // Save text on blur if there's content
-            if (textValue.trim()) {
-              handleTextSubmit();
-            } else {
-              setTextInput(null);
-              setTextValue("");
-              setEditingTextElementId(null);
-              setEditingTextStyle(null);
-            }
-          }}
-          className="absolute bg-transparent outline-none text-foreground resize-none"
+        <div
+          ref={textEditorWrapperRef}
+          className="absolute pointer-events-auto"
           style={{
             left: textInput.x * zoom + pan.x,
             top: textInput.y * zoom + pan.y,
@@ -6774,26 +6785,138 @@ export function Canvas({
                 (editingTextStyle?.lineHeight ?? lineHeight),
             transform: `scale(${zoom})`,
             transformOrigin: "top left",
-            fontSize: editingTextStyle?.fontSize ?? fontSize,
-            fontFamily: editingTextStyle?.fontFamily ?? fontFamily,
-            letterSpacing: `${editingTextStyle?.letterSpacing ?? letterSpacing}px`,
-            color: editingTextStyle?.strokeColor ?? strokeColor,
-            lineHeight: (editingTextStyle?.lineHeight ?? lineHeight).toString(),
-            textAlign: editingTextStyle?.textAlign ?? textAlign,
-            padding: 0,
-            margin: 0,
-            border: 0,
-            outline:
-              "2px dashed color-mix(in oklab, var(--accent) 60%, transparent)",
-            outlineOffset: "0px",
-            boxSizing: "content-box",
-            overflow: "hidden",
-            wordBreak: "break-word",
-            overflowWrap: "anywhere",
-            whiteSpace: "pre-wrap",
           }}
-          placeholder="Type..."
-        />
+        >
+          <textarea
+            ref={textInputRef}
+            value={textValue}
+            wrap="off"
+            rows={1}
+            spellCheck={false}
+            autoCorrect="off"
+            autoCapitalize="off"
+            autoComplete="off"
+            onChange={(e) => handleTextChange(e.target.value)}
+            onSelect={() => {
+              if (caretUpdateRafRef.current !== null) return;
+              caretUpdateRafRef.current = requestAnimationFrame(() => {
+                caretUpdateRafRef.current = null;
+                const textarea = textInputRef.current;
+                const mirror = textEditorMirrorRef.current;
+                const caret = textEditorCaretRef.current;
+                if (!textarea || !mirror || !caret) return;
+                if (textarea.selectionStart !== textarea.selectionEnd) {
+                  caret.style.display = "none";
+                  return;
+                }
+                const pos = textarea.selectionStart ?? textarea.value.length;
+                mirror.textContent = "";
+                mirror.append(
+                  document.createTextNode(textarea.value.slice(0, pos)),
+                );
+                const marker = document.createElement("span");
+                marker.textContent = "\u200b";
+                mirror.append(marker);
+                const mirrorRect = mirror.getBoundingClientRect();
+                const markerRect = marker.getBoundingClientRect();
+                caret.style.display = "block";
+                caret.style.left = `${markerRect.left - mirrorRect.left}px`;
+                caret.style.top = `${markerRect.top - mirrorRect.top}px`;
+                caret.style.height = `${markerRect.height || (editingTextStyle?.fontSize ?? fontSize)}px`;
+              });
+            }}
+            onKeyDown={(e) => {
+              if (e.key === "Escape") {
+                setTextInput(null);
+                setTextValue("");
+                setEditingTextElementId(null);
+                setEditingTextStyle(null);
+              }
+            }}
+            onBlur={(e) => {
+              // Don't close if clicking on sidebar or other UI elements
+              const relatedTarget = e.relatedTarget as HTMLElement;
+              if (
+                relatedTarget &&
+                (relatedTarget.closest(".fixed.right-4") || // Sidebar
+                  relatedTarget.tagName === "BUTTON" ||
+                  relatedTarget.tagName === "SELECT" ||
+                  relatedTarget.tagName === "INPUT")
+              ) {
+                return;
+              }
+              // Save text on blur if there's content
+              if (textValue.trim()) {
+                handleTextSubmit();
+              } else {
+                setTextInput(null);
+                setTextValue("");
+                setEditingTextElementId(null);
+                setEditingTextStyle(null);
+              }
+            }}
+            className="absolute inset-0 bg-transparent outline-none text-foreground resize-none"
+            style={{
+              width: "100%",
+              height: "100%",
+              fontSize: editingTextStyle?.fontSize ?? fontSize,
+              fontFamily: editingTextStyle?.fontFamily ?? fontFamily,
+              letterSpacing: `${editingTextStyle?.letterSpacing ?? letterSpacing}px`,
+              color: editingTextStyle?.strokeColor ?? strokeColor,
+              lineHeight: (
+                editingTextStyle?.lineHeight ?? lineHeight
+              ).toString(),
+              textAlign: editingTextStyle?.textAlign ?? textAlign,
+              padding: 0,
+              margin: 0,
+              border: 0,
+              outline:
+                "2px dashed color-mix(in oklab, var(--accent) 60%, transparent)",
+              outlineOffset: "0px",
+              boxSizing: "content-box",
+              overflow: "hidden",
+              wordBreak: "break-word",
+              overflowWrap: "anywhere",
+              whiteSpace: "pre-wrap",
+              caretColor: "transparent",
+            }}
+          />
+          <div
+            ref={textEditorCaretRef}
+            className="shadeworks-text-caret"
+            style={{
+              position: "absolute",
+              width: "2px",
+              backgroundColor: editingTextStyle?.strokeColor ?? strokeColor,
+              top: 0,
+              left: 0,
+              display: "none",
+            }}
+          />
+          <div
+            ref={textEditorMirrorRef}
+            aria-hidden="true"
+            style={{
+              position: "absolute",
+              inset: 0,
+              visibility: "hidden",
+              pointerEvents: "none",
+              whiteSpace: "pre-wrap",
+              overflowWrap: "anywhere",
+              wordBreak: "break-word",
+              fontSize: `${editingTextStyle?.fontSize ?? fontSize}px`,
+              fontFamily: editingTextStyle?.fontFamily ?? fontFamily,
+              letterSpacing: `${editingTextStyle?.letterSpacing ?? letterSpacing}px`,
+              lineHeight: (
+                editingTextStyle?.lineHeight ?? lineHeight
+              ).toString(),
+              textAlign: editingTextStyle?.textAlign ?? textAlign,
+              padding: 0,
+              margin: 0,
+              boxSizing: "content-box",
+            }}
+          />
+        </div>
       )}
 
       {/* Zoom and Undo/Redo Controls */}
