@@ -163,7 +163,7 @@ function getMinSingleCharWidth(
         maxCharWidth = measureTextWidthPx("W", font);
     }
     // Add letter-spacing and buffer for glyph overhangs
-    return Math.max(2, maxCharWidth + Math.abs(letterSpacing) + 20);
+    return Math.max(2, maxCharWidth + Math.abs(letterSpacing) + 16);
 }
 
 let textMeasureDiv: HTMLDivElement | null = null;
@@ -5380,10 +5380,16 @@ export function Canvas({
                                             "var(--font-inter)",
                                         fontSize: `${fontSize}px`,
                                         lineHeight: `${elLineHeight}`,
-                                        letterSpacing: `${elLetterSpacing}px`,
+                                        // At minimum width, use 0 letter-spacing to force 1 char per line
+                                        letterSpacing: isAtMinWidth
+                                            ? "0px"
+                                            : `${elLetterSpacing}px`,
                                         whiteSpace: "pre-wrap",
                                         overflowWrap: "anywhere",
-                                        wordBreak: "break-word",
+                                        // At minimum width, use break-all to force each character to wrap
+                                        wordBreak: isAtMinWidth
+                                            ? "break-all"
+                                            : "break-word",
                                         textAlign: effectiveTextAlign,
                                         padding: 0,
                                         margin: 0,
@@ -7460,7 +7466,7 @@ export function Canvas({
                     <textarea
                         ref={textInputRef}
                         value={textValue}
-                        wrap="off"
+                        wrap="soft"
                         rows={1}
                         spellCheck={false}
                         autoCorrect="off"
@@ -7558,7 +7564,7 @@ export function Canvas({
                                 "2px dashed color-mix(in oklab, var(--accent) 60%, transparent)",
                             outlineOffset: "0px",
                             boxSizing: "content-box",
-                            overflow: "hidden",
+                            overflow: "visible",
                             wordBreak: "break-word",
                             overflowWrap: "anywhere",
                             whiteSpace: "pre-wrap",
