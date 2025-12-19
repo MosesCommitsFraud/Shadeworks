@@ -163,7 +163,7 @@ function getMinSingleCharWidth(
         maxCharWidth = measureTextWidthPx("W", font);
     }
     // Add letter-spacing and buffer for glyph overhangs
-    return Math.max(2, maxCharWidth + Math.abs(letterSpacing) + 4);
+    return Math.max(2, maxCharWidth + Math.abs(letterSpacing) + 20);
 }
 
 let textMeasureDiv: HTMLDivElement | null = null;
