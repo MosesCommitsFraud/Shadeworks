@@ -1044,6 +1044,7 @@ export function Canvas({
   isEditArrowMode = false,
   remoteSelections = [],
 }: CanvasProps) {
+  const TEXT_CLIP_BUFFER_PX = 2;
   const LASER_HOLD_DURATION_MS = 3000;
   const LASER_FADE_DURATION_MS = 800;
   const LASER_TTL_MS = LASER_HOLD_DURATION_MS + LASER_FADE_DURATION_MS + 250;
@@ -2451,7 +2452,11 @@ export function Canvas({
                 effectiveWidth,
                 font,
               );
-              return Math.max(minH, wrapped.length * lineHeightPx);
+              return Math.max(
+                minH,
+                wrapped.length * lineHeightPx +
+                  Math.max(TEXT_CLIP_BUFFER_PX, Math.ceil(fs * 0.15)),
+              );
             })();
 
             if (newWidth < minW) {
@@ -3606,7 +3611,8 @@ export function Canvas({
         ? textInputRef.current.offsetWidth
         : undefined;
       const measuredHeight = textInputRef.current
-        ? textInputRef.current.scrollHeight
+        ? textInputRef.current.scrollHeight +
+          Math.max(TEXT_CLIP_BUFFER_PX, Math.ceil(activeFontSize * 0.15))
         : undefined;
       const nextElement: BoardElement = {
         id: nextElementId,
@@ -3621,7 +3627,8 @@ export function Canvas({
         height:
           measuredHeight ??
           textInput.height ??
-          activeFontSize * activeLineHeight,
+          activeFontSize * activeLineHeight +
+            Math.max(TEXT_CLIP_BUFFER_PX, Math.ceil(activeFontSize * 0.15)),
         isTextBox: true,
         scaleX: 1,
         scaleY: 1,
@@ -3650,6 +3657,7 @@ export function Canvas({
     setEditingTextElementId(null);
     setEditingTextStyle(null);
   }, [
+    TEXT_CLIP_BUFFER_PX,
     editingTextElementId,
     editingTextStyle,
     textInput,
@@ -3730,13 +3738,17 @@ export function Canvas({
         activeFontSize * activeLineHeight,
         textInput.height ?? 0,
       );
+      const bufferPx = Math.max(
+        TEXT_CLIP_BUFFER_PX,
+        Math.ceil(activeFontSize * 0.15),
+      );
       // Reset height to auto to get the correct scrollHeight
       textarea.style.height = "auto";
       // Set height to scrollHeight to fit content
       const newHeight =
         textarea.value.length === 0
           ? minHeightPx
-          : Math.max(textarea.scrollHeight, minHeightPx);
+          : Math.max(textarea.scrollHeight + bufferPx, minHeightPx);
       textarea.style.height = `${newHeight}px`;
 
       const nextHeight = newHeight;
@@ -3773,7 +3785,14 @@ export function Canvas({
         });
       }
     }
-  }, [editingTextStyle, fontSize, lineHeight, textValue, textInput]);
+  }, [
+    TEXT_CLIP_BUFFER_PX,
+    editingTextStyle,
+    fontSize,
+    lineHeight,
+    textValue,
+    textInput,
+  ]);
 
   const getConnectorDragPreviewElement = useCallback(
     (element: BoardElement): BoardElement => {
