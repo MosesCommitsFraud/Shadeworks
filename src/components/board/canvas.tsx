@@ -163,7 +163,7 @@ function getMinSingleCharWidth(
         maxCharWidth = measureTextWidthPx("W", font);
     }
     // Add letter-spacing and buffer for glyph overhangs
-    return Math.max(2, maxCharWidth + Math.abs(letterSpacing) + 16);
+    return Math.max(2, maxCharWidth + Math.abs(letterSpacing) + 12);
 }
 
 let textMeasureDiv: HTMLDivElement | null = null;
@@ -221,7 +221,12 @@ function measureWrappedTextHeightPx({
     });
 
     // Use a single space to avoid empty content measuring to 0 height in some browsers.
-    textMeasureDiv.textContent = text.length ? text : " ";
+    // Add a zero-width space after trailing newlines to ensure they are measured
+    let textToMeasure = text.length ? text : " ";
+    if (textToMeasure.endsWith("\n")) {
+        textToMeasure += "\u200b"; // Zero-width space to force trailing newline height
+    }
+    textMeasureDiv.textContent = textToMeasure;
     return textMeasureDiv.scrollHeight;
 }
 
@@ -7461,6 +7466,7 @@ export function Canvas({
                                 (editingTextStyle?.lineHeight ?? lineHeight),
                         transform: `scale(${zoom})`,
                         transformOrigin: "top left",
+                        overflow: "visible",
                     }}
                 >
                     <textarea
