@@ -139,6 +139,33 @@ function getTextFontString(fontSize: number, fontFamily: string) {
     return `500 ${fontSize}px ${fontFamily}`;
 }
 
+// Get the minimum width needed to display a single character without clipping
+// Measures the widest character in the text, or falls back to 'W' if text is empty
+function getMinSingleCharWidth(
+    text: string,
+    fontSize: number,
+    fontFamily: string,
+    letterSpacing: number,
+): number {
+    const font = getTextFontString(fontSize, fontFamily);
+    // Find the widest character in the actual text
+    let maxCharWidth = 0;
+    const chars = text.replace(/\s/g, ""); // Remove whitespace
+    if (chars.length > 0) {
+        for (const char of chars) {
+            const charWidth = measureTextWidthPx(char, font);
+            if (charWidth > maxCharWidth) {
+                maxCharWidth = charWidth;
+            }
+        }
+    } else {
+        // Fallback to 'W' if no non-whitespace characters
+        maxCharWidth = measureTextWidthPx("W", font);
+    }
+    // Add letter-spacing and buffer for glyph overhangs
+    return Math.max(2, maxCharWidth + Math.abs(letterSpacing) + 4);
+}
+
 let textMeasureDiv: HTMLDivElement | null = null;
 function measureWrappedTextHeightPx({
     text,
@@ -2363,26 +2390,16 @@ export function Canvas({
                     };
                     const vLocal = rotateVector(vWorld, -rotationDeg);
 
-                    // Calculate minimum width to prevent letter clipping
-                    // Use the widest character (W or M) plus letter-spacing and a buffer for glyph overhangs
+                    // Calculate minimum width based on the widest character in the actual text
                     const minAbsWidth =
                         originalElement?.type === "text"
-                            ? Math.max(
-                                  2,
-                                  measureTextWidthPx(
-                                      "W",
-                                      getTextFontString(
-                                          originalElement.fontSize ??
-                                              originalElement.strokeWidth * 4 +
-                                                  12,
-                                          originalElement.fontFamily ||
-                                              "var(--font-inter)",
-                                      ),
-                                  ) +
-                                      Math.abs(
-                                          originalElement.letterSpacing ?? 0,
-                                      ) +
-                                      4, // 4px buffer for glyph overhangs and rendering
+                            ? getMinSingleCharWidth(
+                                  originalElement.text || "",
+                                  originalElement.fontSize ??
+                                      originalElement.strokeWidth * 4 + 12,
+                                  originalElement.fontFamily ||
+                                      "var(--font-inter)",
+                                  originalElement.letterSpacing ?? 0,
                               )
                             : 0;
                     const minAbsHeight =
@@ -2639,29 +2656,30 @@ export function Canvas({
                             originalElement.fontFamily || "var(--font-inter)";
                         const elLetterSpacing =
                             originalElement.letterSpacing ?? 0;
-                        // Calculate minimum width to prevent letter clipping
-                        // Use the widest character (W) plus letter-spacing and a buffer for glyph overhangs
-                        const minW = Math.max(
-                            2,
-                            measureTextWidthPx("W", getTextFontString(fs, ff)) +
-                                Math.abs(elLetterSpacing) +
-                                4, // 4px buffer for glyph overhangs and rendering
+                        const textContent = originalElement.text || "";
+                        // Calculate minimum width based on the widest character in the actual text
+                        const minW = getMinSingleCharWidth(
+                            textContent,
+                            fs,
+                            ff,
+                            elLetterSpacing,
                         );
                         const lh = originalElement.lineHeight ?? 1.4;
                         const lineHeightPx = fs * lh;
                         const minH = Math.max(2, lineHeightPx);
 
                         const effectiveWidth = Math.max(minW, newWidth);
+                        // Always calculate required height based on current width, not stored height
+                        // This ensures height shrinks back when width expands
                         const requiredHeight = Math.max(
                             minH,
                             measureWrappedTextHeightPx({
-                                text: originalElement.text || "",
+                                text: textContent,
                                 width: effectiveWidth,
                                 fontSize: fs,
                                 lineHeight: lh,
                                 fontFamily: ff,
-                                letterSpacing:
-                                    originalElement.letterSpacing ?? 0,
+                                letterSpacing: elLetterSpacing,
                                 textAlign: originalElement.textAlign ?? "left",
                             }),
                         );
@@ -2677,16 +2695,15 @@ export function Canvas({
                                 newX = originalLeft;
                             }
                         }
-                        if (newHeight < requiredHeight) {
-                            newHeight = requiredHeight;
-                            if (
-                                resizeHandle.includes("n") &&
-                                !resizeHandle.includes("s")
-                            ) {
-                                newY = originalBottom - requiredHeight;
-                            } else {
-                                newY = originalTop;
-                            }
+
+                        // Set height to exactly what's required for the text at this width
+                        newHeight = requiredHeight;
+                        // Adjust Y position if dragging from top edge
+                        if (
+                            resizeHandle.includes("n") &&
+                            !resizeHandle.includes("s")
+                        ) {
+                            newY = originalBottom - requiredHeight;
                         }
 
                         const normalizedX = Math.min(newX, newX + newWidth);
@@ -2717,18 +2734,14 @@ export function Canvas({
                             ? originalElement.fontFamily || "var(--font-inter)"
                             : null;
 
-                    // Add 1px buffer to prevent letter clipping (some glyphs extend beyond measured width)
+                    // Calculate minimum width based on the widest character in the actual text
                     const minAbsWidth =
                         originalElement.type === "text"
-                            ? Math.max(
-                                  2,
-                                  measureTextWidthPx(
-                                      "W",
-                                      getTextFontString(
-                                          fontSizeForMin!,
-                                          fontFamilyForMin!,
-                                      ),
-                                  ) + 1,
+                            ? getMinSingleCharWidth(
+                                  originalElement.text || "",
+                                  fontSizeForMin!,
+                                  fontFamilyForMin!,
+                                  originalElement.letterSpacing ?? 0,
                               )
                             : originalElement.type === "rectangle" ||
                                 originalElement.type === "diamond" ||
@@ -5311,6 +5324,21 @@ export function Canvas({
                 const y = element.y ?? 0;
                 const baselineOffset = fontSize * 0.82;
 
+                // Calculate minimum width to check if at single-character width
+                const minCharWidth = getMinSingleCharWidth(
+                    element.text || "",
+                    fontSize,
+                    element.fontFamily || "var(--font-inter)",
+                    elLetterSpacing,
+                );
+                // Force left alignment when at minimum width (1 char per line)
+                const isAtMinWidth =
+                    element.width !== undefined &&
+                    element.width <= minCharWidth + 1;
+                const effectiveTextAlign = isAtMinWidth
+                    ? "left"
+                    : element.textAlign || "left";
+
                 if (element.isTextBox && element.width && element.height) {
                     // Render text box using HTML inside SVG for true WYSIWYG alignment.
                     return (
@@ -5356,7 +5384,7 @@ export function Canvas({
                                         whiteSpace: "pre-wrap",
                                         overflowWrap: "anywhere",
                                         wordBreak: "break-word",
-                                        textAlign: element.textAlign || "left",
+                                        textAlign: effectiveTextAlign,
                                         padding: 0,
                                         margin: 0,
                                         boxSizing: "border-box",
