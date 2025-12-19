@@ -5,21 +5,22 @@ import YPartyKitProvider from "y-partykit/provider";
 import type { BoardElement, Cursor } from "./board-types";
 import { generateFunnyName } from "./funny-names";
 import {
-    encrypt,
-    decrypt,
-    isEncryptedElement,
-    type EncryptedElement,
+  encrypt,
+  decrypt,
+  isEncryptedElement,
+  type EncryptedElement,
 } from "./encryption";
 
 export type ConnectionStatus = "connecting" | "connected" | "disconnected";
 
 export interface UserState {
-    id: string;
-    name: string;
-    color: string;
-    cursor?: { x: number; y: number } | null;
-    viewport?: { pan: { x: number; y: number }; zoom: number };
-    followingUserId?: string | null;
+  id: string;
+  name: string;
+  color: string;
+  cursor?: { x: number; y: number } | null;
+  viewport?: { pan: { x: number; y: number }; zoom: number };
+  followingUserId?: string | null;
+  drawingElement?: BoardElement | null;
 }
 
 // PartyKit host - set NEXT_PUBLIC_PARTYKIT_HOST in .env.local
@@ -29,439 +30,444 @@ const PARTYKIT_HOST = process.env.NEXT_PUBLIC_PARTYKIT_HOST!;
 type StoredElement = BoardElement | EncryptedElement;
 
 export class CollaborationManager {
-    private doc: Y.Doc;
-    private provider: YPartyKitProvider | null = null;
-    private elements: Y.Array<StoredElement>;
-    private awareness: Map<number, Cursor> | null = null;
-    private userId: string;
-    private userName: string;
-    private userColor: string;
-    private connectionStatus: ConnectionStatus = "connecting";
-    private encryptionKey: CryptoKey | null = null;
-    private decryptedElementsCache: Map<string, BoardElement> = new Map();
+  private doc: Y.Doc;
+  private provider: YPartyKitProvider | null = null;
+  private elements: Y.Array<StoredElement>;
+  private awareness: Map<number, Cursor> | null = null;
+  private userId: string;
+  private userName: string;
+  private userColor: string;
+  private connectionStatus: ConnectionStatus = "connecting";
+  private encryptionKey: CryptoKey | null = null;
+  private decryptedElementsCache: Map<string, BoardElement> = new Map();
 
-    constructor(roomId: string, userName?: string, encryptionKey?: CryptoKey) {
-        this.doc = new Y.Doc();
-        this.elements = this.doc.getArray<StoredElement>("elements");
-        this.userId = Math.random().toString(36).substring(2, 9);
-        // Use provided name or generate a funny random name
-        this.userName = userName || generateFunnyName();
-        this.userColor = this.getRandomColor();
-        this.encryptionKey = encryptionKey || null;
+  constructor(roomId: string, userName?: string, encryptionKey?: CryptoKey) {
+    this.doc = new Y.Doc();
+    this.elements = this.doc.getArray<StoredElement>("elements");
+    this.userId = Math.random().toString(36).substring(2, 9);
+    // Use provided name or generate a funny random name
+    this.userName = userName || generateFunnyName();
+    this.userColor = this.getRandomColor();
+    this.encryptionKey = encryptionKey || null;
 
-        // Connect to PartyKit
-        this.provider = new YPartyKitProvider(
-            PARTYKIT_HOST,
-            `board-${roomId}`,
-            this.doc,
-            {
-                connect: true,
-            },
-        );
+    // Connect to PartyKit
+    this.provider = new YPartyKitProvider(
+      PARTYKIT_HOST,
+      `board-${roomId}`,
+      this.doc,
+      {
+        connect: true,
+      },
+    );
 
-        // Track connection status
-        this.provider.on("sync", (isSynced: boolean) => {
-            console.log("[Collaboration] Synced:", isSynced);
-            this.connectionStatus = isSynced ? "connected" : "connecting";
-        });
+    // Track connection status
+    this.provider.on("sync", (isSynced: boolean) => {
+      console.log("[Collaboration] Synced:", isSynced);
+      this.connectionStatus = isSynced ? "connected" : "connecting";
+    });
 
-        this.provider.on("status", ({ status }: { status: string }) => {
-            console.log("[Collaboration] Status:", status);
-            if (status === "connected") {
-                this.connectionStatus = "connected";
-            } else if (status === "disconnected") {
-                this.connectionStatus = "disconnected";
-            }
-        });
+    this.provider.on("status", ({ status }: { status: string }) => {
+      console.log("[Collaboration] Status:", status);
+      if (status === "connected") {
+        this.connectionStatus = "connected";
+      } else if (status === "disconnected") {
+        this.connectionStatus = "disconnected";
+      }
+    });
 
-        // Set user awareness
-        this.provider.awareness.setLocalStateField("user", {
-            id: this.userId,
-            name: this.userName,
-            color: this.userColor,
-            cursor: null,
-        });
+    // Set user awareness
+    this.provider.awareness.setLocalStateField("user", {
+      id: this.userId,
+      name: this.userName,
+      color: this.userColor,
+      cursor: null,
+    });
 
-        console.log(
-            "[Collaboration] Initialized for room:",
-            roomId,
-            "as:",
-            this.userName,
-        );
+    console.log(
+      "[Collaboration] Initialized for room:",
+      roomId,
+      "as:",
+      this.userName,
+    );
+  }
+
+  private getRandomColor(): string {
+    const colors = [
+      "#f87171",
+      "#fb923c",
+      "#fbbf24",
+      "#a3e635",
+      "#4ade80",
+      "#34d399",
+      "#22d3d8",
+      "#38bdf8",
+      "#60a5fa",
+      "#818cf8",
+      "#a78bfa",
+      "#c084fc",
+      "#e879f9",
+      "#f472b6",
+    ];
+    return colors[Math.floor(Math.random() * colors.length)];
+  }
+
+  /**
+   * Check if encryption is enabled
+   */
+  isEncrypted(): boolean {
+    return this.encryptionKey !== null;
+  }
+
+  /**
+   * Decrypt a single stored element
+   */
+  private async decryptElement(
+    stored: StoredElement,
+  ): Promise<BoardElement | null> {
+    if (!isEncryptedElement(stored)) {
+      // Element is not encrypted, return as-is
+      return stored as BoardElement;
     }
 
-    private getRandomColor(): string {
-        const colors = [
-            "#f87171",
-            "#fb923c",
-            "#fbbf24",
-            "#a3e635",
-            "#4ade80",
-            "#34d399",
-            "#22d3d8",
-            "#38bdf8",
-            "#60a5fa",
-            "#818cf8",
-            "#a78bfa",
-            "#c084fc",
-            "#e879f9",
-            "#f472b6",
-        ];
-        return colors[Math.floor(Math.random() * colors.length)];
+    if (!this.encryptionKey) {
+      console.warn("[Collaboration] Cannot decrypt element: no encryption key");
+      return null;
     }
 
-    /**
-     * Check if encryption is enabled
-     */
-    isEncrypted(): boolean {
-        return this.encryptionKey !== null;
+    // Check cache first
+    const cached = this.decryptedElementsCache.get(stored.id);
+    if (cached) {
+      return cached;
     }
 
-    /**
-     * Decrypt a single stored element
-     */
-    private async decryptElement(
-        stored: StoredElement,
-    ): Promise<BoardElement | null> {
-        if (!isEncryptedElement(stored)) {
-            // Element is not encrypted, return as-is
-            return stored as BoardElement;
-        }
+    try {
+      const decrypted = await decrypt<BoardElement>(
+        this.encryptionKey,
+        stored.ciphertext,
+        stored.iv,
+      );
+      // Cache the decrypted element
+      this.decryptedElementsCache.set(stored.id, decrypted);
+      return decrypted;
+    } catch (error) {
+      console.error("[Collaboration] Failed to decrypt element:", error);
+      return null;
+    }
+  }
 
-        if (!this.encryptionKey) {
-            console.warn(
-                "[Collaboration] Cannot decrypt element: no encryption key",
-            );
-            return null;
-        }
+  /**
+   * Get all elements (decrypted if encryption is enabled)
+   * Note: Returns cached elements for sync access
+   */
+  getElements(): BoardElement[] {
+    const stored = this.elements.toArray();
+    const result: BoardElement[] = [];
 
-        // Check cache first
-        const cached = this.decryptedElementsCache.get(stored.id);
+    for (const el of stored) {
+      if (isEncryptedElement(el)) {
+        // Try to get from cache
+        const cached = this.decryptedElementsCache.get(el.id);
         if (cached) {
-            return cached;
+          result.push(cached);
         }
-
-        try {
-            const decrypted = await decrypt<BoardElement>(
-                this.encryptionKey,
-                stored.ciphertext,
-                stored.iv,
-            );
-            // Cache the decrypted element
-            this.decryptedElementsCache.set(stored.id, decrypted);
-            return decrypted;
-        } catch (error) {
-            console.error("[Collaboration] Failed to decrypt element:", error);
-            return null;
-        }
+        // If not cached, it will be decrypted asynchronously
+      } else {
+        result.push(el as BoardElement);
+      }
     }
 
-    /**
-     * Get all elements (decrypted if encryption is enabled)
-     * Note: Returns cached elements for sync access
-     */
-    getElements(): BoardElement[] {
-        const stored = this.elements.toArray();
-        const result: BoardElement[] = [];
+    return result;
+  }
 
-        for (const el of stored) {
-            if (isEncryptedElement(el)) {
-                // Try to get from cache
-                const cached = this.decryptedElementsCache.get(el.id);
-                if (cached) {
-                    result.push(cached);
-                }
-                // If not cached, it will be decrypted asynchronously
-            } else {
-                result.push(el as BoardElement);
-            }
-        }
+  /**
+   * Get all elements asynchronously (ensures all are decrypted)
+   */
+  async getElementsAsync(): Promise<BoardElement[]> {
+    const stored = this.elements.toArray();
+    const decrypted = await Promise.all(
+      stored.map((el) => this.decryptElement(el)),
+    );
+    return decrypted.filter((el): el is BoardElement => el !== null);
+  }
 
-        return result;
+  /**
+   * Add a new element (encrypts if encryption is enabled)
+   */
+  async addElement(element: BoardElement): Promise<void> {
+    if (this.encryptionKey) {
+      const { ciphertext, iv } = await encrypt(this.encryptionKey, element);
+      const encrypted: EncryptedElement = {
+        id: element.id,
+        encrypted: true,
+        ciphertext,
+        iv,
+      };
+      this.elements.push([encrypted]);
+      // Pre-cache the decrypted element
+      this.decryptedElementsCache.set(element.id, element);
+    } else {
+      this.elements.push([element]);
     }
+  }
 
-    /**
-     * Get all elements asynchronously (ensures all are decrypted)
-     */
-    async getElementsAsync(): Promise<BoardElement[]> {
-        const stored = this.elements.toArray();
-        const decrypted = await Promise.all(
-            stored.map((el) => this.decryptElement(el)),
-        );
-        return decrypted.filter((el): el is BoardElement => el !== null);
-    }
+  /**
+   * Update an existing element (re-encrypts if encryption is enabled)
+   */
+  async updateElement(
+    id: string,
+    updates: Partial<BoardElement>,
+  ): Promise<void> {
+    const storedArray = this.elements.toArray();
+    const index = storedArray.findIndex((el) => el.id === id);
 
-    /**
-     * Add a new element (encrypts if encryption is enabled)
-     */
-    async addElement(element: BoardElement): Promise<void> {
-        if (this.encryptionKey) {
-            const { ciphertext, iv } = await encrypt(
-                this.encryptionKey,
-                element,
-            );
-            const encrypted: EncryptedElement = {
-                id: element.id,
-                encrypted: true,
-                ciphertext,
-                iv,
-            };
-            this.elements.push([encrypted]);
-            // Pre-cache the decrypted element
-            this.decryptedElementsCache.set(element.id, element);
+    if (index !== -1) {
+      const stored = storedArray[index];
+      let currentElement: BoardElement;
+
+      if (isEncryptedElement(stored)) {
+        // Get from cache or decrypt
+        const cached = this.decryptedElementsCache.get(id);
+        if (cached) {
+          currentElement = cached;
+        } else if (this.encryptionKey) {
+          const decrypted = await decrypt<BoardElement>(
+            this.encryptionKey,
+            stored.ciphertext,
+            stored.iv,
+          );
+          currentElement = decrypted;
         } else {
-            this.elements.push([element]);
+          console.error(
+            "[Collaboration] Cannot update encrypted element without key",
+          );
+          return;
         }
+      } else {
+        currentElement = stored as BoardElement;
+      }
+
+      const updated = { ...currentElement, ...updates };
+
+      this.elements.delete(index, 1);
+
+      if (this.encryptionKey) {
+        const { ciphertext, iv } = await encrypt(this.encryptionKey, updated);
+        const encrypted: EncryptedElement = {
+          id: updated.id,
+          encrypted: true,
+          ciphertext,
+          iv,
+        };
+        this.elements.insert(index, [encrypted]);
+        // Update cache
+        this.decryptedElementsCache.set(id, updated);
+      } else {
+        this.elements.insert(index, [updated]);
+      }
     }
+  }
 
-    /**
-     * Update an existing element (re-encrypts if encryption is enabled)
-     */
-    async updateElement(
-        id: string,
-        updates: Partial<BoardElement>,
-    ): Promise<void> {
-        const storedArray = this.elements.toArray();
-        const index = storedArray.findIndex((el) => el.id === id);
+  /**
+   * Delete an element
+   */
+  deleteElement(id: string): void {
+    const index = this.elements.toArray().findIndex((el) => el.id === id);
+    if (index !== -1) {
+      this.elements.delete(index, 1);
+      // Remove from cache
+      this.decryptedElementsCache.delete(id);
+    }
+  }
 
-        if (index !== -1) {
-            const stored = storedArray[index];
-            let currentElement: BoardElement;
+  /**
+   * Clear all elements
+   */
+  clearAll(): void {
+    this.elements.delete(0, this.elements.length);
+    this.decryptedElementsCache.clear();
+  }
 
-            if (isEncryptedElement(stored)) {
-                // Get from cache or decrypt
-                const cached = this.decryptedElementsCache.get(id);
-                if (cached) {
-                    currentElement = cached;
-                } else if (this.encryptionKey) {
-                    const decrypted = await decrypt<BoardElement>(
-                        this.encryptionKey,
-                        stored.ciphertext,
-                        stored.iv,
-                    );
-                    currentElement = decrypted;
-                } else {
-                    console.error(
-                        "[Collaboration] Cannot update encrypted element without key",
-                    );
-                    return;
-                }
-            } else {
-                currentElement = stored as BoardElement;
+  /**
+   * Subscribe to element changes
+   * Callback receives decrypted elements
+   */
+  onElementsChange(callback: (elements: BoardElement[]) => void): () => void {
+    const handler = async (event: Y.YArrayEvent<StoredElement>) => {
+      if (this.encryptionKey) {
+        // Invalidate cache for changed elements
+        // When elements change from remote, we need to re-decrypt them
+        const currentStored = this.elements.toArray();
+        const currentIds = new Set(currentStored.map((el) => el.id));
+
+        // Remove deleted elements from cache
+        for (const cachedId of this.decryptedElementsCache.keys()) {
+          if (!currentIds.has(cachedId)) {
+            this.decryptedElementsCache.delete(cachedId);
+          }
+        }
+
+        // Invalidate cache for elements that were modified
+        // We detect this by comparing ciphertext - if it changed, invalidate
+        for (const stored of currentStored) {
+          if (isEncryptedElement(stored)) {
+            const cached = this.decryptedElementsCache.get(stored.id);
+            if (cached) {
+              // Check if this element was in the delta (changed)
+              // Simple approach: always re-decrypt on remote changes
+              // by checking if the event came from a remote source
+              if (event.transaction.origin !== null) {
+                // Remote change - invalidate cache for this element
+                this.decryptedElementsCache.delete(stored.id);
+              }
             }
-
-            const updated = { ...currentElement, ...updates };
-
-            this.elements.delete(index, 1);
-
-            if (this.encryptionKey) {
-                const { ciphertext, iv } = await encrypt(
-                    this.encryptionKey,
-                    updated,
-                );
-                const encrypted: EncryptedElement = {
-                    id: updated.id,
-                    encrypted: true,
-                    ciphertext,
-                    iv,
-                };
-                this.elements.insert(index, [encrypted]);
-                // Update cache
-                this.decryptedElementsCache.set(id, updated);
-            } else {
-                this.elements.insert(index, [updated]);
-            }
+          }
         }
+
+        // Decrypt all elements asynchronously
+        const decrypted = await this.getElementsAsync();
+        callback(decrypted);
+      } else {
+        callback(this.elements.toArray() as BoardElement[]);
+      }
+    };
+    this.elements.observe(handler);
+    return () => this.elements.unobserve(handler);
+  }
+
+  updateCursor(x: number, y: number): void {
+    if (this.provider) {
+      const currentState = this.provider.awareness.getLocalState() as {
+        user?: any;
+      } | null;
+      this.provider.awareness.setLocalStateField("user", {
+        ...(currentState?.user || {}),
+        id: this.userId,
+        name: this.userName,
+        color: this.userColor,
+        cursor: { x, y },
+      });
     }
+  }
 
-    /**
-     * Delete an element
-     */
-    deleteElement(id: string): void {
-        const index = this.elements.toArray().findIndex((el) => el.id === id);
-        if (index !== -1) {
-            this.elements.delete(index, 1);
-            // Remove from cache
-            this.decryptedElementsCache.delete(id);
-        }
+  updateViewport(pan: { x: number; y: number }, zoom: number): void {
+    if (this.provider) {
+      const currentState = this.provider.awareness.getLocalState() as {
+        user?: any;
+      } | null;
+      this.provider.awareness.setLocalStateField("user", {
+        ...(currentState?.user || {}),
+        id: this.userId,
+        name: this.userName,
+        color: this.userColor,
+        viewport: { pan, zoom },
+      });
     }
+  }
 
-    /**
-     * Clear all elements
-     */
-    clearAll(): void {
-        this.elements.delete(0, this.elements.length);
-        this.decryptedElementsCache.clear();
+  updateDrawingElement(element: BoardElement | null): void {
+    if (this.provider) {
+      const currentState = this.provider.awareness.getLocalState() as {
+        user?: any;
+      } | null;
+      this.provider.awareness.setLocalStateField("user", {
+        ...(currentState?.user || {}),
+        id: this.userId,
+        name: this.userName,
+        color: this.userColor,
+        drawingElement: element,
+      });
     }
+  }
 
-    /**
-     * Subscribe to element changes
-     * Callback receives decrypted elements
-     */
-    onElementsChange(callback: (elements: BoardElement[]) => void): () => void {
-        const handler = async (event: Y.YArrayEvent<StoredElement>) => {
-            if (this.encryptionKey) {
-                // Invalidate cache for changed elements
-                // When elements change from remote, we need to re-decrypt them
-                const currentStored = this.elements.toArray();
-                const currentIds = new Set(currentStored.map((el) => el.id));
-
-                // Remove deleted elements from cache
-                for (const cachedId of this.decryptedElementsCache.keys()) {
-                    if (!currentIds.has(cachedId)) {
-                        this.decryptedElementsCache.delete(cachedId);
-                    }
-                }
-
-                // Invalidate cache for elements that were modified
-                // We detect this by comparing ciphertext - if it changed, invalidate
-                for (const stored of currentStored) {
-                    if (isEncryptedElement(stored)) {
-                        const cached = this.decryptedElementsCache.get(
-                            stored.id,
-                        );
-                        if (cached) {
-                            // Check if this element was in the delta (changed)
-                            // Simple approach: always re-decrypt on remote changes
-                            // by checking if the event came from a remote source
-                            if (event.transaction.origin !== null) {
-                                // Remote change - invalidate cache for this element
-                                this.decryptedElementsCache.delete(stored.id);
-                            }
-                        }
-                    }
-                }
-
-                // Decrypt all elements asynchronously
-                const decrypted = await this.getElementsAsync();
-                callback(decrypted);
-            } else {
-                callback(this.elements.toArray() as BoardElement[]);
-            }
-        };
-        this.elements.observe(handler);
-        return () => this.elements.unobserve(handler);
+  updateFollowingUser(userId: string | null): void {
+    if (this.provider) {
+      const currentState = this.provider.awareness.getLocalState() as {
+        user?: any;
+      } | null;
+      this.provider.awareness.setLocalStateField("user", {
+        ...(currentState?.user || {}),
+        id: this.userId,
+        name: this.userName,
+        color: this.userColor,
+        followingUserId: userId,
+      });
     }
+  }
 
-    updateCursor(x: number, y: number): void {
-        if (this.provider) {
-            const currentState = this.provider.awareness.getLocalState() as {
-                user?: any;
-            } | null;
-            this.provider.awareness.setLocalStateField("user", {
-                ...(currentState?.user || {}),
-                id: this.userId,
-                name: this.userName,
-                color: this.userColor,
-                cursor: { x, y },
-            });
-        }
-    }
+  onAwarenessChange(
+    callback: (users: Map<number, { user: UserState }>) => void,
+  ): () => void {
+    if (!this.provider) return () => {};
 
-    updateViewport(pan: { x: number; y: number }, zoom: number): void {
-        if (this.provider) {
-            const currentState = this.provider.awareness.getLocalState() as {
-                user?: any;
-            } | null;
-            this.provider.awareness.setLocalStateField("user", {
-                ...(currentState?.user || {}),
-                id: this.userId,
-                name: this.userName,
-                color: this.userColor,
-                viewport: { pan, zoom },
-            });
-        }
-    }
+    const handler = () => {
+      const states = this.provider!.awareness.getStates() as Map<
+        number,
+        { user: UserState }
+      >;
+      callback(states);
+    };
 
-    updateFollowingUser(userId: string | null): void {
-        if (this.provider) {
-            const currentState = this.provider.awareness.getLocalState() as {
-                user?: any;
-            } | null;
-            this.provider.awareness.setLocalStateField("user", {
-                ...(currentState?.user || {}),
-                id: this.userId,
-                name: this.userName,
-                color: this.userColor,
-                followingUserId: userId,
-            });
-        }
-    }
+    this.provider.awareness.on("change", handler);
+    handler(); // Initial call
 
-    onAwarenessChange(
-        callback: (users: Map<number, { user: UserState }>) => void,
-    ): () => void {
-        if (!this.provider) return () => {};
+    return () => {
+      this.provider?.awareness.off("change", handler);
+    };
+  }
 
-        const handler = () => {
-            const states = this.provider!.awareness.getStates() as Map<
-                number,
-                { user: UserState }
-            >;
-            callback(states);
-        };
+  getConnectedUsers(): number {
+    if (!this.provider) return 1;
+    return this.provider.awareness.getStates().size;
+  }
 
-        this.provider.awareness.on("change", handler);
-        handler(); // Initial call
+  getUserInfo() {
+    return {
+      id: this.userId,
+      name: this.userName,
+      color: this.userColor,
+    };
+  }
 
-        return () => {
-            this.provider?.awareness.off("change", handler);
-        };
-    }
+  getConnectionStatus(): ConnectionStatus {
+    return this.connectionStatus;
+  }
 
-    getConnectedUsers(): number {
-        if (!this.provider) return 1;
-        return this.provider.awareness.getStates().size;
-    }
+  onConnectionChange(
+    callback: (status: ConnectionStatus, peers: number) => void,
+  ): () => void {
+    if (!this.provider) return () => {};
 
-    getUserInfo() {
-        return {
-            id: this.userId,
-            name: this.userName,
-            color: this.userColor,
-        };
-    }
+    const syncHandler = (isSynced: boolean) => {
+      this.connectionStatus = isSynced ? "connected" : "connecting";
+      callback(this.connectionStatus, this.getConnectedUsers() - 1);
+    };
 
-    getConnectionStatus(): ConnectionStatus {
-        return this.connectionStatus;
-    }
+    const statusHandler = ({ status }: { status: string }) => {
+      if (status === "connected") {
+        this.connectionStatus = "connected";
+      } else if (status === "disconnected") {
+        this.connectionStatus = "disconnected";
+      }
+      callback(this.connectionStatus, this.getConnectedUsers() - 1);
+    };
 
-    onConnectionChange(
-        callback: (status: ConnectionStatus, peers: number) => void,
-    ): () => void {
-        if (!this.provider) return () => {};
+    const awarenessHandler = () => {
+      callback(this.connectionStatus, this.getConnectedUsers() - 1);
+    };
 
-        const syncHandler = (isSynced: boolean) => {
-            this.connectionStatus = isSynced ? "connected" : "connecting";
-            callback(this.connectionStatus, this.getConnectedUsers() - 1);
-        };
+    this.provider.on("sync", syncHandler);
+    this.provider.on("status", statusHandler);
+    this.provider.awareness.on("change", awarenessHandler);
 
-        const statusHandler = ({ status }: { status: string }) => {
-            if (status === "connected") {
-                this.connectionStatus = "connected";
-            } else if (status === "disconnected") {
-                this.connectionStatus = "disconnected";
-            }
-            callback(this.connectionStatus, this.getConnectedUsers() - 1);
-        };
+    return () => {
+      this.provider?.off("sync", syncHandler);
+      this.provider?.off("status", statusHandler);
+      this.provider?.awareness.off("change", awarenessHandler);
+    };
+  }
 
-        const awarenessHandler = () => {
-            callback(this.connectionStatus, this.getConnectedUsers() - 1);
-        };
-
-        this.provider.on("sync", syncHandler);
-        this.provider.on("status", statusHandler);
-        this.provider.awareness.on("change", awarenessHandler);
-
-        return () => {
-            this.provider?.off("sync", syncHandler);
-            this.provider?.off("status", statusHandler);
-            this.provider?.awareness.off("change", awarenessHandler);
-        };
-    }
-
-    destroy(): void {
-        this.provider?.destroy();
-        this.doc.destroy();
-    }
+  destroy(): void {
+    this.provider?.destroy();
+    this.doc.destroy();
+  }
 }
