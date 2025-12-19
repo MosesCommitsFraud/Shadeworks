@@ -21,6 +21,7 @@ export interface UserState {
   viewport?: { pan: { x: number; y: number }; zoom: number };
   followingUserId?: string | null;
   drawingElement?: BoardElement | null;
+  selectedElementIds?: string[];
 }
 
 // PartyKit host - set NEXT_PUBLIC_PARTYKIT_HOST in .env.local
@@ -390,6 +391,21 @@ export class CollaborationManager {
         name: this.userName,
         color: this.userColor,
         followingUserId: userId,
+      });
+    }
+  }
+
+  updateSelectedElements(elementIds: string[]): void {
+    if (this.provider) {
+      const currentState = this.provider.awareness.getLocalState() as {
+        user?: any;
+      } | null;
+      this.provider.awareness.setLocalStateField("user", {
+        ...(currentState?.user || {}),
+        id: this.userId,
+        name: this.userName,
+        color: this.userColor,
+        selectedElementIds: elementIds,
       });
     }
   }

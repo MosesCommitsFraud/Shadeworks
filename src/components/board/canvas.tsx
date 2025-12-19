@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useEffect, useState, useCallback } from "react";
+import { useRef, useEffect, useState, useCallback, useMemo } from "react";
 import { v4 as uuid } from "uuid";
 import getStroke from "perfect-freehand";
 import type { Tool, BoardElement, Point } from "@/lib/board-types";
@@ -8,6 +8,13 @@ import { isClosedShape } from "@/lib/board-types";
 import { CollaborationManager } from "@/lib/collaboration";
 import { CollaboratorCursors } from "./collaborator-cursor";
 import { EraserTrail } from "@/lib/eraser-trail";
+
+interface RemoteSelection {
+  userId: string;
+  userName: string;
+  userColor: string;
+  elementIds: string[];
+}
 
 interface CanvasProps {
   tool: Tool;
@@ -47,6 +54,7 @@ interface CanvasProps {
   highlightedElementIds?: string[];
   isToolLocked?: boolean;
   isEditArrowMode?: boolean;
+  remoteSelections?: RemoteSelection[];
 }
 
 interface RemoteCursor {
@@ -332,6 +340,15 @@ function chooseRotateHandleSide(rotationDeg: number): RotateHandleSide {
     }
   }
   return best.side;
+}
+
+function getContrastingTextColor(bgColor: string): string {
+  const hex = bgColor.replace("#", "");
+  const r = parseInt(hex.substr(0, 2), 16);
+  const g = parseInt(hex.substr(2, 2), 16);
+  const b = parseInt(hex.substr(4, 2), 16);
+  const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+  return luminance > 0.5 ? "#000000" : "#ffffff";
 }
 
 function expandBounds(bounds: BoundingBox, padding: number): BoundingBox {
@@ -865,7 +882,31 @@ export function Canvas({
   highlightedElementIds = [],
   isToolLocked = false,
   isEditArrowMode = false,
+  remoteSelections = [],
 }: CanvasProps) {
+  // Compute a set of element IDs that are selected by remote users (locked for editing)
+  const remotelySelectedIds = useMemo(() => {
+    const ids = new Set<string>();
+    remoteSelections.forEach((sel) => {
+      sel.elementIds.forEach((id) => ids.add(id));
+    });
+    return ids;
+  }, [remoteSelections]);
+
+  // Create a map from element ID to the remote user who selected it
+  const remoteSelectionByElementId = useMemo(() => {
+    const map = new Map<string, { userName: string; userColor: string }>();
+    remoteSelections.forEach((sel) => {
+      sel.elementIds.forEach((id) => {
+        // First user to select wins (shouldn't happen in practice)
+        if (!map.has(id)) {
+          map.set(id, { userName: sel.userName, userColor: sel.userColor });
+        }
+      });
+    });
+    return map;
+  }, [remoteSelections]);
+
   const svgRef = useRef<SVGSVGElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const eraserTrailPathRef = useRef<SVGPathElement>(null);
@@ -1202,6 +1243,8 @@ export function Canvas({
       const toErase: string[] = [];
 
       elements.forEach((el) => {
+        // Skip elements that are selected by remote users
+        if (remotelySelectedIds.has(el.id)) return;
         if (el.type === "pen" || el.type === "line" || el.type === "arrow") {
           const getConnectorPoints = () => {
             if (
@@ -1336,7 +1379,7 @@ export function Canvas({
 
       return toErase;
     },
-    [elements, strokeWidth],
+    [elements, strokeWidth, remotelySelectedIds],
   );
 
   // Get selected elements and their combined bounds
@@ -1405,7 +1448,12 @@ export function Canvas({
           nextSelectionBox.width >= minBoxSize ||
           nextSelectionBox.height >= minBoxSize
         ) {
-          setSelectedIds(getBoxSelectedIds(elements, nextSelectionBox));
+          // Filter out remotely selected elements from box selection
+          const boxSelected = getBoxSelectedIds(
+            elements,
+            nextSelectionBox,
+          ).filter((id) => !remotelySelectedIds.has(id));
+          setSelectedIds(boxSelected);
         } else {
           setSelectedIds([]);
         }
@@ -2359,6 +2407,7 @@ export function Canvas({
       draggingConnectorPoint,
       connectorStyle,
       getElementsToErase,
+      remotelySelectedIds,
     ],
   );
 
@@ -2398,8 +2447,14 @@ export function Canvas({
       const clickedElement = clickedElementId
         ? elements.find((el) => el.id === clickedElementId)
         : null;
+      // Don't allow selecting elements that are selected by remote users
+      const isRemotelySelected = clickedElement
+        ? remotelySelectedIds.has(clickedElement.id)
+        : false;
       const selectableClickedElement =
-        clickedElement?.type === "laser" ? null : clickedElement;
+        clickedElement?.type === "laser" || isRemotelySelected
+          ? null
+          : clickedElement;
 
       if (tool === "select") {
         // Check if clicking on a resize handle first (supports multi-selection)
@@ -2691,7 +2746,12 @@ export function Canvas({
 
       if (tool === "text") {
         // Check if we clicked on an existing text element to edit it
-        if (clickedElement && clickedElement.type === "text") {
+        // Don't allow editing text elements that are selected by remote users
+        if (
+          clickedElement &&
+          clickedElement.type === "text" &&
+          !isRemotelySelected
+        ) {
           // Enter edit mode for the existing text element
           setTextInput({
             x: clickedElement.x ?? 0,
@@ -2811,6 +2871,7 @@ export function Canvas({
       onStartTransform,
       getElementsToErase,
       onDeleteElement,
+      remotelySelectedIds,
     ],
   );
 
@@ -2843,7 +2904,11 @@ export function Canvas({
         selectionBox.width >= minBoxSize ||
         selectionBox.height >= minBoxSize
       ) {
-        setSelectedIds(getBoxSelectedIds(elements, selectionBox));
+        // Filter out remotely selected elements from box selection
+        const boxSelected = getBoxSelectedIds(elements, selectionBox).filter(
+          (id) => !remotelySelectedIds.has(id),
+        );
+        setSelectedIds(boxSelected);
       }
       setIsBoxSelecting(false);
       setSelectionBox(null);
@@ -3060,6 +3125,7 @@ export function Canvas({
     zoom,
     connectorStyle,
     originalElements,
+    remotelySelectedIds,
   ]);
 
   const handleMouseLeave = useCallback(() => {
@@ -5386,6 +5452,94 @@ export function Canvas({
     ],
   );
 
+  // Render remote selection overlays (elements selected by other users)
+  const renderRemoteSelections = () => {
+    if (remoteSelections.length === 0) return null;
+
+    const selectionPadding = 6 / zoom;
+
+    return (
+      <g pointerEvents="none">
+        {remoteSelections.map((selection) => {
+          return selection.elementIds.map((elementId) => {
+            const element = elements.find((el) => el.id === elementId);
+            if (!element) return null;
+
+            const bounds = getBoundingBox(element);
+            if (!bounds) return null;
+
+            const visualBounds = expandBounds(bounds, selectionPadding);
+            const rotationDeg = element.rotation ?? 0;
+            const center = getBoundsCenter(visualBounds);
+
+            // Calculate label position (top-left corner of bounds, accounting for rotation)
+            const labelOffset = 4 / zoom;
+            const labelFontSize = 11 / zoom;
+            const labelPadding = { x: 6 / zoom, y: 3 / zoom };
+
+            return (
+              <g key={`${selection.userId}-${elementId}`}>
+                {/* Selection frame */}
+                <rect
+                  x={visualBounds.x}
+                  y={visualBounds.y}
+                  width={visualBounds.width}
+                  height={visualBounds.height}
+                  fill="none"
+                  stroke={selection.userColor}
+                  strokeWidth={2 / zoom}
+                  rx={4 / zoom}
+                  transform={
+                    rotationDeg
+                      ? `rotate(${rotationDeg}, ${center.x}, ${center.y})`
+                      : undefined
+                  }
+                />
+                {/* Name tag background */}
+                <g
+                  transform={
+                    rotationDeg
+                      ? `rotate(${rotationDeg}, ${center.x}, ${center.y})`
+                      : undefined
+                  }
+                >
+                  <rect
+                    x={visualBounds.x}
+                    y={
+                      visualBounds.y -
+                      labelFontSize -
+                      labelPadding.y * 2 -
+                      labelOffset
+                    }
+                    width={
+                      selection.userName.length * labelFontSize * 0.6 +
+                      labelPadding.x * 2
+                    }
+                    height={labelFontSize + labelPadding.y * 2}
+                    fill={selection.userColor}
+                    rx={3 / zoom}
+                  />
+                  {/* Name tag text */}
+                  <text
+                    x={visualBounds.x + labelPadding.x}
+                    y={visualBounds.y - labelOffset - labelPadding.y}
+                    fontSize={labelFontSize}
+                    fill={getContrastingTextColor(selection.userColor)}
+                    fontFamily="system-ui, sans-serif"
+                    fontWeight="500"
+                    dominantBaseline="text-after-edge"
+                  >
+                    {selection.userName}
+                  </text>
+                </g>
+              </g>
+            );
+          });
+        })}
+      </g>
+    );
+  };
+
   // Render selection box with handles
   const renderSelectionBox = () => {
     if (!selectedBounds || selectedIds.length === 0) return null;
@@ -6028,6 +6182,9 @@ export function Canvas({
 
           {/* Render current element being drawn */}
           {currentElement && renderElement(currentElement, true)}
+
+          {/* Render remote user selections (colored frames with name tags) */}
+          {renderRemoteSelections()}
 
           {/* Render selection box */}
           {tool === "select" && renderSelectionBox()}
