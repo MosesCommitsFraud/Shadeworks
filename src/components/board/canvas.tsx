@@ -479,6 +479,68 @@ function wrapText(text: string, maxWidth: number, fontSize: number): string[] {
   return lines.length > 0 ? lines : [""];
 }
 
+function wrapTextBreakWord(
+  text: string,
+  maxWidth: number,
+  fontSize: number,
+): string[] {
+  if (text === "") return [""];
+  const avgCharWidth = fontSize * 0.6;
+  const maxChars = Math.max(1, Math.floor(maxWidth / avgCharWidth));
+
+  const result: string[] = [];
+  const paragraphs = text.split("\n");
+
+  for (const paragraph of paragraphs) {
+    if (paragraph === "") {
+      result.push("");
+      continue;
+    }
+
+    const tokens = paragraph.split(/(\s+)/).filter((t) => t.length > 0);
+    let line = "";
+
+    const pushLine = () => {
+      result.push(line);
+      line = "";
+    };
+
+    for (const token of tokens) {
+      // If token itself is too long, break it into chunks (down to 1 char/line).
+      const appendToken = (t: string) => {
+        if (line.length === 0) {
+          if (t.length <= maxChars) {
+            line = t;
+            return;
+          }
+          for (let i = 0; i < t.length; i += maxChars) {
+            result.push(t.slice(i, i + maxChars));
+          }
+          return;
+        }
+
+        if (line.length + t.length <= maxChars) {
+          line += t;
+          return;
+        }
+
+        pushLine();
+        appendToken(t);
+      };
+
+      // Skip whitespace at line start (matches typical wrapping behavior).
+      if (line.length === 0 && /^\s+$/.test(token)) continue;
+      appendToken(token);
+    }
+
+    if (line.length > 0) {
+      result.push(line);
+    }
+  }
+
+  return result.length ? result : [""];
+}
+
 function getArrowHeadPoints(tip: Point, from: Point, size: number) {
   const dx = tip.x - from.x;
   const dy = tip.y - from.y;
@@ -3375,7 +3437,10 @@ export function Canvas({
       // Reset height to auto to get the correct scrollHeight
       textarea.style.height = "auto";
       // Set height to scrollHeight to fit content
-      const newHeight = Math.max(textarea.scrollHeight, minHeightPx);
+      const newHeight =
+        textarea.value.length === 0
+          ? minHeightPx
+          : Math.max(textarea.scrollHeight, minHeightPx);
       textarea.style.height = `${newHeight}px`;
 
       const nextHeight = newHeight;
@@ -4485,7 +4550,11 @@ export function Canvas({
         if (element.isTextBox && element.width && element.height) {
           // Render text box (Excalidraw-style: no padding; new lines only)
           const lineHeight = fontSize * elLineHeight;
-          const allLines = (element.text || "").split("\n");
+          const allLines = wrapTextBreakWord(
+            element.text || "",
+            element.width,
+            fontSize,
+          );
           const clipId = `clip-${element.id}`;
 
           return (
@@ -6412,6 +6481,7 @@ export function Canvas({
           ref={textInputRef}
           value={textValue}
           wrap="off"
+          rows={1}
           onChange={(e) => handleTextChange(e.target.value)}
           onKeyDown={(e) => {
             if (e.key === "Escape") {
@@ -6468,9 +6538,9 @@ export function Canvas({
             outlineOffset: "0px",
             boxSizing: "content-box",
             overflow: "hidden",
-            wordWrap: "normal",
-            overflowWrap: "normal",
-            whiteSpace: "pre",
+            wordBreak: "break-word",
+            overflowWrap: "anywhere",
+            whiteSpace: "pre-wrap",
           }}
           placeholder="Type..."
         />
