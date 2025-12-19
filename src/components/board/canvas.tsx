@@ -1205,6 +1205,8 @@ export function Canvas({
 
     // Prefer sending a live text draft while editing; otherwise send in-progress drawings.
     if (textInput) {
+      const activeFontSize = editingTextStyle?.fontSize ?? fontSize;
+      const activeLineHeight = editingTextStyle?.lineHeight ?? lineHeight;
       const draft: BoardElement = {
         id:
           editingTextElementId ??
@@ -1215,11 +1217,7 @@ export function Canvas({
         x: textInput.x,
         y: textInput.y,
         width: textInput.width ?? 200,
-        height:
-          textInput.height ??
-          (editingTextStyle?.fontSize ?? fontSize) *
-            (editingTextStyle?.lineHeight ?? lineHeight) +
-            8 * 2,
+        height: textInput.height ?? activeFontSize * activeLineHeight,
         isTextBox: true,
         strokeColor: editingTextStyle?.strokeColor ?? strokeColor,
         strokeWidth: editingTextStyle?.strokeWidth ?? strokeWidth,
@@ -3145,8 +3143,7 @@ export function Canvas({
         const x = Math.min(startPoint.x, currentPoint.x);
         const y = Math.min(startPoint.y, currentPoint.y);
 
-        const padding = 8;
-        const minHeight = fontSize * lineHeight + padding * 2 + 4 / zoom;
+        const minHeight = fontSize * lineHeight;
 
         setTextInput({
           x,
@@ -3277,14 +3274,12 @@ export function Canvas({
       const activeLineHeight = editingTextStyle?.lineHeight ?? lineHeight;
 
       const nextElementId = editingTextElementId ?? uuid();
-      const measuredWidth =
-        textInputRef.current && zoom
-          ? textInputRef.current.offsetWidth / zoom
-          : undefined;
-      const measuredHeight =
-        textInputRef.current && zoom
-          ? textInputRef.current.offsetHeight / zoom
-          : undefined;
+      const measuredWidth = textInputRef.current
+        ? textInputRef.current.offsetWidth
+        : undefined;
+      const measuredHeight = textInputRef.current
+        ? textInputRef.current.offsetHeight
+        : undefined;
       const nextElement: BoardElement = {
         id: nextElementId,
         type: "text",
@@ -3298,7 +3293,7 @@ export function Canvas({
         height:
           measuredHeight ??
           textInput.height ??
-          activeFontSize * activeLineHeight + 8 * 2 + 4 / zoom,
+          activeFontSize * activeLineHeight,
         isTextBox: true,
         scaleX: 1,
         scaleY: 1,
@@ -3371,30 +3366,26 @@ export function Canvas({
   useEffect(() => {
     if (textInputRef.current && textInput) {
       const textarea = textInputRef.current;
-      const padding = 8;
       const activeFontSize = editingTextStyle?.fontSize ?? fontSize;
       const activeLineHeight = editingTextStyle?.lineHeight ?? lineHeight;
-      const minHeightWorld =
-        activeFontSize * activeLineHeight + padding * 2 + 4 / zoom;
       const minHeightPx = Math.max(
-        minHeightWorld * zoom,
-        (textInput.height ?? 0) * zoom,
+        activeFontSize * activeLineHeight,
+        textInput.height ?? 0,
       );
-      const borderPx = 4;
       // Reset height to auto to get the correct scrollHeight
       textarea.style.height = "auto";
       // Set height to scrollHeight to fit content
-      const newHeight = Math.max(textarea.scrollHeight + borderPx, minHeightPx);
+      const newHeight = Math.max(textarea.scrollHeight, minHeightPx);
       textarea.style.height = `${newHeight}px`;
 
-      const nextHeightWorld = newHeight / zoom;
-      if (Math.abs((textInput.height ?? 0) - nextHeightWorld) > 0.5) {
+      const nextHeight = newHeight;
+      if (Math.abs((textInput.height ?? 0) - nextHeight) > 0.5) {
         setTextInput((prev) =>
-          prev ? { ...prev, height: nextHeightWorld, isTextBox: true } : prev,
+          prev ? { ...prev, height: nextHeight, isTextBox: true } : prev,
         );
       }
     }
-  }, [editingTextStyle, fontSize, lineHeight, textValue, textInput, zoom]);
+  }, [editingTextStyle, fontSize, lineHeight, textValue, textInput]);
 
   const getConnectorDragPreviewElement = useCallback(
     (element: BoardElement): BoardElement => {
@@ -4492,8 +4483,7 @@ export function Canvas({
         const baselineOffset = fontSize * 0.82;
 
         if (element.isTextBox && element.width && element.height) {
-          // Render text box (no soft wrapping; new lines only)
-          const padding = 8;
+          // Render text box (Excalidraw-style: no padding; new lines only)
           const lineHeight = fontSize * elLineHeight;
           const allLines = (element.text || "").split("\n");
           const clipId = `clip-${element.id}`;
@@ -4529,14 +4519,14 @@ export function Canvas({
               <g clipPath={`url(#${clipId})`}>
                 {allLines.map((line, i) => {
                   const elTextAlign = element.textAlign || "left";
-                  let textX = x + padding;
+                  let textX = x;
                   let textAnchor: "start" | "middle" | "end" = "start";
 
                   if (elTextAlign === "center") {
                     textX = x + (element.width ?? 0) / 2;
                     textAnchor = "middle";
                   } else if (elTextAlign === "right") {
-                    textX = x + (element.width ?? 0) - padding;
+                    textX = x + (element.width ?? 0);
                     textAnchor = "end";
                   }
 
@@ -4549,7 +4539,7 @@ export function Canvas({
                       textAnchor={textAnchor}
                       letterSpacing={`${elLetterSpacing}px`}
                       x={textX}
-                      y={y + padding + i * lineHeight}
+                      y={y + i * lineHeight}
                       dominantBaseline="text-before-edge"
                       opacity={
                         isMarkedForDeletion ? elOpacity * 0.3 : elOpacity
@@ -6343,7 +6333,7 @@ export function Canvas({
               x={Math.min(startPoint.x, lastMousePos.x)}
               y={Math.min(startPoint.y, lastMousePos.y)}
               width={Math.abs(lastMousePos.x - startPoint.x)}
-              height={fontSize * lineHeight + 8 * 2 + 4 / zoom}
+              height={fontSize * lineHeight}
               fill="none"
               stroke={strokeColor}
               strokeWidth={strokeWidth * 0.5}
@@ -6453,34 +6443,34 @@ export function Canvas({
               setEditingTextStyle(null);
             }
           }}
-          className="absolute bg-transparent border-2 border-dashed border-accent/50 outline-none text-foreground resize-none"
+          className="absolute bg-transparent outline-none text-foreground resize-none"
           style={{
             left: textInput.x * zoom + pan.x,
             top: textInput.y * zoom + pan.y,
-            width: (textInput.width ?? 200) * zoom,
+            width: textInput.width ?? 200,
             height:
-              (textInput.height ??
-                (editingTextStyle?.fontSize ?? fontSize) *
-                  (editingTextStyle?.lineHeight ?? lineHeight) +
-                  8 * 2 +
-                  4 / zoom) * zoom,
-            fontSize: (editingTextStyle?.fontSize ?? fontSize) * zoom,
+              textInput.height ??
+              (editingTextStyle?.fontSize ?? fontSize) *
+                (editingTextStyle?.lineHeight ?? lineHeight),
+            transform: `scale(${zoom})`,
+            transformOrigin: "top left",
+            fontSize: editingTextStyle?.fontSize ?? fontSize,
             fontFamily: editingTextStyle?.fontFamily ?? fontFamily,
             letterSpacing: `${editingTextStyle?.letterSpacing ?? letterSpacing}px`,
             color: editingTextStyle?.strokeColor ?? strokeColor,
             lineHeight: (editingTextStyle?.lineHeight ?? lineHeight).toString(),
             textAlign: editingTextStyle?.textAlign ?? textAlign,
-            // Match SVG padding: horizontal is 8, vertical is 8 but adjusted for baseline
-            paddingLeft: `${8 * zoom}px`,
-            paddingRight: `${8 * zoom}px`,
-            paddingTop: `${8 * zoom}px`,
-            paddingBottom: `${8 * zoom}px`,
-            overflowX: "auto",
-            overflowY: "hidden",
+            padding: 0,
+            margin: 0,
+            border: 0,
+            outline:
+              "2px dashed color-mix(in oklab, var(--accent) 60%, transparent)",
+            outlineOffset: "0px",
+            boxSizing: "content-box",
+            overflow: "hidden",
             wordWrap: "normal",
             overflowWrap: "normal",
             whiteSpace: "pre",
-            boxSizing: "border-box",
           }}
           placeholder="Type..."
         />
