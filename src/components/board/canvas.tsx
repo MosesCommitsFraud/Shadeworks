@@ -139,6 +139,65 @@ function getTextFontString(fontSize: number, fontFamily: string) {
   return `500 ${fontSize}px ${fontFamily}`;
 }
 
+let textMeasureDiv: HTMLDivElement | null = null;
+function measureWrappedTextHeightPx({
+  text,
+  width,
+  fontSize,
+  lineHeight,
+  fontFamily,
+  letterSpacing,
+  textAlign,
+}: {
+  text: string;
+  width: number;
+  fontSize: number;
+  lineHeight: number;
+  fontFamily: string;
+  letterSpacing: number;
+  textAlign: "left" | "center" | "right";
+}) {
+  if (typeof document === "undefined") {
+    const lineHeightPx = fontSize * lineHeight;
+    const lineCount = Math.max(1, (text || "").split("\n").length);
+    return lineCount * lineHeightPx;
+  }
+
+  textMeasureDiv ??= (() => {
+    const el = document.createElement("div");
+    el.setAttribute("data-role", "text-measure");
+    Object.assign(el.style, {
+      position: "absolute",
+      left: "-99999px",
+      top: "0px",
+      visibility: "hidden",
+      pointerEvents: "none",
+      whiteSpace: "pre-wrap",
+      overflowWrap: "anywhere",
+      wordBreak: "break-word",
+      padding: "0px",
+      margin: "0px",
+      border: "0px",
+      boxSizing: "content-box",
+    } as CSSStyleDeclaration);
+    document.body.appendChild(el);
+    return el;
+  })();
+
+  Object.assign(textMeasureDiv.style, {
+    width: `${Math.max(0, width)}px`,
+    fontSize: `${fontSize}px`,
+    lineHeight: `${lineHeight}`,
+    fontFamily,
+    letterSpacing: `${letterSpacing}px`,
+    textAlign,
+  });
+
+  // Use a single space to avoid empty content measuring to 0 height in some browsers.
+  textMeasureDiv.textContent = text.length ? text : " ";
+  return textMeasureDiv.scrollHeight;
+}
+
 function getHandlePointFromBounds(
   bounds: BoundingBox,
   handle: Exclude<ResizeHandle, null>,
@@ -1163,6 +1222,7 @@ export function Canvas({
     useState<RotateHandleSide>("n");
   const lastSingleSelectedIdRef = useRef<string | null>(null);
   const [hoverCursor, setHoverCursor] = useState<string | null>(null);
+  const lastEnforcedTextHeightsRef = useRef<Map<string, number>>(new Map());
 
   const [draggingConnectorPoint, setDraggingConnectorPoint] = useState<{
     index: number;
@@ -2445,19 +2505,18 @@ export function Canvas({
             const minH = Math.max(2, lineHeightPx);
 
             const effectiveWidth = Math.max(minW, newWidth);
-            const requiredHeight = (() => {
-              const font = getTextFontString(fs, ff);
-              const wrapped = wrapTextBreakWordMeasured(
-                originalElement.text || "",
-                effectiveWidth,
-                font,
-              );
-              return Math.max(
-                minH,
-                wrapped.length * lineHeightPx +
-                  Math.max(TEXT_CLIP_BUFFER_PX, Math.ceil(fs * 0.15)),
-              );
-            })();
+            const requiredHeight = Math.max(
+              minH,
+              measureWrappedTextHeightPx({
+                text: originalElement.text || "",
+                width: effectiveWidth,
+                fontSize: fs,
+                lineHeight: lh,
+                fontFamily: ff,
+                letterSpacing: originalElement.letterSpacing ?? 0,
+                textAlign: originalElement.textAlign ?? "left",
+              }) + Math.max(TEXT_CLIP_BUFFER_PX, Math.ceil(fs * 0.15)),
+            );
 
             if (newWidth < minW) {
               newWidth = minW;
@@ -3742,13 +3801,17 @@ export function Canvas({
         TEXT_CLIP_BUFFER_PX,
         Math.ceil(activeFontSize * 0.15),
       );
-      // Reset height to auto to get the correct scrollHeight
-      textarea.style.height = "auto";
-      // Set height to scrollHeight to fit content
-      const newHeight =
-        textarea.value.length === 0
-          ? minHeightPx
-          : Math.max(textarea.scrollHeight + bufferPx, minHeightPx);
+      const measuredContentHeight = measureWrappedTextHeightPx({
+        text: textarea.value,
+        width: textInput.width ?? 200,
+        fontSize: activeFontSize,
+        lineHeight: activeLineHeight,
+        fontFamily: editingTextStyle?.fontFamily ?? fontFamily,
+        letterSpacing: editingTextStyle?.letterSpacing ?? letterSpacing,
+        textAlign: editingTextStyle?.textAlign ?? textAlign,
+      });
+
+      const newHeight = Math.max(measuredContentHeight + bufferPx, minHeightPx);
       textarea.style.height = `${newHeight}px`;
 
       const nextHeight = newHeight;
@@ -6446,6 +6509,50 @@ export function Canvas({
       onSelectionChange(selected);
     }
   }, [selectedIds, elements, onSelectionChange]);
+
+  // Ensure selected text boxes never clip their content (e.g. after style changes like letterSpacing).
+  useEffect(() => {
+    const bufferFor = (fs: number) =>
+      Math.max(TEXT_CLIP_BUFFER_PX, Math.ceil(fs * 0.15));
+
+    selectedIds.forEach((id) => {
+      const el = elements.find((e) => e.id === id);
+      if (!el || el.type !== "text" || !el.isTextBox) return;
+      if (textInput && editingTextElementId === id) return;
+      if (el.width == null || el.height == null) return;
+
+      const fs = el.fontSize ?? el.strokeWidth * 4 + 12;
+      const lh = el.lineHeight ?? 1.4;
+      const ff = el.fontFamily || "var(--font-inter)";
+
+      const required = Math.max(
+        fs * lh,
+        measureWrappedTextHeightPx({
+          text: el.text || "",
+          width: el.width,
+          fontSize: fs,
+          lineHeight: lh,
+          fontFamily: ff,
+          letterSpacing: el.letterSpacing ?? 0,
+          textAlign: el.textAlign ?? "left",
+        }) + bufferFor(fs),
+      );
+
+      if (required <= el.height + 0.5) return;
+
+      const last = lastEnforcedTextHeightsRef.current.get(id);
+      if (last && Math.abs(last - required) <= 0.5) return;
+      lastEnforcedTextHeightsRef.current.set(id, required);
+      onUpdateElement(id, { height: required });
+    });
+  }, [
+    TEXT_CLIP_BUFFER_PX,
+    editingTextElementId,
+    elements,
+    onUpdateElement,
+    selectedIds,
+    textInput,
+  ]);
 
   // Helper function to get background style
   const getBackgroundStyle = () => {
