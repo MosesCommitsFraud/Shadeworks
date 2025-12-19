@@ -205,6 +205,7 @@ export function ToolSidebar({
   const [openMoreMenu, setOpenMoreMenu] = useState(false);
   const arrowStartButtonRef = useRef<HTMLButtonElement | null>(null);
   const arrowEndButtonRef = useRef<HTMLButtonElement | null>(null);
+  const arrowEndMenuRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     const update = () => {
@@ -215,6 +216,35 @@ export function ToolSidebar({
     window.addEventListener("resize", update);
     return () => window.removeEventListener("resize", update);
   }, []);
+
+  useEffect(() => {
+    if (!openArrowEndMenu) return;
+
+    const handlePointerDownCapture = (e: PointerEvent) => {
+      const target = e.target as Node | null;
+      if (!target) return;
+
+      const menuEl = arrowEndMenuRef.current;
+      if (menuEl?.contains(target)) return;
+
+      const startTrigger = arrowStartButtonRef.current;
+      if (startTrigger?.contains(target)) return;
+
+      const endTrigger = arrowEndButtonRef.current;
+      if (endTrigger?.contains(target)) return;
+
+      setOpenArrowEndMenu(null);
+    };
+
+    window.addEventListener("pointerdown", handlePointerDownCapture, {
+      capture: true,
+    });
+    return () => {
+      window.removeEventListener("pointerdown", handlePointerDownCapture, {
+        capture: true,
+      });
+    };
+  }, [openArrowEndMenu]);
 
   const arrowEndOptions = useMemo(
     () =>
@@ -2003,13 +2033,9 @@ export function ToolSidebar({
       {openArrowEndMenu && arrowEndMenuPos && (
         <>
           <div
-            className="fixed inset-0 z-[9998]"
-            onClick={() => setOpenArrowEndMenu(null)}
-          />
-          <div
             className="fixed z-[9999] w-[260px] bg-card/95 backdrop-blur-md border border-border rounded-md shadow-2xl p-2"
             style={{ left: arrowEndMenuPos.left, top: arrowEndMenuPos.top }}
-            onClick={(e) => e.stopPropagation()}
+            ref={arrowEndMenuRef}
           >
             <div className="grid grid-cols-2 gap-1">
               {arrowEndOptions.map((opt) => {
