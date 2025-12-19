@@ -894,6 +894,10 @@ export function Canvas({
   isEditArrowMode = false,
   remoteSelections = [],
 }: CanvasProps) {
+  const LASER_HOLD_DURATION_MS = 3000;
+  const LASER_FADE_DURATION_MS = 800;
+  const LASER_TTL_MS = LASER_HOLD_DURATION_MS + LASER_FADE_DURATION_MS + 250;
+
   // Compute a set of element IDs that are selected by remote users (locked for editing)
   const remotelySelectedIds = useMemo(() => {
     const ids = new Set<string>();
@@ -955,6 +959,10 @@ export function Canvas({
 
   // Laser pointer cursor state
   const [laserCursorPos, setLaserCursorPos] = useState<Point | null>(null);
+  const expiredLaserIdsRef = useRef<Set<string>>(new Set());
+  const elementsRef = useRef(elements);
+  const pendingCursorPosRef = useRef<Point | null>(null);
+  const cursorBroadcastRafRef = useRef<number | null>(null);
 
   // Move and resize state
   const [isDragging, setIsDragging] = useState(false);
@@ -1180,6 +1188,36 @@ export function Canvas({
     if (!collaboration) return;
     collaboration.updateViewport(pan, zoom);
   }, [collaboration, pan, zoom]);
+
+  // Periodically delete expired laser elements so they don't stick around if the creator disconnects mid-fade.
+  useEffect(() => {
+    const interval = window.setInterval(() => {
+      const now = Date.now();
+      elementsRef.current.forEach((el) => {
+        if (el.type !== "laser") return;
+        if (!el.timestamp) return;
+        if (expiredLaserIdsRef.current.has(el.id)) return;
+        if (now - el.timestamp < LASER_TTL_MS) return;
+
+        expiredLaserIdsRef.current.add(el.id);
+        onDeleteElement(el.id);
+      });
+    }, 2000);
+
+    return () => window.clearInterval(interval);
+  }, [LASER_TTL_MS, onDeleteElement]);
+
+  useEffect(() => {
+    elementsRef.current = elements;
+  }, [elements]);
+
+  useEffect(() => {
+    return () => {
+      if (cursorBroadcastRafRef.current !== null) {
+        cancelAnimationFrame(cursorBroadcastRafRef.current);
+      }
+    };
+  }, []);
 
   // Clear eraser marked IDs when tool changes
   useEffect(() => {
@@ -1432,7 +1470,16 @@ export function Canvas({
       }
 
       if (collaboration) {
-        collaboration.updateCursor(point.x, point.y);
+        pendingCursorPosRef.current = point;
+        if (cursorBroadcastRafRef.current === null) {
+          cursorBroadcastRafRef.current = requestAnimationFrame(() => {
+            cursorBroadcastRafRef.current = null;
+            const pending = pendingCursorPosRef.current;
+            if (pending) {
+              collaboration.updateCursor(pending.x, pending.y);
+            }
+          });
+        }
       }
 
       // Handle panning
@@ -3047,40 +3094,8 @@ export function Canvas({
         currentElement.type === "laser" &&
         currentElement.points.length > 1
       ) {
-        // Add laser element and schedule smooth fade-out
-        onAddElement(currentElement);
-
-        // Smooth fade-out animation
-        const fadeStartTime = Date.now();
-        const fadeDuration = 800; // 800ms fade duration
-        const holdDuration = 3000; // Hold at full opacity for 3 seconds first
-
-        const animateFade = () => {
-          const elapsed = Date.now() - fadeStartTime;
-
-          if (elapsed < holdDuration) {
-            // Hold at full opacity
-            requestAnimationFrame(animateFade);
-          } else {
-            const fadeElapsed = elapsed - holdDuration;
-            if (fadeElapsed < fadeDuration) {
-              // Smoothly fade out using easeOut curve
-              const progress = fadeElapsed / fadeDuration;
-              const easeOutProgress = 1 - Math.pow(1 - progress, 3); // Cubic ease-out
-              const newOpacity = Math.max(0, 100 * (1 - easeOutProgress));
-
-              onUpdateElement(currentElement.id, {
-                opacity: newOpacity,
-              });
-              requestAnimationFrame(animateFade);
-            } else {
-              // Fully faded, delete the element
-              onDeleteElement(currentElement.id);
-            }
-          }
-        };
-
-        requestAnimationFrame(animateFade);
+        // Add laser element; fade-out is computed client-side based on timestamp.
+        onAddElement({ ...currentElement, timestamp: Date.now() });
         // Don't switch tool for laser
       } else if (
         (currentElement.type === "rectangle" ||
@@ -4678,7 +4693,18 @@ export function Canvas({
       }
       case "laser": {
         if (element.points.length < 2) return null;
-        const elOpacity = (element.opacity ?? 100) / 100;
+        const baseOpacity = (element.opacity ?? 100) / 100;
+        let fadeMultiplier = 1;
+        if (element.timestamp) {
+          const elapsed = Date.now() - element.timestamp;
+          if (elapsed >= LASER_HOLD_DURATION_MS) {
+            const fadeElapsed = elapsed - LASER_HOLD_DURATION_MS;
+            const progress = Math.min(1, fadeElapsed / LASER_FADE_DURATION_MS);
+            const easeOutProgress = 1 - Math.pow(1 - progress, 3);
+            fadeMultiplier = Math.max(0, 1 - easeOutProgress);
+          }
+        }
+        const elOpacity = baseOpacity * fadeMultiplier;
         const stroke = getStroke(
           element.points.map((p) => [p.x, p.y]),
           {
