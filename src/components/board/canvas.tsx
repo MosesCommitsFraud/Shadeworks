@@ -4073,7 +4073,7 @@ export function Canvas({
             const activeLineHeight = editingTextStyle?.lineHeight ?? lineHeight;
             const minHeightPx = activeFontSize * activeLineHeight;
             const measuredContentHeight = measureWrappedTextHeightPx({
-                text: textarea.value,
+                text: textValue, // Use textValue state instead of textarea.value for immediate updates
                 width: textInput.width ?? 200,
                 fontSize: activeFontSize,
                 lineHeight: activeLineHeight,
@@ -4086,12 +4086,21 @@ export function Canvas({
             const newHeight = Math.max(measuredContentHeight, minHeightPx);
             textarea.style.height = `${newHeight}px`;
 
-            if (Math.abs((textInput.height ?? 0) - newHeight) > 0.5) {
+            // Always update textInput height to match content (both growing and shrinking)
+            const currentHeight = textInput.height ?? 0;
+            if (Math.abs(currentHeight - newHeight) > 0.5) {
                 setTextInput((prev) =>
                     prev
                         ? { ...prev, height: newHeight, isTextBox: true }
                         : prev,
                 );
+            }
+            // Always update the actual element's text and height so the selection box and content stay in sync
+            if (editingTextElementId) {
+                onUpdateElement(editingTextElementId, {
+                    text: textValue,
+                    height: newHeight,
+                });
             }
 
             // Update caret position after layout changes.
@@ -4124,7 +4133,15 @@ export function Canvas({
                 });
             }
         }
-    }, [editingTextStyle, fontSize, lineHeight, textValue, textInput]);
+    }, [
+        editingTextStyle,
+        fontSize,
+        lineHeight,
+        textValue,
+        textInput,
+        editingTextElementId,
+        onUpdateElement,
+    ]);
 
     const getConnectorDragPreviewElement = useCallback(
         (element: BoardElement): BoardElement => {
