@@ -218,6 +218,10 @@ export function Whiteboard({ roomId }: WhiteboardProps) {
         string[]
     >([]);
     const [hideLogoBar, setHideLogoBar] = useState(false);
+    const handleJoin = useCallback((name: string) => {
+        setShowJoinModal(false);
+        setPendingName(name);
+    }, []);
 
     const effectiveTool = isReadOnly ? "hand" : tool;
 
@@ -1335,6 +1339,7 @@ export function Whiteboard({ roomId }: WhiteboardProps) {
                         Connecting to board...
                     </p>
                 </div>
+                <JoinModal open={showJoinModal} onJoin={handleJoin} />
             </div>
         );
     }
@@ -1408,13 +1413,7 @@ export function Whiteboard({ roomId }: WhiteboardProps) {
                 }}
             />
 
-            <JoinModal
-                open={showJoinModal}
-                onJoin={(name) => {
-                    setShowJoinModal(false);
-                    setPendingName(name);
-                }}
-            />
+            <JoinModal open={showJoinModal} onJoin={handleJoin} />
 
             {/* Find Canvas */}
             <FindCanvas
