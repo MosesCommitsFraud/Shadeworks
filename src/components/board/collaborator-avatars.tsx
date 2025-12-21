@@ -5,7 +5,6 @@ import {
     AvatarGroupTooltip,
 } from "@/components/animate-ui/components/animate/avatar-group";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { getAnimalIcon } from "@/lib/animal-icons";
 import { Eye } from "lucide-react";
 
 interface CollaboratorUser {
@@ -24,7 +23,17 @@ interface CollaboratorAvatarsProps {
 }
 
 /**
- * Displays a group of collaborator avatars with animal icons
+ * Gets the first letter of a name for avatar display
+ * Handles edge cases like empty strings
+ */
+function getFirstLetter(name: string): string {
+    const trimmed = name.trim();
+    if (!trimmed) return "?";
+    return trimmed.charAt(0).toUpperCase();
+}
+
+/**
+ * Displays a group of collaborator avatars with the first letter of their names
  * Uses the user's assigned color and shows their full name in a tooltip
  */
 export function CollaboratorAvatars({
@@ -37,7 +46,7 @@ export function CollaboratorAvatars({
     if (users.length === 0) return null;
 
     const avatarElements = users.slice(0, maxDisplay).map((user) => {
-        const AnimalIcon = getAnimalIcon(user.name);
+        const firstLetter = getFirstLetter(user.name);
         const isFollowed = followedUserId === user.id;
         const isBeingSpectated = spectatedUserIds.has(user.id);
 
@@ -56,12 +65,12 @@ export function CollaboratorAvatars({
                     onClick={() => onFollowUser(user.id)}
                 >
                     <AvatarFallback
-                        className="bg-transparent text-white/90"
+                        className="bg-transparent text-white font-semibold text-sm"
                         style={{
                             backgroundColor: user.color,
                         }}
                     >
-                        <AnimalIcon className="size-3.5" strokeWidth={2.5} />
+                        {firstLetter}
                     </AvatarFallback>
                     <AvatarGroupTooltip>
                         <div className="flex flex-col gap-1">

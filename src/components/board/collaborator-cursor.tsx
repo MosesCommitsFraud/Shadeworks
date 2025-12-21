@@ -94,7 +94,7 @@ export function CollaboratorCursor({
                 data-slot="collaborator-cursor"
                 style={{
                     pointerEvents: "none",
-                    zIndex: 9999,
+                    zIndex: 30,
                     position: "absolute",
                     top: springY,
                     left: springX,
@@ -125,7 +125,7 @@ export function CollaboratorCursor({
                 data-slot="collaborator-cursor-label"
                 style={{
                     pointerEvents: "none",
-                    zIndex: 9998,
+                    zIndex: 29,
                     position: "absolute",
                     top: followSpringY,
                     left: followSpringX,
